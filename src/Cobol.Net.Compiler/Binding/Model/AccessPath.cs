@@ -41,6 +41,13 @@ public sealed record AccessPath(IReadOnlyList<AccessSegment> Segments)
     /// <summary>True when any segment evaluates a subscript (a table access) — the structural replacement for the
     /// former <c>path.Contains("CobolTable.At(")</c> string-sniff (CORRESPONDING ref-vs-value anchoring).</summary>
     public bool HasIndex => Segments.Any(s => s is FixedTableSegment or DynTableSegment or CellTableSegment);
+
+    /// <summary>True when identifying the data item this path reaches evaluates something at RUN TIME — a subscript
+    /// (ISO §14.6.4 step 4), or a formal parameter's root whose reference can raise its *-ARG-OMITTED condition
+    /// (<see cref="RootFieldSegment.Guard"/>). The path half of <see cref="Place.IdentifiesAtRunTime"/>; a subscript
+    /// counts even when it is a literal, because an occurs-depending or dynamic-capacity table still bounds it at
+    /// run time and the answer must never be a wrong "no".</summary>
+    public bool IdentifiesAtRunTime => HasIndex || Segments.Any(s => s is RootFieldSegment { Guard: not null });
 }
 
 /// <summary>One step of an <see cref="AccessPath"/>.</summary>

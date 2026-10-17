@@ -600,6 +600,27 @@ data is moved to the first of the receiving operands" — and without it `MOVE O
 AFTER storing into `N` and sent one character to the second receiver. A DYNAMIC-LENGTH elementary sender is
 frozen by §8.5.1.10.4's own carrier.
 
+**With ONE receiving operand the freeze is owed only where it is observable, and the ORDER of the two
+identifications is one such place** (kb/Work PB370). GR1 evaluates identifier-1's reference modifier, subscript
+or function-identifier "immediately before data is moved to the first of the receiving operands" and identifies
+identifier-2 "immediately before the data is moved to the respective data item" — the sender first, as §14.6.4's
+left-to-right order has it. The store C# renders inverts that: a ref-returning `CobolTable.At(T, Occ(I)) = <sender>`
+identifies its left operand before it evaluates its right, and a receiver's function-bearing subscript or
+user-function activation is a pre-op that runs before the statement. So `MOVE X (1:L) TO T (I)` with both out of
+range selected EC-BOUND-SUBSCRIPT where §14.9.49.4 GR11 ("the first one that occurs in the order of evaluation")
+selects EC-BOUND-REF-MOD. `MoveBinder.SenderIdentificationIsOverrun` freezes the sender at N = 1 when its own
+evaluation can be overtaken (`Place.IdentifiesAtRunTime`, or a function-identifier) AND the receiver can act first:
+it registered pre-ops, or it identifies at run time while the compilation group can enable a condition at all
+(`TurnState.AnyEnabled`, the zero-scaffolding invariant every raising identification step keeps). The freeze is
+placed on the pending list at the point the sender finished binding (`SendingValueTemp.Positioned`, the one
+placement `ArgumentOrder` uses for a function argument too), so it also precedes a receiver's pre-ops at N > 1.
+`Place.IdentifiesAtRunTime` is ABSTRACT: a new place kind cannot compile without answering whether identifying it
+evaluates anything (a subscript, a reference modifier, an occurs-depending length, an omitted-formal guard, or a
+BASED entry's pointer, §13.18.5.4 GR3). A NUMERIC function-identifier's temporary is sized for the MOVE's receivers
+(`SendingValueTemp.ReturnedValuePicFor` over `PicInfo.WidestReceiving`): the fixed 30-digit, scale-9 description
+stored `MOVE FUNCTION PI TO S1 S2` into `PIC 9V9(12)` as 3.141592653000 where the single-receiver MOVE stores
+3.141592653589, so the equivalence was exact only for receivers of scale 9 or less and 21 integer digits or fewer.
+
 **The intermediate's CAPACITY is counted in §8.4.3.3.4 GR5 positions, not in characters.** GR5 a) fixes the unit —
 "If the usage of identifier-1 is bit, positions used in evaluation are bit positions; otherwise, positions used
 in evaluation are character positions" — and `DataItem.ImageWidth` answers a different question, the item's
