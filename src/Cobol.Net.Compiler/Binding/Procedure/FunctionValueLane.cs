@@ -53,6 +53,17 @@ internal static class FunctionValueLane
         "MedianScaled", "MidrangeScaled", "Variance", "StandardDeviation", "Annuity", "PresentValue",
     }.ToFrozenSet(StringComparer.Ordinal);
 
+    /// <summary>The native SDIDI bodies whose value <c>IntrinsicRenderer.RenderDec</c> returns as an EXACT scale-0 value
+    /// rather than on the SDIDI: SIGN reads an SDIDI argument and returns +1, 0 or -1 (§15.81.1), and ORD-MAX / ORD-MIN
+    /// compare on the SDIDI and return "the ordinal number that corresponds to the position of the argument-1 having the
+    /// greatest [least] value" (§15.71.4 r1 / §15.72.4 r1). Every other member of <see cref="NativeSdidiBodies"/> returns
+    /// the SDIDI. <c>FunctionValueLaneDriftTests</c> derives this set from the renderer's switch as well (the native arms
+    /// not wrapped in its <c>Dec(...)</c>).</summary>
+    internal static readonly FrozenSet<string> NativeSdidiBodiesWithExactResult = new[]
+    {
+        "SignOf", "OrdMax", "OrdMin",
+    }.ToFrozenSet(StringComparer.Ordinal);
+
     /// <summary>The pure selections, which a MIXED list takes onto the SDIDI under native arithmetic so the compared and
     /// selected argument keeps its own carrier: MAX / MIN return "the content of the argument-1 having the greatest
     /// [least] value" (§15.59.4 r1 / §15.63.4 r1), ORD-MAX / ORD-MIN "the ordinal number that corresponds to the position
@@ -67,7 +78,9 @@ internal static class FunctionValueLane
 
     /// <summary>True when <paramref name="call"/>'s returned value is a binary64 wherever no fixed-point scale governs the
     /// render — the lane <c>IntrinsicRenderer.RenderNum</c> reaches through <c>RenderFloat</c> under NATIVE arithmetic.
-    /// Always false under a decimal-engine mode and for an INTEGER function (§15.2 item 5).</summary>
+    /// Always false under a decimal-engine mode. An INTEGER function (§15.2 item 5) is answered as any other is, because
+    /// the renderer has no integer early-out (a binary64 argument takes INTEGER onto <c>FloorReal</c>); the intermediate
+    /// of a TOP-LEVEL integer function is described before this is asked (<c>SendingValueTemp.IntermediatePic</c>).</summary>
     internal static bool ReturnsBinary64(BoundIntrinsicCall call, ArithmeticMode mode) =>
         !ArithmeticModes.IsDecimalEngine(mode) && Of(call) is CarrierKind.Real or CarrierKind.ApproximateReal;
 
@@ -78,9 +91,15 @@ internal static class FunctionValueLane
         // NUMVAL / NUMVAL-C return the SDIDI in EVERY mode — RenderNum's first arm, ahead of the mode dispatch and of
         // whatever their arguments are (the value is fixed by the function's definition).
         if (ValueFixedByDefinition(sig.RuntimeMethod)) return CarrierKind.Dec;
-        // An INTEGER function (§15.2 item 5) and a function of a non-numeric result (reachable in a numeric context only
-        // under --permissive) are exact values; the renderer never returns them on a binary64.
-        if (call.ResultCategory is not PicCategory.Numeric || IsInteger(call)) return CarrierKind.Fixed;
+        // A function of a non-numeric result (reachable in a numeric context only under --permissive) is an exact value
+        // (RenderNum's alphanumeric-decode arm). ⛔ AN INTEGER FUNCTION IS NOT EXEMPT (kb/Work PB3268, review R3-1):
+        // RenderNum has no integer early-out, so INTEGER(1.5E0) computes FloorDec on the SDIDI, a SUM over wide integer
+        // items takes the PB621 arm onto the SDIDI, and INTEGER of a COMP-2 item takes FloorReal. §15.2 item 5 fixes the
+        // value's TYPE ("an integer function has an operational sign and no digits to the right of the decimal point"),
+        // never its carrier. The exemption that stood here predicted an exact value for a nested call the renderer hands
+        // its caller on the SDIDI, so ANNUITY(INTEGER(1.5E0) 3) got a COMP-2 intermediate that rounded AnnuityDec's value
+        // in a multi-receiver MOVE (§15.4.1: "the returned value is the same for all instances of a given function").
+        if (call.ResultCategory is not PicCategory.Numeric) return CarrierKind.Fixed;
         var args = call.Args.Select((a, i) => AtPosition(sig.Name, i, a.Accept(ArgumentCarrier.Instance))).ToList();
         bool anyDec = args.Any(a => a.Kind == CarrierKind.Dec);
         bool anyReal = args.Any(a => a.IsReal);
@@ -88,19 +107,24 @@ internal static class FunctionValueLane
         bool sdidiBody = NativeSdidiBodies.Contains(sig.RuntimeMethod);
         // The SDIDI lane precedes the float lane: an SDIDI-carried argument (a floating-point literal, ...) is computed
         // on the SDIDI by a function that has a body for it (RenderNum's `AnyDecRaw(ic) && RenderDec(ic)` arm).
-        if (anyDec && sdidiBody) return CarrierKind.Dec;
+        if (anyDec && sdidiBody) return OnSdidiBody(sig.RuntimeMethod);
         // A cross-aligning arm (SUM / RANGE / MEAN / MEDIAN / MIDRANGE) whose aligned arguments may leave the Int128 carrier
         // takes the SDIDI (RenderNum's PB621 arm) — ahead of the float lane, whatever the arithmetic around it.
         if (IntrinsicRenderer.CrossAlignedNativeArms.Contains(sig.RuntimeMethod)
             && AlignmentMayLeaveCarrier(sig.RuntimeMethod, args.Select(a => a.Aligned).ToList()))
-            return CarrierKind.Dec;
+            return OnSdidiBody(sig.RuntimeMethod);
         // A mixed selection list rides the SDIDI too (RenderNum's selection arm).
-        if (Selections.Contains(sig.RuntimeMethod) && anyReal && !allReal && sdidiBody) return CarrierKind.Dec;
+        if (Selections.Contains(sig.RuntimeMethod) && anyReal && !allReal && sdidiBody) return OnSdidiBody(sig.RuntimeMethod);
         if (sig.Float) return CarrierKind.ApproximateReal;
         // RenderNum's last dispatch: a binary64 argument at a numeric position moves the whole call onto the float lane.
         if (anyReal && IntrinsicArgumentRules.ArgumentRunIsAllNumeric(sig.Name, args.Count)) return CarrierKind.ApproximateReal;
         return CarrierKind.Fixed;
     }
+
+    /// <summary>The carrier of the value an SDIDI body returns (<c>RenderDec</c>'s arm for the function): the SDIDI, or an
+    /// exact scale-0 value for <see cref="NativeSdidiBodiesWithExactResult"/>.</summary>
+    private static CarrierKind OnSdidiBody(string runtimeMethod) =>
+        NativeSdidiBodiesWithExactResult.Contains(runtimeMethod) ? CarrierKind.Fixed : CarrierKind.Dec;
 
     /// <summary>The argument as the renderer's intake (<c>IntrinsicRenderer.RawArg</c>) hands it to the lane predicates: at a
     /// §15.3 type-6 (integer) position a binary64 or fractional fixed-point operand is already its INTEGER on the exact

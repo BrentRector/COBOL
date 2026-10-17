@@ -391,8 +391,9 @@ r1), so the arm is the item the TYPE describes, never a list of the three string
 national or boolean result keeps a RUNTIME length over its string image (BYTE-LENGTH: 1 byte per alphanumeric position,
 2 per national position — D-N1 — and ceil(positions / 8) per boolean, §15.14.4 r4, the renderer's `ByteLength` arm over
 `ByteLengthNational` / `ByteLengthBoolean`); an integer or numeric result is the §15.4 temporary
-(`SendingValueTemp.NumericReturnedValuePic` — the ONE description the statement hoist stores the value in, so the item a
-value is stored in and the item its length is asked of cannot differ), S9(30) DISPLAY, 30 positions and 30 bytes
+(`SendingValueTemp.NumericReturnedValuePic` — the ONE description of the returned-value item that LENGTH, BYTE-LENGTH
+and IN-ARITHMETIC-RANGE ask about; the intermediate a statement hoist stores the value in is a different item, described
+for the value by `SendingValueTemp.IntermediatePic`, kb/Work PB3268), S9(30) DISPLAY, 30 positions and 30 bytes
 (DOC-A.1-92); an index result is the index carrier, 8. A result the binder FOLDED to a literal (`FUNCTION
 LENGTH(FUNCTION LENGTH(X))`) is not a literal the source wrote: `BoundNumLiteral.FunctionValue` /
 `BoundNumericLiteral.FunctionValue` carry that origin from the ONE point every bound function result passes

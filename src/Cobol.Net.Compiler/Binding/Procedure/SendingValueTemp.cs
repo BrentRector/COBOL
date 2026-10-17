@@ -153,7 +153,8 @@ internal sealed class SendingValueTemp(BinderContext ctx)
     /// (PIC 9V9(15)) stored 3.141592653000000 where `MOVE FUNCTION PI TO Q3` stores 3.141592653589793.
     /// <para>The carrier follows the value, in the order the renderer chooses it:</para>
     /// <list type="number">
-    ///   <item>an INTEGER function (§15.2 item 5) — <see cref="IntegerFunctionValuePic"/>, unchanged;</item>
+    ///   <item>an INTEGER function (§15.2 item 5) — <see cref="IntegerIntermediatePic"/>, the carrier's whole width at
+    ///     scale 0, or <see cref="IntegerFunctionValuePic"/> for the one text use (its image is DOC-A.1-92's);</item>
     ///   <item>a function the renderer returns as a BINARY64 (<see cref="FunctionValueLane.ReturnsBinary64"/>, asked of
     ///     the call and its ARGUMENTS' carriers — a floating-point literal argument takes a function with an SDIDI body
     ///     off the float lane, a binary64 argument puts any numeric-argument function onto it), or any function whose
@@ -166,13 +167,24 @@ internal sealed class SendingValueTemp(BinderContext ctx)
     /// </list></summary>
     private PicInfo IntermediatePic(BoundOperand c, ValueUse use)
     {
-        if (IntrinsicResultType.IsIntegerOperand(c)) return IntegerFunctionValuePic;
+        if (IntrinsicResultType.IsIntegerOperand(c)) return use.AsText ? IntegerFunctionValuePic : IntegerIntermediatePic;
         var receivers = use.Receivers;
         if (c is BoundComputedOperand { Expr: BoundIntrinsicCall call } && FunctionValueLane.ReturnsBinary64(call, ctx.Data.Options.Arithmetic)
             || receivers is { Count: > 0 } && receivers.All(r => r.DenotedItem is not null && r.Item.OperandPic is { IsFloat: true }))
             return Binary64ReturnedValuePic;
         return receivers is { Count: > 0 } ? ShapedPic(receivers) : use.AsText ? FunctionValuePic : ValueOperandPic;
     }
+
+    /// <summary>The intermediate of an INTEGER function's value (§15.2 item 5 — "no digits to the right of the decimal
+    /// point") for every use but text: the whole <c>Int128</c> carrier at scale 0. The returned-value item's 30 digits
+    /// (<see cref="IntegerFunctionValuePic"/>) are what <c>FUNCTION LENGTH</c> measures, not a bound on the value: INTEGER
+    /// of a PIC S9(31) item, or SUM over PIC 9(31) elements, is a 31-digit integer that `MOVE … TO R3` stores whole into a
+    /// PIC S9(31) receiver, so the intermediate of `MOVE … TO R1 R2` dropped its leading digit (kb/Work PB3268: §14.9.25.4
+    /// GR1's temp is "an intermediate result item provided by the implementor", and it must hand each receiver the value
+    /// the single-receiver MOVE does).</summary>
+    private static readonly PicInfo IntegerIntermediatePic =
+        new(PicCategory.Numeric, Usage.Display, Length: PicInfo.ScaledCarrierDigits, Digits: PicInfo.ScaledCarrierDigits,
+            Scale: 0, Signed: true);
 
     /// <summary>The fixed-point intermediate of a NUMERIC, non-binary64 function value that is read as a VALUE
     /// operand — an EVALUATE subject compared with its WHEN objects, an argument frozen for §8.4.3.2.4 GR2's order —

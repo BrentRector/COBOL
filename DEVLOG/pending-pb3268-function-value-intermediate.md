@@ -98,3 +98,23 @@ comment and the intrinsics design doc. Goldens: `2023/pb3268_function_value_nest
 arithmetic expressions with exact decimals: 7/450, 0.1/(1-1.1^-3), sqrt(7/450)); the permissive witness is a unit test,
 since strict conformance rejects the float at a type-6 position. Residual: a computed expression as the direct argument of
 a nested wide cross-aligning call has a digit bound only the renderer's arithmetic knows.
+
+**Review round 3 (w1108b finisher).** One finding. R3-1: `FunctionValueLane.Of` returned an exact value for every
+INTEGER-typed call BEFORE its SDIDI arms, but `IntrinsicRenderer.RenderNum` has no integer early-out: INTEGER(1.5E0)
+computes `FloorDec` on the SDIDI, a SUM over PIC 9(31) elements takes the PB621 arm, and INTEGER of a COMP-2 item takes
+`FloorReal`. So a nested integer call with an SDIDI-carried argument made the outer float-family call compute on the SDIDI
+while the prediction said binary64: `MOVE FUNCTION ANNUITY(FUNCTION INTEGER(1.5E0) 3) TO Q1 Q2` (PIC 9V9(25)) stored
+1.1428571428571427937015414 where the single MOVE stores 1.1428571428571428571428571 (8/7), and `ANNUITY(SUM(T(ALL)) 3)`
+stored 0.3333333333333333148296162 against 0.3333333333333333333333333 (reproduced on this build). Fixed at the root: the
+early-out now covers only a non-numeric result (§15.2 item 5 fixes an integer function's TYPE, never its carrier), and an
+SDIDI arm answers the carrier `RenderDec`'s arm really returns: the SDIDI, or an exact integer for SIGN / ORD-MAX / ORD-MIN
+(`FunctionValueLane.NativeSdidiBodiesWithExactResult`, derived from the renderer's switch by
+`FunctionValueLaneDriftTests.NativeSdidiBodiesWithExactResult_AreTheRenderDecArmsNotBuiltByDec`). The sibling sweep
+(`E:\COBOL-coord\scratch\w1108\w1108b\intsweep.cbl`: INTEGER of a COMP-2, INTEGER-PART, SIGN, ORD-MAX, SUM / VARIANCE /
+MEAN / STANDARD-DEVIATION over a nested integer call) found every nested shape now equal, and one more defect in the same
+intermediate: an INTEGER function's intermediate was the returned-value item's S9(30), so `MOVE FUNCTION INTEGER(N31) TO R1
+R2` (N31, R PIC S9(31)) dropped the leading digit of a 31-digit value the single MOVE stores whole. The intermediate of an
+integer value is now the carrier's 38 digits at scale 0 (`SendingValueTemp.IntegerIntermediatePic`; the 30-digit item stays
+what `FUNCTION LENGTH` measures and the text image a character formal reads). Witness:
+`2023/pb3268_function_value_integer_nested` (INTEGER and INTEGER-PART of 1.5E0 and a wide integer SUM nested in ANNUITY,
+8/7 and 1/3 truncated to 25 places, and the 31-digit INTEGER and SUM stored whole; prints BAD=0000).

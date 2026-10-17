@@ -24,9 +24,40 @@ namespace CobolNet.Tests.Unit;
 [Trait("Sweep", "tree")]
 public sealed class FunctionValueLaneDriftTests
 {
-    /// <summary>A <c>"Name" =></c> or <c>"Name" when … =></c> arm of the <c>RenderDec</c> switch.</summary>
+    /// <summary>A <c>"Name" =></c> or <c>"Name" when … =></c> arm of the <c>RenderDec</c> switch, and the text of its
+    /// value expression that follows on the same line (empty when the expression starts on the next one).</summary>
     private static readonly Regex Arm = new(
-        "^\\s*\"(?<name>\\w+)\"(?<guard>\\s+when\\s+[^=]+?)?\\s*=>", RegexOptions.Compiled);
+        "^\\s*\"(?<name>\\w+)\"(?<guard>\\s+when\\s+[^=]+?)?\\s*=>\\s*(?<body>.*)$", RegexOptions.Compiled);
+
+    /// <summary>The native arms of <c>RenderDec</c>'s switch (the standard-decimal-only arms excluded), each with whether
+    /// its value is built by the switch's local <c>Dec(...)</c> (an SDIDI value) or otherwise (an exact one).</summary>
+    private static SortedDictionary<string, bool> NativeRenderDecArms()
+    {
+        string source = File.ReadAllText(Path.Combine(
+            TestRepo.Src("Cobol.Net.Compiler"), "CodeGen", "Emit", "IntrinsicRenderer.cs"));
+        int start = source.IndexOf("private NumX? RenderDec(BoundIntrinsicCall ic)", StringComparison.Ordinal);
+        int end = source.IndexOf("static NumX Dec(string expr)", start, StringComparison.Ordinal);
+        Assert.True(start >= 0 && end > start, "RenderDec's body could not be located in IntrinsicRenderer.cs");
+
+        var native = new SortedDictionary<string, bool>(StringComparer.Ordinal);
+        string[] lines = source[start..end].Split('\n');
+        for (int i = 0; i < lines.Length; i++)
+        {
+            var m = Arm.Match(lines[i].TrimEnd('\r'));
+            if (!m.Success) continue;
+            // `"Sqrt" when num.StandardDecimal` / `"Factorial" when num.StandardDecimal` are standard-mode arms: a NATIVE
+            // call to either keeps the float / exact lane (IntrinsicRenderer: "an unguarded arm would flip native float
+            // SQRT onto the Dec lane").
+            if (m.Groups["guard"].Value.Contains("num.StandardDecimal", StringComparison.Ordinal)) continue;
+            string body = m.Groups["body"].Value.Trim();
+            if (body.Length == 0 && i + 1 < lines.Length) body = lines[i + 1].Trim();
+            bool sdidi = body.StartsWith("Dec(", StringComparison.Ordinal);
+            // A name with several arms (NUMVAL-C's LOCALE arm and its plain one) is SDIDI only when every arm is.
+            native[m.Groups["name"].Value] = native.TryGetValue(m.Groups["name"].Value, out bool prior) ? prior && sdidi : sdidi;
+        }
+        Assert.True(native.Count > 10, "the RenderDec arm scan found suspiciously few arms: " + string.Join(", ", native.Keys));
+        return native;
+    }
 
     /// <summary>The two other function sets the prediction reads off the renderer's own members
     /// (<c>IntrinsicRenderer.CrossAlignedNativeArms</c>, <see cref="FunctionValueLane.ValueFixedByDefinition"/>) route a call
@@ -50,29 +81,27 @@ public sealed class FunctionValueLaneDriftTests
     [Fact]
     public void NativeSdidiBodies_AreTheArmsOfRenderDec_ThatAreNotStandardDecimalOnly()
     {
-        string source = File.ReadAllText(Path.Combine(
-            TestRepo.Src("Cobol.Net.Compiler"), "CodeGen", "Emit", "IntrinsicRenderer.cs"));
-        int start = source.IndexOf("private NumX? RenderDec(BoundIntrinsicCall ic)", StringComparison.Ordinal);
-        int end = source.IndexOf("static NumX Dec(string expr)", start, StringComparison.Ordinal);
-        Assert.True(start >= 0 && end > start, "RenderDec's body could not be located in IntrinsicRenderer.cs");
-
-        var native = new SortedSet<string>(StringComparer.Ordinal);
-        foreach (string line in source[start..end].Split('\n'))
-        {
-            var m = Arm.Match(line);
-            if (!m.Success) continue;
-            // `"Sqrt" when num.StandardDecimal` / `"Factorial" when num.StandardDecimal` are standard-mode arms: a NATIVE
-            // call to either keeps the float / exact lane (IntrinsicRenderer: "an unguarded arm would flip native float
-            // SQRT onto the Dec lane").
-            if (m.Groups["guard"].Value.Contains("num.StandardDecimal", StringComparison.Ordinal)) continue;
-            native.Add(m.Groups["name"].Value);
-        }
-
+        var native = new SortedSet<string>(NativeRenderDecArms().Keys, StringComparer.Ordinal);
         var restated = new SortedSet<string>(FunctionValueLane.NativeSdidiBodies, StringComparer.Ordinal);
-        Assert.True(native.Count > 10, "the RenderDec arm scan found suspiciously few arms: " + string.Join(", ", native));
         Assert.True(native.SetEquals(restated),
             "FunctionValueLane.NativeSdidiBodies must be exactly RenderDec's native arms (kb/Work PB3268).\n"
             + "  in RenderDec only: [" + string.Join(", ", native.Except(restated)) + "]\n"
             + "  in NativeSdidiBodies only: [" + string.Join(", ", restated.Except(native)) + "]");
+    }
+
+    /// <summary>The native SDIDI bodies whose value the renderer returns as an EXACT scale-0 value (SIGN, ORD-MAX, ORD-MIN:
+    /// not built by <c>RenderDec</c>'s <c>Dec(...)</c>) are exactly <see cref="FunctionValueLane.NativeSdidiBodiesWithExactResult"/>
+    /// — so a nested call the lane prediction routes onto an SDIDI body is handed to its caller on the carrier the
+    /// renderer's arm really returns (kb/Work PB3268, review R3-1: an INTEGER function is no longer exempted wholesale).</summary>
+    [Fact]
+    public void NativeSdidiBodiesWithExactResult_AreTheRenderDecArmsNotBuiltByDec()
+    {
+        var exact = new SortedSet<string>(NativeRenderDecArms().Where(a => !a.Value).Select(a => a.Key), StringComparer.Ordinal);
+        var restated = new SortedSet<string>(FunctionValueLane.NativeSdidiBodiesWithExactResult, StringComparer.Ordinal);
+        Assert.NotEmpty(exact);
+        Assert.True(exact.SetEquals(restated),
+            "FunctionValueLane.NativeSdidiBodiesWithExactResult must be exactly RenderDec's native arms not built by Dec(...).\n"
+            + "  in RenderDec only: [" + string.Join(", ", exact.Except(restated)) + "]\n"
+            + "  in NativeSdidiBodiesWithExactResult only: [" + string.Join(", ", restated.Except(exact)) + "]");
     }
 }
