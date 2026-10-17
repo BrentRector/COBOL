@@ -287,6 +287,14 @@ public sealed class CollationTable
 
     internal static bool IsHangulSyllable(int codePoint) => (uint)(codePoint - Hangul_SBase) < Hangul_SCount;
 
+    /// <summary>Whether a tailored key's NFD spelling maps like the key — the one rule both readers of a tailoring
+    /// keep (<see cref="Rebuild"/>'s canonical closure and the CLDR builder's mappings-so-far): every key except one
+    /// that starts with a precomposed Hangul syllable. The engine never looks a syllable up as a single (the walk
+    /// decomposes it to its jamo before the table, UTS #10 S2.1's algorithmic Hangul arm), so mapping such a key's
+    /// jamo spelling would move the jamo text alone and set the two canonically equivalent spellings apart; ICU's
+    /// builder refuses such a key outright.</summary>
+    internal static bool MapsItsNfdSpelling(ReadOnlySpan<int> key) => !IsHangulSyllable(key[0]);
+
     /// <summary>Algorithmic Hangul syllable → conjoining jamo (L V [T]) decomposition (The Unicode Standard §3.12) —
     /// the NFD of a precomposed syllable, without a normalization call. Returns the jamo count (2 or 3; <paramref name="t"/>
     /// is 0 for an LV syllable).</summary>
@@ -439,13 +447,10 @@ public sealed class CollationTable
         // (1) every tailored key that is not in NFD (a precomposed letter, a contraction whose first code point
         //     decomposes, marks out of canonical order) also maps its NFD spelling — what Normalizer turns the text
         //     into whenever it holds a combining mark — unless the plan maps that spelling itself;
-        //     A key that starts with a precomposed Hangul syllable is passed over: the engine never looks such a key
-        //     up (CollationElementIterator decomposes a syllable to its jamo before the table, UTS #10 S2.1's
-        //     algorithmic Hangul arm), so mapping its jamo spelling would move the jamo text alone and set the two
-        //     canonically equivalent spellings apart — ICU's builder refuses such a key outright.
+        //     a key that starts with a precomposed Hangul syllable is passed over (MapsItsNfdSpelling).
         foreach (var (codePoints, elements) in plan.Entries)
         {
-            if (IsHangulSyllable(codePoints[0])) continue;
+            if (!MapsItsNfdSpelling(codePoints)) continue;
             var nfd = CanonicalForm(codePoints);
             if (nfd is null || plan.Defines(nfd)) continue;
             int offset = pool.Count;

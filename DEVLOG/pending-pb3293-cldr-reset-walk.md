@@ -20,13 +20,17 @@ drives for S2.1 while it keeps S2.2 (fetching elements). The builder's new `Buil
 far in the walk's shape: each tailored string keyed by its NFD, a first code point's root contractions copied in on
 first use (ICU's `copyFromBaseCE32`), the `[suppressContractions]` ones never; `ElementsOf` NFDs a string and walks
 it with the same `ContractionWalker`. `CollationTable.WithContraction` is the one replace-or-insert-longest-first rule
-both contraction lists use. Deleted: `Builder.Lookup`, `CollationTable.GetElements(ReadOnlySpan<int>)` (public, no
+both contraction lists use, and `CollationTable.MapsItsNfdSpelling` the one rule for which keys map their NFD
+spelling (not a key led by a Hangul syllable, which the engine never meets as a single): Rebuild's closure and
+`BuiltSoFar.Map` both read it, so a reset never reads a jamo mapping the built table does not have (found in
+self-review; its witness was seen red without it). Deleted: `Builder.Lookup`, `CollationTable.GetElements(ReadOnlySpan<int>)` (public, no
 other caller; `RuntimeAbiPinDriftTests` re-pinned alone, major 6 kept, because no module this compiler emits calls
 it) and the write-only `_skipped` counter. The CLDR and collation READMEs describe the walk.
 
 **Witnesses.** `CldrLocaleLoaderTests.ResetExtensionAndPrefix_WalkTheirNfdOverTheRulesBuiltSoFar`: zh pinyin, ar, and
 one synthetic rule set per arm (a reset holding a tailored contraction, an extension and a prefix holding one, a
-reset not in NFD, the discontiguous match); each of its six cases was seen red on the old read. `CldrIcuCrossCheckTests`
+reset not in NFD, the discontiguous match, a Hangul-led key); each case was seen red on the old read (the Hangul
+case without the shared rule). `CldrIcuCrossCheckTests`
 gains the zh-CN and ar-SA pairs (red on the old read: 4 and 3 disagreements with the host ICU). Golden
 `tests/conformance/2002/pb3293_locale_reset_walk.cob` (PB3293ZH, LOCALE "zh-u-co-pinyin"): ㈦ < ㈢ < ㈠, derived
 from zh.xml's pinyin order and its `&'(一)'<<<㈠` resets. No negative: the rule is the runtime's CLDR derivation, not an

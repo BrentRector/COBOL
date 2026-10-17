@@ -209,9 +209,12 @@ public static class CldrTailoringBuilder
             _suppressed = codePoints is { Count: > 0 } ? new HashSet<int>(codePoints) : null;
 
         /// <summary>Record that these rules map <paramref name="key"/> (a relation's string, a prefix context's
-        /// prefix+string) to <paramref name="elements"/>, replacing any earlier mapping of its NFD spelling.</summary>
+        /// prefix+string) to <paramref name="elements"/>, replacing any earlier mapping of its NFD spelling. A key whose
+        /// NFD spelling the built table does not map (<see cref="CollationTable.MapsItsNfdSpelling"/>: one led by a
+        /// Hangul syllable) is never met by a walk over NFD text, so it is not recorded.</summary>
         public void Map(string key, List<BuildElement> elements)
         {
+            if (!CollationTable.MapsItsNfdSpelling(CodePoints(key))) return;
             var cps = CodePoints(Nfd(key));
             int offset = _pool.Count;
             _pool.AddRange(elements);

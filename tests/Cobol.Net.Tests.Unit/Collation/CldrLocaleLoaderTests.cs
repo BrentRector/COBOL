@@ -411,6 +411,11 @@ public sealed class CldrLocaleLoaderTests(ITestOutputHelper output)
         // The discontiguous arm: a + dot below + acute walks to the tailored á (a + U+0301, the dot below unblocked
         // between them, UTS #10 S2.1.1-S2.1.3) and then the dot below; q is its secondary variant, so after b.
         Less(FromRules("&b<á &ạ́<<q"), "bz", "q");
+        // A key led by a Hangul syllable is not a mapping the walk can meet (the engine decomposes the syllable before
+        // the table, so the built table maps no jamo spelling for it): 가x reads the root's jamo then x, exactly as the
+        // text 가x itself walks, so q (its secondary variant) sorts between 가x and 가y, not after a.
+        var hangul = FromRules("&a<가 &가x<<q");
+        Less(hangul, "가x", "q"); Less(hangul, "q", "가y");
     }
 
     [Fact]
