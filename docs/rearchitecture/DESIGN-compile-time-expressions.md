@@ -383,8 +383,15 @@ Presence of an operand is the catalog's (`directiveOperand.operandRequired`, COB
 
 ```csharp
 enum CtCategory { Numeric, Alphanumeric, National, Boolean }
-sealed record CtValue(CtCategory Category, CobolDec Number, string Text, BitString? Bits);   // Number: the CtNumeric carrier
+sealed record CtValue(CtCategory Category, CobolDec Number, string Text, BitString? Bits)   // Number: the CtNumeric carrier
+{ string? WrittenLiteral { get; init; } }   // the literal as written, when the operand was ONE nonnumeric literal token
 ```
+
+`WrittenLiteral` keeps the FORM of a DEFINE operand written as one nonnumeric literal (`X"2A"`), which the decoded
+`Text` has lost: a constant entry FROM the variable is "as if … the text represented by compilation-variable-name-1
+were written" (§13.10.4 GR1), so a rule asking that literal's form (OPTIONS INITIALIZE's hexadecimal-alphanumeric
+fill, §11.9.10.3 SR1; CURRENCY SIGN's no-hexadecimal operand, §12.3.7.3 SR26) reads it through
+`DataBinder.ConstantDef.WrittenLiteral` (kb/Work PB780). Equality never reads it.
 
 Member-wise record equality is **replaced by a hand-written `Equals`** dispatching on `Category` (Numeric →
 `Number` by VALUE — `CobolDec.Compare`, with `CtNumeric.ValueHash` for the hash, never the carrier's member-wise

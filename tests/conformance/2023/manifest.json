@@ -79,6 +79,7 @@
   "pb1260_seven_nested_tables_are_legal",
   "pb1264_occurs_dynamic_maximum_is_legal",
   "pb1215_method_local_storage_options_initialize",
+  "pb780_constant_name_options_fill",
   "pb1191_line_sequential_trailing_space_strip",
   "pb1191_line_sequential_record_category",
   "pb1125_inspect_tallying_next_counter_extent",

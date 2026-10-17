@@ -1296,8 +1296,11 @@ public sealed partial class DataBinder
     /// (<see cref="OperandLiteralClass"/> / <see cref="LiteralCharsOf"/> — a §8.8.3.3 concatenation folds, a
     /// hexadecimal format decodes). identifier-1 is kept as the WRITTEN reference, exactly as the SOURCE clause's
     /// identifier operand is (<see cref="FieldReferenceSource"/>): its base item is screened post-build with SR2's shape
-    /// rules (<see cref="ResolveReportCode"/>) and its value is bound in the procedure phase. Returns null for an
-    /// operand that was refused, so no code is emitted for it.</summary>
+    /// rules (<see cref="ResolveReportCode"/>) and its value is bound in the procedure phase. A constant-name written
+    /// where identifier-1 could stand is literal-1: it "may be used anywhere that a format specifies a literal of the
+    /// class and category of constant-name-1" (ISO §13.10.3 SR2), "as if literal-1 … were written" (§13.10.4 GR1), so
+    /// it takes SR1's screen and the literal's characters (kb/Work PB780; it was refused as an unresolved identifier-1).
+    /// Returns null for an operand that was refused, so no code is emitted for it.</summary>
     private ReportCodeModel? BindCodeClause(Core.ReportCodeClauseContext cc, ReportModel model)
     {
         string where = $"RD '{model.Name}': the CODE clause";
@@ -1312,6 +1315,17 @@ public sealed partial class DataBinder
             return new ReportCodeModel { Literal = LiteralCharsOf(lit, sr11: false), Written = lit.GetText() };
         }
         var dref = cc.dataReference();
+        if (ConstantOf(dref) is { } k)
+        {
+            if (k.Category != PicCategory.Alphanumeric)
+            {
+                Edition.Error(DiagnosticCatalog.ReportCodeClauseRule, $"{where} names the constant-name '{DataBinder.WrittenText(dref)}' "
+                    + $"for {k.StandsFor}, which is not an alphanumeric literal: literal-1 shall be an alphanumeric literal "
+                    + "(ISO §13.18.12.3 SR1; §13.10.4 GR1)");
+                return null;
+            }
+            return new ReportCodeModel { Literal = k.Text, Written = DataBinder.WrittenText(dref) };
+        }
         if (dref.LINE_COUNTER() is not null || dref.PAGE_COUNTER() is not null)
         {
             // LINE-COUNTER / PAGE-COUNTER — the report's registers, numeric: never an alphanumeric data item.

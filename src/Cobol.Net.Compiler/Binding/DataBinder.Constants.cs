@@ -80,10 +80,27 @@ public sealed partial class DataBinder
     /// positions read (an OCCURS bound, a PICTURE repetition, a subscript). <paramref name="RawText"/> is the
     /// equivalent literal as RAW source text (re-quoted per class) — the currency of the text-plumbed paths (the
     /// DATA-division VALUE capture), mirroring <c>ConcatFolder.Folded.RawText</c>. <paramref name="Specification"/>
-    /// is the AS operand as written, which §13.10.3 SR9 compares when the name is duplicated.</summary>
+    /// is the AS operand as written, which §13.10.3 SR9 compares when the name is duplicated.
+    /// <para><paramref name="WrittenLiteral"/> is literal-1 AS WRITTEN when it is ONE nonnumeric literal token (an
+    /// alphanumeric, hexadecimal, national or boolean literal) — written in the entry, or reached through a
+    /// constant-name the entry is written AS (it inherits that entry's), or the literal a FROM compilation variable
+    /// was defined as (§13.10.4 GR1, "as if literal-1 or the text represented by compilation-variable-name-1 were
+    /// written") — and null for every other operand (a concatenation, an arithmetic expression, a length phrase). It
+    /// is the subject of every rule that asks literal-1's FORM, which <paramref name="Text"/> (decoded) and
+    /// <paramref name="RawText"/> (re-quoted: X'2A' is "*") no longer carry: OPTIONS INITIALIZE's one-byte
+    /// hexadecimal-alphanumeric fill (§11.9.10.3 SR1) and CURRENCY SIGN's no-hexadecimal operands (§12.3.7.3 SR26).
+    /// ⛔ It is NOT <paramref name="Specification"/> (kb/Work PB780 review R1-1): <c>AS KX</c> SPECIFIES the word KX —
+    /// what SR9 compares — and WRITES KX's literal-1 — what the form rules ask. One field serving both made
+    /// <c>INITIALIZE … TO KY</c> (KY AS KX AS X'2A') ask the form of the word "KX" and refuse it, and
+    /// <c>PICTURE SYMBOL KY</c> (KY AS KX AS X'23') miss the hexadecimal literal.</para></summary>
     public sealed record ConstantDef(
         string Name, PicCategory Category, string Text, string? IntegerText, bool IsGlobal, string RawText,
-        string Specification);
+        string Specification, string? WrittenLiteral)
+    {
+        /// <summary>What a diagnostic names as the literal the constant stands for: literal-1 as written when it is one
+        /// literal token, else the entry's specification.</summary>
+        public string StandsFor => WrittenLiteral ?? Specification;
+    }
 
     /// <summary>⛔ THE CONSTANT ENTRIES OF ONE SOURCE ELEMENT (kb/Work PB3164): the binder's own element (a program, a
     /// function, or a class's object, factory or interface definition — <see cref="_constants"/>), or one METHOD
@@ -570,8 +587,22 @@ public sealed partial class DataBinder
             : cv.constantByteLengthWord() is not null
                 ? BindConstantLength(name, isGlobal, spec, cv.dataReference(), where, bytes: true, demanded, out waits)
             : cv.nonNumericLiteral() is { } nn ? BindConstantStringLiteral(name, isGlobal, spec, nn, where)
+            : ConstantLiteralOperand(cv.arithmeticExpression()) is { } named ? named with { Name = name, IsGlobal = isGlobal, Specification = spec }
             : BindConstantArithmetic(name, isGlobal, spec, cv.arithmeticExpression(), where);
     }
+
+    /// <summary>The constant an AS operand written as ONE constant-name spells, or null for any other operand. The word
+    /// is literal-1 — "constant-name-1 may be used anywhere that a format specifies a literal of the class and category of
+    /// constant-name-1" (ISO §13.10.3 SR2), and §13.10.2 specifies literal-1 here — so the entry is "as if literal-1 …
+    /// were written" (§13.10.4 GR1) and takes that literal's class, category and text (GR2), whatever its class: an
+    /// alphanumeric, national or boolean constant-name is no operand of arithmetic-expression-1, which refused it
+    /// (kb/Work PB780), and a numeric one is a single numeric literal, "treated as a literal, not as an
+    /// arithmetic-expression" (§13.10.3 SR1), so <c>AS K</c> keeps K's 0.25 where the expression form truncates
+    /// (§13.10.4 GR4). A word that closes a circular dependence is left to the arithmetic path, which reports it
+    /// once (§13.10.3 SR5). The caller restates only the entry's own name, GLOBAL and specification (the word, SR9's
+    /// subject); the named constant's <see cref="ConstantDef.WrittenLiteral"/> is literal-1 here too and is kept.</summary>
+    private ConstantDef? ConstantLiteralOperand(Core.ArithmeticExpressionContext operand) =>
+        SoleOperand.DataRef(operand) is { } word && !ClosesConstantCycle(word.GetText()) ? ConstantOf(word) : null;
 
     /// <summary>The AS operand's specification as written (§13.10.3 SR9's subject): its tokens' texts, one space
     /// apart. Built from the parse tree's TOKENS, not the source span, so a comment written inside a multi-line
@@ -626,10 +657,10 @@ public sealed partial class DataBinder
         {
             string text = DecimalPointIsComma ? value.Text.Replace('.', ',') : value.Text;
             string? integer = NumericLiteral.IsIntegerLiteralForm(value.Text) ? CtNumeric.ToIntegerText(value.Number) : null;
-            return new ConstantDef(name, PicCategory.Numeric, text, integer, isGlobal, text, spec);
+            return new ConstantDef(name, PicCategory.Numeric, text, integer, isGlobal, text, spec, WrittenLiteral: null);
         }
         var folded = VariableStringValue(value, where);
-        return new ConstantDef(name, folded.Category, folded.Value, null, isGlobal, folded.RawText, spec);
+        return new ConstantDef(name, folded.Category, folded.Value, null, isGlobal, folded.RawText, spec, value.WrittenLiteral);
     }
 
     /// <summary>The class, category and value a STRING-class compilation variable gives the constant entry that names it
@@ -657,8 +688,9 @@ public sealed partial class DataBinder
     {
         if (nn.concatenationExpression() is { } ce)
         {
+            // A concatenation is "equivalent to a literal" (§8.8.3.3 GR3), never one written literal token.
             var folded = ConcatFolder.Fold(ce, Edition, LiteralEnv);
-            return new ConstantDef(name, folded.Category, folded.Value, null, isGlobal, folded.RawText, spec);
+            return new ConstantDef(name, folded.Category, folded.Value, null, isGlobal, folded.RawText, spec, WrittenLiteral: null);
         }
         if (nn.figurativeConstant() is not null)
         {
@@ -676,7 +708,7 @@ public sealed partial class DataBinder
             return null;
         }
         var token = LiteralTokenValue(nn, where);
-        return new ConstantDef(name, token.Category, token.Value, null, isGlobal, token.RawText, spec);
+        return new ConstantDef(name, token.Category, token.Value, null, isGlobal, token.RawText, spec, nn.GetText());
     }
 
     /// <summary>The class, category and value of a nonnumeric literal written as ONE literal token — an alphanumeric,
@@ -717,7 +749,7 @@ public sealed partial class DataBinder
         // The constant carries the literal AS WRITTEN (§13.10.4 GR1 — kb/Work PB1230), never a normalized form; its
         // value, where an integer position needs one, is the evaluator's — derived once, from the ONE literal parser.
         return new ConstantDef(name, PicCategory.Numeric, n.Literal,
-            n.IsInteger ? CtNumeric.ToIntegerText(n.Value) : null, isGlobal, n.Literal, spec);
+            n.IsInteger ? CtNumeric.ToIntegerText(n.Value) : null, isGlobal, n.Literal, spec, WrittenLiteral: null);
     }
 
     /// <summary>The value of a BARE constant-name (§7.3.6.2 SR1b / §13.10.3 SR2 substitution), or null when the
@@ -874,7 +906,7 @@ public sealed partial class DataBinder
             return null;
         }
         string text = width.ToString(CultureInfo.InvariantCulture);
-        return new ConstantDef(name, PicCategory.Numeric, text, text, isGlobal, text, spec);
+        return new ConstantDef(name, PicCategory.Numeric, text, text, isGlobal, text, spec, WrittenLiteral: null);
     }
 
     /// <summary>The data item a length phrase's operand names (kb/Work PB1231). No clause of §13.10 orders a constant

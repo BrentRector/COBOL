@@ -17,30 +17,28 @@ using CobolNet.Runtime;
 /// </summary>
 internal static class OptionsBinder
 {
-    /// <summary>Read the program unit's OPTIONS paragraph into an <see cref="OptionsModel"/>. The OPTIONS
+    /// <summary>A program unit's OPTIONS paragraph, written in its identification division, or null. The OO
+    /// definitions carry theirs on the SKELETON (§10.6.1; kb/Work PB135), which <c>DataBinder.UseSkeletonOptions</c>
+    /// and <c>DataBinder.OoBindMethodData</c> hand to <see cref="BindParagraph"/> directly.</summary>
+    public static Core.OptionsParagraphContext? ParagraphOf(Core.ProgramUnitContext program) =>
+        program.identificationDivision()?.identificationBody()?.identificationParagraph()
+            .Select(p => p.optionsParagraph()).FirstOrDefault(o => o is not null);
+
+    /// <summary>Read a source element's OPTIONS paragraph into an <see cref="OptionsModel"/>. The OPTIONS
     /// paragraph was introduced by ISO/IEC 1989:2002 (§11.9 — with the ARITHMETIC clause; Annex E.2 item 21
     /// back-derives the container from obsolete-in-2014 Standard Arithmetic): targeting 85 REJECTS it with an
     /// edition diagnostic and the implied defaults (native arithmetic, nearest-away-from-zero bare ROUNDED)
-    /// apply. The 2014-only clauses (DEFAULT ROUNDED, INTERMEDIATE ROUNDING, ENTRY-CONVENTION, FLOAT-BINARY/
-    /// -DECIMAL, INITIALIZE; the STANDARD-BINARY/-DECIMAL keywords) carry per-clause 2014 rows in the pass
-    /// (P10 Step 12) — a strict 2002 compile fails on those diagnostics before the bound model matters.</summary>
-    /// <param name="baseline">The model the unit's clauses override — a contained program's CONTAINER model
-    /// (ISO §11.9.4 GR1: the container's clauses apply "unless overridden by a clause in an OPTIONS paragraph in
-    /// a contained source element"), null for an outermost unit (the all-defaults model).</param>
-    public static OptionsModel Bind(Core.ProgramUnitContext program, EditionContext? edition = null, OptionsModel? baseline = null)
-    {
-        var start = baseline ?? OptionsModel.Default;
-        var paragraphs = program.identificationDivision()?.identificationBody()?.identificationParagraph();
-        if (paragraphs is null) return start;
-
-        var options = paragraphs.Select(p => p.optionsParagraph()).FirstOrDefault(o => o is not null);
-        return BindParagraph(options, edition, start);
-    }
-
-    /// <summary>The paragraph-level core (kb/Work PB135): the OO units carry their OPTIONS paragraph on the
-    /// SKELETON (§10.6.1), not inside an identification body, so OoDriver / OoBindMethodData hand the
-    /// context in directly — with the container's model as the §11.9.4 GR1 baseline.</summary>
-    public static OptionsModel BindParagraph(Core.OptionsParagraphContext? options, EditionContext? edition, OptionsModel? baseline)
+    /// apply. The later clauses (DEFAULT ROUNDED, INTERMEDIATE ROUNDING, ENTRY-CONVENTION, FLOAT-BINARY/-DECIMAL,
+    /// INITIALIZE; the STANDARD-BINARY/-DECIMAL keywords) carry per-clause edition rows in the pass (P10 Step 12) —
+    /// a strict compile below a clause's edition fails on those diagnostics before the bound model matters.</summary>
+    /// <param name="baseline">The model the element's clauses override — the CONTAINING element's model (ISO
+    /// §11.9.4 GR1: the container's clauses apply "unless overridden by a clause in an OPTIONS paragraph in a
+    /// contained source element"), null for an outermost element (the all-defaults model).</param>
+    /// <param name="constants">The element's constant-name lookup (<c>DataBinder.FindConstant</c>): the INITIALIZE
+    /// clause's literal-1 may be written as a constant-name (§13.10.3 SR2; kb/Work PB780), so the caller binds the
+    /// paragraph only after the element's constant entries are declared.</param>
+    public static OptionsModel BindParagraph(Core.OptionsParagraphContext? options, EditionContext? edition, OptionsModel? baseline,
+        Func<string, DataBinder.ConstantDef?> constants)
     {
         var start = baseline ?? OptionsModel.Default;
         if (options is null) return start;
@@ -55,11 +53,12 @@ internal static class OptionsBinder
         // has each clause at most once.
         var model = start;
         foreach (var clause in options.optionsClause())
-            model = Apply(model, clause, edition);
+            model = Apply(model, clause, edition, constants);
         return model;
     }
 
-    private static OptionsModel Apply(OptionsModel m, Core.OptionsClauseContext c, EditionContext? edition)
+    private static OptionsModel Apply(OptionsModel m, Core.OptionsClauseContext c, EditionContext? edition,
+        Func<string, DataBinder.ConstantDef?> constants)
     {
         if (c.arithmeticClause()?.arithmeticMethod() is { } am)
             return m with { Arithmetic = ArithmeticOf(am, edition) };
@@ -77,7 +76,7 @@ internal static class OptionsBinder
         if (c.intermediateRoundingClause()?.intermediateRoundingMode() is { } ir)
             return m with { IntermediateRounding = RoundingModes.MapIntermediate(ir) };
         if (c.optionsInitializeClause() is { } init)
-            return m with { Initialize = InitializeOf(init, edition) };
+            return m with { Initialize = InitializeOf(init, edition, constants) };
         return m;
     }
 
@@ -191,12 +190,35 @@ internal static class OptionsBinder
         return m;
     }
 
-    private static OptionsInitialize InitializeOf(Core.OptionsInitializeClauseContext init, EditionContext? edition)
+    private static OptionsInitialize InitializeOf(Core.OptionsInitializeClauseContext init, EditionContext? edition,
+        Func<string, DataBinder.ConstantDef?> constants)
     {
         var target = init.optionsInitializeTarget();
         OptionsSections sections = target.ALL() is not null ? OptionsSections.All : SectionsOf(target, edition);
 
         var fill = init.optionsInitializeFill();
+        using var at = edition?.At(fill);   // the fill's diagnostics carry its position
+        // literal-1 written as a constant-name (§13.10.3 SR2: it "may be used anywhere that a format specifies a
+        // literal"; kb/Work PB780): the effect "is as if literal-1 … were written where constant-name-1 is written"
+        // (§13.10.4 GR1), so SR1 below is asked of the entry's literal-1 exactly as of a written one. SR1 asks the
+        // literal's FORM (hexadecimal-alphanumeric), which the entry's value no longer carries (RawText re-quotes it:
+        // X'2A' is "*"), so it is asked of ConstantDef.WrittenLiteral: literal-1 as written, reached through a
+        // constant-name the entry is written AS (KY AS KX) or the literal a FROM compilation variable was defined as
+        // — never the entry's Specification, which for AS KX is the word KX (kb/Work PB780 review R1-1). An operand
+        // of any other shape (a concatenation, an arithmetic expression, a length phrase) has no written literal
+        // and is not one hexadecimal-alphanumeric literal: it is refused.
+        if (fill.cobolWord() is { } word)
+        {
+            string name = word.GetText();
+            if (constants(name) is { } k)
+                return LiteralFill(sections, k.WrittenLiteral, $"constant-name {name}, standing for {k.StandsFor} "
+                    + "(ISO §13.10.4 GR1),", figurative: false, edition);
+            edition?.Error(DiagnosticCatalog.OptionsInitializeFillLiteral, $"the INITIALIZE clause's fill {name} is "
+                + "neither a literal nor a constant-name in scope — literal-1 shall be a one-byte "
+                + "hexadecimal-alphanumeric literal, written X\"nn\" (or X'nn') or as a constant-name that stands for "
+                + "one (ISO §11.9.10.3 SR1; §13.10.3 SR2)");
+            return new OptionsInitialize(sections, OptionsFill.Literal, name, null);
+        }
         // §8.8.3.3 GR3: a concatenation-expression fill literal folds to its equivalent literal's raw text
         // (GetText would glue the operand tokens). OPTIONS precedes SPECIAL-NAMES, so no PCS table applies.
         if (fill.literal() is { } lit)
@@ -204,23 +226,9 @@ internal static class OptionsBinder
             string raw = lit.nonNumericLiteral()?.concatenationExpression() is { } ce && edition is not null
                 ? ConcatFolder.Fold(ce, edition, LiteralEnvironment.Unscoped).RawText
                 : lit.GetText();
-            char? c = OneByteHexAlphanumeric(raw);
-            if (c is null)
-                edition?.Error(DiagnosticCatalog.OptionsInitializeFillLiteral, $"the INITIALIZE clause's fill "
-                    + $"literal {raw} is not a one-byte hexadecimal-alphanumeric literal — literal-1 shall be "
-                    + "written in the format-2 alphanumeric form X\"nn\" (or X'nn'), exactly two hexadecimal "
-                    + "digits (ISO §11.9.10.3 SR1; §8.3.3.2.2 format 2; §8.3.3.2.3 SR5)"
-                    // A figurative constant reaches literal-1 only when it is NOT one of the clause's four fill
-                    // keywords as printed — the singular spellings (kb/Work PB510): name the keyword it missed.
-                    + (lit.nonNumericLiteral()?.figurativeConstant() is not null
-                        ? "; the clause's figurative fills are the keywords BINARY ZEROES, HIGH-VALUES, LOW-VALUES "
-                          + "and SPACES, each in that one spelling (ISO §11.9.10.2)"
-                        : ""));
-            // Recovery leaves the byte UNRESOLVED (null), never a guessed one off the rejected literal:
-            // InitialStateBackground then falls back to the §11.9.10.4 GR6 no-clause background, so a rejected
-            // clause behaves as though it were absent instead of laying down a character the program did not
-            // conformingly ask for.
-            return new OptionsInitialize(sections, OptionsFill.Literal, raw, c);
+            // A figurative constant reaches literal-1 only when it is NOT one of the clause's four fill keywords as
+            // printed — the singular spellings (kb/Work PB510): the diagnostic names the keyword it missed.
+            return LiteralFill(sections, raw, $"literal {raw}", lit.nonNumericLiteral()?.figurativeConstant() is not null, edition);
         }
         OptionsFill kind =
             fill.BINARY() is not null ? OptionsFill.BinaryZeroes
@@ -230,6 +238,29 @@ internal static class OptionsBinder
         // ⛔ No figurative character is resolved here — see OptionsInitialize.LiteralFillChar. GR5 b/d depend on
         // the PROGRAM COLLATING SEQUENCE (§8.3.3.6.4 GR6), which this compiler defines in exactly one place.
         return new OptionsInitialize(sections, kind, null, null);
+    }
+
+    /// <summary>The literal-1 arm, written or substituted for a constant-name: ISO §11.9.10.3 SR1 asked of
+    /// <paramref name="raw"/>, the literal's text (null: a constant whose literal-1 is no one written literal).
+    /// <paramref name="described"/> names what the program wrote.</summary>
+    private static OptionsInitialize LiteralFill(OptionsSections sections, string? raw, string described, bool figurative,
+        EditionContext? edition)
+    {
+        char? c = OneByteHexAlphanumeric(raw);
+        if (c is null)
+            edition?.Error(DiagnosticCatalog.OptionsInitializeFillLiteral, $"the INITIALIZE clause's fill "
+                + $"{described} is not a one-byte hexadecimal-alphanumeric literal — literal-1 shall be "
+                + "written in the format-2 alphanumeric form X\"nn\" (or X'nn'), exactly two hexadecimal "
+                + "digits (ISO §11.9.10.3 SR1; §8.3.3.2.2 format 2; §8.3.3.2.3 SR5)"
+                + (figurative
+                    ? "; the clause's figurative fills are the keywords BINARY ZEROES, HIGH-VALUES, LOW-VALUES "
+                      + "and SPACES, each in that one spelling (ISO §11.9.10.2)"
+                    : ""));
+        // Recovery leaves the byte UNRESOLVED (null), never a guessed one off the rejected literal:
+        // InitialStateBackground then falls back to the §11.9.10.4 GR6 no-clause background, so a rejected
+        // clause behaves as though it were absent instead of laying down a character the program did not
+        // conformingly ask for.
+        return new OptionsInitialize(sections, OptionsFill.Literal, raw, c);
     }
 
     /// <summary>ISO §11.9.10.3 SR1's decode: literal-1's byte, or null when the literal is not a ONE-BYTE

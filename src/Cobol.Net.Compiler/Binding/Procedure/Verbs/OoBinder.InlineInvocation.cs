@@ -147,8 +147,9 @@ internal sealed class InvocationSite
             // GROUPING-PAREN-ONLY: this '(' can never be the FNARG_LPAREN twin, and that is a property of the
             // lexer rather than an assumption. `OnDefaultLParen` retypes a '(' to FNARG_LPAREN only when
             // `PreviousIsFunctionName()` holds — the token two back is `FUNCTION` (ISO §8.4.3.2.3 SR6). Here
-            // the two tokens before the paren are always `COLONCOLON literal` (the §8.4.3.4.2 general format
-            // admits nothing else between the operator and the argument list), so the predicate is
+            // the two tokens before the paren are always `COLONCOLON literal-1` (the §8.4.3.4.2 general format
+            // admits nothing else between the operator and the argument list — a constant-name spelling literal-1
+            // is one word token too, kb/Work PB780), so the predicate is
             // structurally false and only the plain token can appear. Handling FNARG_LPAREN as well would be a
             // second reading of SR6 at a site SR6 does not reach.
             ArgsWritten = seg.LPAREN() is not null,
@@ -244,12 +245,17 @@ internal sealed partial class OoBinder
                 return refusedChained;
             string receiverText = written;
             written += " " + DataBinder.WrittenText(seg);
-            if (OoMethodNameOf(seg.literal()) is not { Length: > 0 } methodName)
+            // literal-1 as written, or spelled by a constant-name (§13.10.3 SR2; kb/Work PB780) — a word that names no
+            // literal-alias is no literal at all, and takes the same refusal.
+            string? segmentMethod = seg.cobolWord() is { } methodWord
+                ? host.Expr.LiteralAliasOf(methodWord) is { } alias ? OoMethodNameOf(alias) : null
+                : OoMethodNameOf(seg.literal());
+            if (segmentMethod is not { Length: > 0 } methodName)
             {
                 ctx.Edition.Error(DiagnosticCatalog.InlineInvocationReceiver,
                     $"the inline method invocation '{seg.GetText()}': literal-1 (the method name) shall be a "
-                    + "non-zero-length literal of class alphanumeric or national (ISO §8.4.3.4.2; "
-                    + "§8.4.3.4.3 SR3 → §14.9.23.3 SR2)");
+                    + "non-zero-length literal of class alphanumeric or national, or a constant-name that stands for "
+                    + "one (ISO §8.4.3.4.2; §8.4.3.4.3 SR3 → §14.9.23.3 SR2; §13.10.3 SR2)");
                 return BoundExprError.Refused(ctx.Edition, "inline method invocation method name");
             }
             var site = InvocationSite.OfInlineSegment(seg);

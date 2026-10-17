@@ -476,6 +476,15 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
           && ctx.Data.SymbolicOf(dref) is { } s ? new(DataBinder.WrittenText(dref), null, s)
         : null;
 
+    /// <summary>The literal-alias a BARE WORD spells where the grammar writes <c>literal | cobolWord</c> — a position no
+    /// identifier can occupy (an inline method invocation's literal-1, §8.4.3.4.2; kb/Work PB780), so there is no own
+    /// data item for the word to yield to and the §8.4.6.1 own-item test of the data-reference overload does not arise.
+    /// The same two tables in the same order: a constant-name, then a symbolic-character.</summary>
+    internal LiteralAlias? LiteralAliasOf(Core.CobolWordContext word) =>
+        word.GetText() is var w && ctx.Data.FindConstant(w) is { } k ? new(w, k, null)
+        : ctx.Data.NamesSymbolic(w) && ctx.Data.SymbolicOf(word, w) is { } s ? new(w, null, s)
+        : null;
+
     /// <summary>The bound operand <paramref name="alias"/> stands for: the SAME shape the equivalent written literal
     /// produces (the <see cref="ConcatOperand"/> precedent) — a numeric constant through <see cref="NumericLiteralOperand"/>,
     /// so the edition digit-cap window applies to the substituted literal exactly as to a written one — and a

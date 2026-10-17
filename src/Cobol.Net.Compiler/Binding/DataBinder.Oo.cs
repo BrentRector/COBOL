@@ -370,11 +370,6 @@ public sealed partial class DataBinder
         // for every OO definition kind (kb/Work PB1076). A method references the class's files via §11.7.4 GR5.
         OoEnvironmentRules.Screen(OoDefinition.Method, where, m.Ctx.environmentDivision(), Edition);
 
-        // §10.6.1's method skeleton prints [options-paragraph] (kb/Work PB135): fold it over the class
-        // channel's model per §11.9.4 GR1; the roster swaps it in around this method's body bind.
-        if (m.Ctx.optionsParagraph() is { } mo)
-            m.MethodOptions = OptionsBinder.BindParagraph(mo, Edition, Options);
-
         var dd = m.Ctx.dataDivision();
         using (EnterMethodDeclarations(m.DataScope))
         {
@@ -385,11 +380,18 @@ public sealed partial class DataBinder
             using (Edition.At(m.Ctx))
                 DeclareUserWord(m.PropertyName ?? m.Name,
                     m.PropertyName is null ? UserWordKind.MethodName : UserWordKind.PropertyName);
+            // The method's constant entries are declared before its OPTIONS paragraph and its sections bind, so one may be
+            // referenced before the entry that defines it (kb/Work PB1231); BindRemainingConstants below binds what
+            // nothing needed.
+            if (dd is not null) DeclareDataEntries(dd);
+            // §10.6.1's method skeleton prints [options-paragraph] (kb/Work PB135): fold it over the class
+            // channel's model per §11.9.4 GR1; the roster swaps it in around this method's body bind. Bound inside the
+            // method's scope, after its constant entries are declared: the INITIALIZE clause's literal-1 may be one of
+            // its constant-names, or one of its object's (§13.10.3 SR2, §8.4.6.2.2; kb/Work PB780).
+            if (m.Ctx.optionsParagraph() is { } mo)
+                m.MethodOptions = OptionsBinder.BindParagraph(mo, Edition, Options, FindConstant);
             if (dd is not null)
             {
-                // The method's constant entries are declared before its sections bind, so one may be referenced before
-                // the entry that defines it (kb/Work PB1231); BindRemainingConstants below binds what nothing needed.
-                DeclareDataEntries(dd);
                 // The sections a method definition may not carry — FILE, WORKING-STORAGE, REPORT, SCREEN (§13.4.3,
                 // §13.5.3, §13.8.3, §13.9.3 SR1) — are judged once, at EVERY edition, by the one DATA-division placement
                 // table (kb/Work PB1251, PB1308 decision R62). A method's own data division is LOCAL-STORAGE (§13.6.3) and
