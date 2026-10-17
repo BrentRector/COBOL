@@ -418,8 +418,15 @@ def load_tests(suites: Path, editions: list[str] | None, only: set[str] | None) 
         raise UsageError(f"no suite manifest for {', '.join(missing)} under {suites} (it has {', '.join(found)})")
     tests: dict[str, dict[str, dict[str, Any]]] = {}
     for e in chosen:
-        manifest = json.loads((suites / e / "manifest.json").read_text(encoding="utf-8"))
-        tests[e] = {t["id"]: t for t in manifest["tests"]}
+        try:
+            manifest = json.loads((suites / e / "manifest.json").read_text(encoding="utf-8"))
+            tests[e] = {t["id"]: t for t in manifest["tests"]}
+        except (OSError, ValueError, KeyError, TypeError) as err:
+            raise UsageError(f"{suites / e / 'manifest.json'} is not a generator manifest ({err!r}): run "
+                             f"conformance-suite/harness/generate.py again") from err
+    if not any(tests.values()):
+        # A run over nothing is never GREEN: the regression net would pass a suite that lost every test.
+        raise UsageError(f"the chosen suites ({', '.join(chosen)}) hold no test")
     if only is not None:
         unknown = sorted(only - {t for ts in tests.values() for t in ts})
         if unknown:
@@ -811,6 +818,14 @@ def self_test() -> int:
               quiet(small) == 2)
         (root / "profiles" / "stub.json").write_text(json.dumps(profile), encoding="utf-8", newline="\n")
         check("arm: a missing suite manifest is a usage error (2)", quiet(small[:-4] + ["--editions", "2014"]) == 2)
+        (root / "suites" / "2014").mkdir()
+        (root / "suites" / "2014" / "manifest.json").write_text(json.dumps({"edition": "2014", "tests": []}),
+                                                                 encoding="utf-8", newline="\n")
+        check("arm: a run over suites holding no test is a usage error (2), never GREEN",
+              quiet(small[:-4] + ["--editions", "2014"]) == 2)
+        (root / "suites" / "2014" / "manifest.json").write_text("{not json", encoding="utf-8", newline="\n")
+        check("arm: an unreadable manifest is a usage error (2)", quiet(small[:-4] + ["--editions", "2014"]) == 2)
+        shutil.rmtree(root / "suites" / "2014")
 
         # The configuration formats (config.py), as the generator's audit checks them.
         bad_adapter = _stub_adapter("bad", stub, **{"compile": ["{nope}"], "diagnostic": "no-line-group"})

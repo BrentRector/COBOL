@@ -437,7 +437,7 @@ hold the status, this section the scope. Every slice ships its own tests and dri
   of §5, the WiseOwl and GnuCOBOL adapters and profiles, a fresh working directory per test, stdin closed, the
   verdicts and their JUnit XML and JSON, `--record-baseline` and the CHANGES report; `--self-test` drives a stub
   compiler (a Python script) through every verdict, so the logic is tested without `cobc`. Runs on Windows and
-  Linux. **As landed:** `harness/run.py` (the runner, its results and CHANGES, a 56-arm `--self-test` passing on
+  Linux. **As landed:** `harness/run.py` (the runner, its results and CHANGES, a 58-arm `--self-test` passing on
   Windows and under WSL) and `harness/config.py` (the formats); `adapters/` and `profiles/` for `wiseowl` and
   `gnucobol`; `baselines/gnucobol.json` recorded on the S1a seed under WSL (14 PASS, 6 NOT APPLICABLE at 2023, and 2
   FAIL: READ PREVIOUS after OPEN is at end at -std=cobol2002 and -std=cobol2014, the 2023 rule, where E.2 item 22

@@ -56,7 +56,7 @@ refuses (COBOLNET1675 on the flagged seed, an edition diagnostic): `RunCompile`'
 arm and its `_` default was 70, so a wrong program read as a compiler failure. `Program.ExitCode` names every outcome
 (BindError 65, like a parse error; an unnamed one throws) and `CliParserTests` pins each.
 
-**Tests.** `run.py --self-test` 56 arms (Windows and WSL), `generate.py --self-test` 75 arms (the words, the defined
+**Tests.** `run.py --self-test` 58 arms (Windows and WSL), `generate.py --self-test` 75 arms (the words, the defined
 names, the standard's keywords, the configuration refusals), `ConformanceSuiteProfileDriftTests`, two `CliParserTests`.
 No inventory row: test infrastructure (`closes_rows: []`, its reason filed). PB3176 (S1c) unblocked.
 
