@@ -89,13 +89,10 @@ internal readonly record struct ReceiverContext(
     /// before it five emit sites each spelled this out again and none carried the floating-point edited flag).</summary>
     public static ReceiverContext OfSet(IReadOnlyList<PicInfo?> pics, bool inSizeError)
     {
-        int scale = 0, integerDigits = 0;
+        var (scale, integerDigits) = PicInfo.WidestReceiving(pics);
         bool allFloat = true, anyFloatEdited = false;
         foreach (var pic in pics)
         {
-            int s = pic?.ReceiverScale() ?? 0;
-            scale = Math.Max(scale, s);
-            integerDigits = Math.Max(integerDigits, pic is null ? 0 : Math.Max(0, pic.DigitPositions - s));
             allFloat &= pic is { IsFloat: true };
             anyFloatEdited |= pic is { IsFloatEdited: true };
         }

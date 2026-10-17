@@ -70,7 +70,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
             // WriteInPart (§14.9.43.4 GR7; §8.4.3.3.4 GR5): the statement stores a PART of the item and keeps the rest, so
             // the get method supplies the kept portion where the class has one; a class WITH NO GET is not refused,
             // for the position is a receiving one (§14.9.43.3 SR10) and SR3 speaks of a sending use only (kb/Work PB2618).
-            bool needGet = kind == StoreKind.None || kind == StoreKind.ReadWrite || (kind == StoreKind.WriteInPart && op.Get is not null);
+            bool needGet = op.GetsBefore(kind);
             bool needSet = kind != StoreKind.None;
             string where = $"'{op.PropName}' OF '{op.ReceiverName}'";
             var tempPlace = ctx.Refs.ResolveItem(op.Temp)!;
@@ -88,10 +88,10 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
             // accessors invoke on that temporary. Where the steps go is the statement's: around ITS receiver for a statement
             // that claimed it, else before and after the whole statement.
             var receiver = op.Receiver;
-            if (needSet && op.Form == InvokeForm.Instance && receiver is { Item: { IsCompilerTemp: false, Pic.ObjectRef: { } described } })
+            if (needSet && op.IdentifiedReceiver is { Item.Pic.ObjectRef: { } described } written)
             {
                 var identified = ctx.Refs.ResolveItem(ctx.Data.OoCreateIdentifiedObjectTemp(described))!;
-                open.Add(new BoundSetObjectRef([identified], receiver, SourceIsNull: false, SourceIsSelf: false));
+                open.Add(new BoundSetObjectRef([identified], written, SourceIsNull: false, SourceIsSelf: false));
                 receiver = identified;
             }
             if (needGet && PropertyGet(op, receiver) is { } get) open.Add(get);

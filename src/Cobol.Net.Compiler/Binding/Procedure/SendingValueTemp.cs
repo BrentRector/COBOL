@@ -80,11 +80,11 @@ internal sealed class SendingValueTemp(BinderContext ctx)
     /// subscript, written once here so the two cannot drift. §15.4.1: "When native arithmetic is in effect, the
     /// characteristics and representation of the returned value are defined by the implementor."
     /// <para>21 integer digits × 9 fraction digits — 30 total, so the item takes the <c>Int128</c> wide tier
-    /// (<c>PicInfo.IsWide</c>, &gt;18 digits) and no function value a program can consume overflows it; the
-    /// fraction is carried because a scale-0 temp would TRUNCATE, turning a legal non-integer result into a
-    /// different value. 9 is also the working scale an intrinsic renders at when no receiver widens it
-    /// (<c>ReceiverContext</c>), so for every receiver of scale ≤ 9 the materialized value is bit-identical to
-    /// the un-hoisted render.</para></summary>
+    /// (<c>PicInfo.IsWide</c>, &gt;18 digits); the fraction is carried because a scale-0 temp would TRUNCATE,
+    /// turning a legal non-integer result into a different value. 9 is also the working scale an intrinsic renders
+    /// at when no receiver widens it (<c>ReceiverContext</c>), so for every receiver of scale ≤ 9 and at most 21
+    /// integer digits the materialized value is bit-identical to the un-hoisted render; a MOVE whose receivers take
+    /// more digits than that freezes the value in a WIDER temporary (<see cref="ReturnedValuePicFor"/>).</para></summary>
     internal static readonly PicInfo FunctionValuePic =
         new(PicCategory.Numeric, Usage.Display, Length: 30, Digits: 30, Scale: 9, Signed: true);
 
@@ -106,6 +106,43 @@ internal sealed class SendingValueTemp(BinderContext ctx)
     internal static PicInfo NumericReturnedValuePic(BoundOperand c) =>
         IntrinsicResultType.IsIntegerOperand(c) ? IntegerFunctionValuePic : FunctionValuePic;
 
+    /// <summary>⛔ THE TEMPORARY A MOVE FREEZES A NUMERIC FUNCTION'S VALUE INTO KEEPS EVERY DIGIT ITS RECEIVERS TAKE
+    /// (kb/Work PB370). §14.9.25.4 GR1's equivalence — <c>MOVE a TO temp</c> / <c>MOVE temp TO b</c> — is exact
+    /// only if <c>MOVE temp TO b</c> stores what <c>MOVE a TO b</c> stores, and the un-frozen MOVE renders the
+    /// function at the RECEIVER's scale when that is wider than the working scale 9 (<c>ReceiverContext</c>). A
+    /// scale-9 temporary therefore truncated <c>MOVE FUNCTION PI TO S (I)</c> into a <c>PIC 9V9(12)</c> receiver to
+    /// 3.141592653000 where the un-frozen statement stores 3.141592653589 — and the same for every receiver of a
+    /// multi-receiver MOVE; and a 21-integer-digit temporary dropped the high-order digits a receiver with more
+    /// integer positions holds. <paramref name="reach"/> decides (<see cref="ReceivingReach"/>'s summary has the
+    /// rule): a floating-point set takes its floating-point description (<see cref="ReceivingReach.Floating"/>); an
+    /// all-fixed-point set takes exactly its receivers' widest integer digits and scale
+    /// (<see cref="ReceivingReach.FixedPointOnly"/>), since each receiver truncates a sub-range of them, unless those
+    /// digits pass the 38-digit carrier, where a non-integer value takes <see cref="ReceivingReach.BeyondCarrier"/>;
+    /// any other set takes the larger of <see cref="NumericReturnedValuePic"/>'s and <paramref name="reach"/>'s. An
+    /// INTEGER function keeps scale 0 (§15.2 item 5), and the scale is capped so the whole value still fits the
+    /// 38-digit <c>Int128</c> carrier — the cap <c>ReceiverContext.WorkingScale</c> applies to the un-frozen landing,
+    /// for the same reason. <see cref="NumericReturnedValuePic"/> stays the description of the returned value itself, which
+    /// the LENGTH fold measures.</summary>
+    private static PicInfo ReturnedValuePicFor(BoundOperand c, ReceivingReach reach)
+    {
+        // ⛔ A FLOATING-POINT SET TAKES A FLOATING-POINT INTERMEDIATE (kb/Work PB370): no scaled integer carries a
+        // binary64 receiver's value, so a FLOAT-LONG F (I) stored 3.141592653 for FUNCTION PI where the un-frozen
+        // MOVE stores 3.141592653589793 — and no binary64 carries a 21-digit floating-point edited receiver's.
+        if (reach.Floating is { } floating) return floating;
+        var pic = NumericReturnedValuePic(c);
+        if (pic.Scale != 0 && reach.BeyondCarrier is { } beyondCarrier) return beyondCarrier;
+        int ownIntegerDigits = reach.FixedPointOnly ? 0 : pic.Digits - pic.Scale;
+        int ownScale = reach.FixedPointOnly ? 0 : pic.Scale;
+        int integerDigits = Math.Min(ReceivingReach.CarrierDigits, Math.Max(ownIntegerDigits, reach.IntegerDigits));
+        int scale = pic.Scale == 0 ? 0
+            : Math.Min(Math.Max(ownScale, reach.Scale), ReceivingReach.CarrierDigits - integerDigits);
+        // An INTEGER function moved only to all-fraction receivers (PIC V99) keeps one integer digit: a numeric item
+        // has at least one digit position, and those receivers store zero whatever the integer digits hold.
+        if (integerDigits + scale == 0) integerDigits = 1;
+        int digits = integerDigits + scale;
+        return digits == pic.Digits && scale == pic.Scale ? pic : pic with { Length = digits, Digits = digits, Scale = scale };
+    }
+
     /// <summary>Materialize <paramref name="op"/>'s value into the implementor's intermediate result item and
     /// return the <see cref="Place"/> holding it, or <see langword="null"/> when the operand needs no
     /// materialization (a literal / figurative constant) or carries a description this clone cannot freeze (a
@@ -116,9 +153,22 @@ internal sealed class SendingValueTemp(BinderContext ctx)
     /// statement" (§14.9.13.4 GR3) are the same position in the generated code.</summary>
     /// <param name="op">The sending operand / selection subject to freeze.</param>
     /// <param name="tag">A short source tag for the temp's synthesized names (diagnostics and readability only).</param>
-    internal Place? Materialize(BoundOperand op, string tag)
+    /// <param name="at">Where on the pending list the freeze belongs: the count of pre-ops registered when the
+    /// operand finished binding, so the value is frozen AFTER its own pre-ops (the function-bearing subscripts and
+    /// activations it reads) and BEFORE those the statement's LATER operands registered — §14.6.4's left-to-right
+    /// order, which a receiving operand's function-bearing subscript would otherwise overtake (kb/Work PB370).
+    /// <see langword="null"/> appends, for a caller whose later operands register nothing.</param>
+    /// <param name="reach">What the operands the frozen value is moved to can hold (a MOVE's receivers,
+    /// <see cref="ReceivingReach.Of"/>): a numeric function's temporary keeps at least that many fraction and integer
+    /// digits, or is floating-point (or floating-point edited) for a floating-point set (<see cref="ReturnedValuePicFor"/>). Default (no
+    /// digits, fixed-point) for a caller with no such receiver.</param>
+    internal Place? Materialize(BoundOperand op, string tag, int? at = null, ReceivingReach reach = default) =>
+        Positioned(at, () => Freeze(op, tag, reach));
+
+    /// <summary>The body of <see cref="Materialize"/>: the intermediate and its stores, appended.</summary>
+    private Place? Freeze(BoundOperand op, string tag, ReceivingReach reach)
     {
-        if (Model(op) is not { } model) return null;
+        if (Model(op, reach) is not { } model) return null;
         var temp = ctx.Data.CreateCompilerTemp(model.Item, "__SENDVAL-", "__sendval", tag);
         // ⛔ GR1's OTHER sentence, for a group whose extent is decided at run time: "The length of the data item
         // referenced by identifier-1 is evaluated only once, immediately before the data is moved to the first of
@@ -148,6 +198,27 @@ internal sealed class SendingValueTemp(BinderContext ctx)
         // then compared a value that never arrived, so it took WHEN OTHER. The identity copy of an index data item into
         // its own class-index clone is the SET it names.
         ctx.Data.PendingPreOps.Add(IdentityStore(op, model.Item, place));
+        return place;
+    }
+
+    /// <summary>⛔ THE ONE PLACEMENT OF A FREEZE ON THE PENDING LIST: run <paramref name="register"/>, then move every
+    /// pre-op it registered (the identity copy, and the occurs-depending control-value copy before it when there is
+    /// one), in their own order, to <paramref name="at"/> — the position the frozen operand's evaluation owns, ahead
+    /// of the pre-ops a LATER operand of the statement registered (§14.6.4's left-to-right order). A later function
+    /// argument (<c>ArgumentOrder</c>, §8.4.3.2.4 GR2) and a MOVE's receiving operand (§14.9.25.4 GR1, kb/Work PB370)
+    /// are the two such later operands. <see langword="null"/>, or a position at the end, leaves the steps where they
+    /// were registered; a freeze that answers <see langword="null"/> moves nothing.</summary>
+    private Place? Positioned(int? at, Func<Place?> register)
+    {
+        var pending = ctx.Data.PendingPreOps;
+        int mark = pending.Count;
+        var place = register();
+        if (place is not null && at is { } position && position < mark)
+        {
+            var steps = pending.GetRange(mark, pending.Count - mark);
+            pending.RemoveRange(mark, steps.Count);
+            pending.InsertRange(position, steps);
+        }
         return place;
     }
 
@@ -222,7 +293,10 @@ internal sealed class SendingValueTemp(BinderContext ctx)
     /// in the argument list (§8.4.3.2.4 GR2) and not after a later argument's activation changed an item it reads.
     /// The store is COMPUTE Format 2's own (<see cref="BoundComputeBoolean"/>), the channel a boolean expression has
     /// and <see cref="Materialize"/> deliberately does not reach. Null when the item cannot be resolved.</summary>
-    internal Place? MaterializeBoolean(BoundBoolExpr expr, int positions, string tag)
+    internal Place? MaterializeBoolean(BoundBoolExpr expr, int positions, string tag, int? at = null) =>
+        Positioned(at, () => FreezeBoolean(expr, positions, tag));
+
+    private Place? FreezeBoolean(BoundBoolExpr expr, int positions, string tag)
     {
         var model = new DataItem
         {
@@ -289,7 +363,7 @@ internal sealed class SendingValueTemp(BinderContext ctx)
     /// <summary>⛔ THE ONE description derivation — every <see cref="BoundOperand"/> leaf is named, so a leaf
     /// added tomorrow is a COMPILE error here rather than a silent fall-through to "no hoist" (the
     /// feedback_a_dead_lookup_is_also_unverified shape: a default arm that quietly means "correct as it is").</summary>
-    private TempModel? Model(BoundOperand op) => op switch
+    private TempModel? Model(BoundOperand op, ReceivingReach reach) => op switch
     {
         // §8.3.3.6.4 GR2 sizes a figurative / ALL "literal" from the RECEIVER, and §14.9.25.4 GR1's antecedent
         // names neither; a literal's value cannot change. No description of their own ⇒ no intermediate.
@@ -302,7 +376,7 @@ internal sealed class SendingValueTemp(BinderContext ctx)
         BoundAddressOperand => null,
         BoundFieldOperand f => OfPlace(f.Place),
         BoundCurrentRecord cr => OfPlace(cr.Area),
-        BoundComputedOperand c => OfComputed(c),
+        BoundComputedOperand c => OfComputed(c, reach),
         // Every leaf of the hierarchy is named above; the arm exists because C# cannot prove a public abstract
         // record's leaf set is closed. It is LOUD rather than a silent "no hoist", which would let a new operand
         // form inherit the very defect this class removes (feedback_a_dead_lookup_is_also_unverified).
@@ -356,7 +430,7 @@ internal sealed class SendingValueTemp(BinderContext ctx)
     /// <see cref="FunctionValuePic"/> shape §15.4.1 leaves to the implementor; an alphanumeric / national /
     /// boolean result has a run-time length (FUNCTION TRIM's is its argument's content, CONCAT's the sum of its
     /// arguments') and takes the §8.5.1.10.4 carrier.</summary>
-    private TempModel? OfComputed(BoundComputedOperand c)
+    private TempModel? OfComputed(BoundComputedOperand c, ReceivingReach reach)
     {
         // §15.2 classifies every function; the bound node carries the call's RESOLVED category
         // (BoundIntrinsicCall.ResultCategory — never the declared column, for the twenty argument-typed rows).
@@ -373,7 +447,7 @@ internal sealed class SendingValueTemp(BinderContext ctx)
         // `MOVE FUNCTION INTEGER(N) TO A B` stored 0000 in both where `MOVE FUNCTION INTEGER(N) TO A` stores 3.
         if (cat is PicCategory.Numeric)
             return new TempModel(
-                new DataItem { Level = 1, CobolName = "__SENDVAL-FN", CsName = "__sendvalFn", Pic = NumericReturnedValuePic(c) },
+                new DataItem { Level = 1, CobolName = "__SENDVAL-FN", CsName = "__sendvalFn", Pic = ReturnedValuePicFor(c, reach) },
                 DynLimit: 0, FunctionValue: true);
         return CharacterCarrier("__SENDVAL-FNS", "__sendvalFns", cat, CharacterUsage(cat), FunctionTextLimit);
     }

@@ -142,25 +142,21 @@ internal sealed class ArgumentOrder(BinderContext ctx, SendingValueTemp temps,
         }
     }
 
-    /// <summary>Materialize <paramref name="operand"/> and move the registered pre-ops (the extent freeze, when
-    /// there is one, and the store itself) from the end of the pending list to <paramref name="index"/>.</summary>
+    /// <summary>Materialize <paramref name="operand"/> with its registered pre-ops (the extent freeze, when there is
+    /// one, and the store itself) placed at <paramref name="index"/> — <c>SendingValueTemp</c>'s one placement.</summary>
     private BoundFieldOperand? StoreAt(BoundOperand operand, int index, out int added)
     {
-        var pending = Pending;
-        int start = pending.Count;
+        int start = Pending.Count;
         added = 0;
         // A boolean-expression argument has its own store (COMPUTE Format 2's) and its own length (§8.8.2 rule 10); a
         // run-time length is the one shape no intermediate item can describe, and stays where it was.
         var held = operand is BoundBoolOperand { Expr: var boolean }
             ? ConditionBinder.BoolResultLength(boolean) is int positions and > 0
-                ? temps.MaterializeBoolean(boolean, positions, "fnarg")
+                ? temps.MaterializeBoolean(boolean, positions, "fnarg", index)
                 : null
-            : temps.Materialize(operand, "fnarg");
+            : temps.Materialize(operand, "fnarg", index);
         if (held is not { } place) return null;
-        var steps = pending.GetRange(start, pending.Count - start);
-        pending.RemoveRange(start, steps.Count);
-        pending.InsertRange(Math.Min(index, pending.Count), steps);
-        added = steps.Count;
+        added = Pending.Count - start;
         return new BoundFieldOperand(place);
     }
 }
