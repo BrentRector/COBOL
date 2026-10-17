@@ -627,7 +627,13 @@ occurs-depending or OCCURS DYNAMIC table: §13.18.38.4 GR7's bound test rides th
 raised the receiver's EC-BOUND-ODO first). The PRE-OP half is the binder's: a receiver's function-bearing subscript or
 user-function activation is a pre-op that runs before the statement, which no store order can reach, so when the
 receiver registered one and the sender identifies at run time `MoveBinder.BindMoveOf` freezes the sender at N = 1 as
-well. The freeze is placed on the pending list at the point the sender finished binding
+well. An OBJECT-PROPERTY receiver is the same arm in another form: its identifier-3's pre-ops move into its accessor
+bracket (`OoPendingPropertyOp.Prelude`), which `ReceiverBracketEmitter.Receive` opens just before the store, together
+with identifier-3's evaluation into the identified-object temporary and the GET of a part store, so
+`DataBinder.OoReceiverOpensAtRunTime` asks whether that bracket evaluates anything and the binder freezes on it too
+(`MOVE X (1:L) TO P OF R (I)` raised R's EC-BOUND-SUBSCRIPT first; golden `2002/pb370_move_property_receiver_order`).
+The bracket's steps and that question read the same `OoPendingPropertyOp` members (`IdentifiedReceiver`,
+`GetsBefore`). The freeze is placed on the pending list at the point the sender finished binding
 (`SendingValueTemp.Positioned`, the one placement `ArgumentOrder` uses for a function argument too), so it also
 precedes a receiver's pre-ops at N > 1. A NUMERIC function-identifier's temporary is sized for the MOVE's receivers
 (`SendingValueTemp.ReturnedValuePicFor` over `ReceivingReach.Of`): the fixed 30-digit, scale-9 description

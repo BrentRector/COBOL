@@ -48,13 +48,27 @@ SendingValueTemp's private copy of 38 is gone.
 - `2002/pb370_move_first_condition` and its reject half, `negative/pb370-move-first-condition-below-2002`, ship as they
   were written in wave 1102 F.
 
+**Branch review round 1 (finding R1-1): an object-property receiver.** The leg-F freeze watched only the statement's
+pending pre-op list. An object-property receiver moves its identifier-3's pre-ops off that list into its accessor
+bracket (`OoPendingPropertyOp.Prelude`), and `ReceiverBracketEmitter.Receive` opens the bracket just before the store,
+together with identifier-3's evaluation into the identified-object temporary and the GET of a part store. Three legs
+measured wrong on the reviewed head: `MOVE X (1:L) TO P OF R (FUNCTION SQRT (NEG))` selected EC-ARGUMENT-FUNCTION,
+`MOVE X (1:L) TO P OF R (I)` selected EC-BOUND-SUBSCRIPT, and `MOVE X (1:L) TO Q OF R (1) (1:2)` ran Q's get method
+before the sender's EC-BOUND-REF-MOD. `DataBinder.OoReceiverOpensAtRunTime` now answers whether a claimed property's
+bracket evaluates anything at run time. It reads the members the bracket is built from, which `OoBinder.OoWrapPropertyOps`
+now reads too: `OoPendingPropertyOp.IdentifiedReceiver` and `GetsBefore`. The part-store polarity is
+`BoundStores.WholeReceiverStore`, which the store walk also asks. `MoveBinder.BindMoveOf` freezes the sender on that
+answer as it does on a pre-op. The new golden `2002/pb370_move_property_receiver_order` has legs K, L and N, the
+sending-property mirror M, and an in-range control. On the reviewed head K, L and N print the receiver's condition.
+
 **Rows.** No row changes owner.
 - `GR-14.9.49.4-11` stays PB3261's and gains `pb370_move_first_condition` as a witness (batch `w1107a-pb370-gr11`).
 - `GR-14.9.25.4-1` is re-verdicted CONFORMS with current notes (batch `w1107a-pb370-gr1`). GAP 58 → 58.
 
 **Not fixed here (leads).** The same pre-op gap reaches the arithmetic statements:
 `COMPUTE N (FUNCTION SQRT (NEG)) = N (I)` selects EC-ARGUMENT-FUNCTION, where §14.7.7 4) b) identifies the receivers
-after the initial evaluation. STRING also identifies a BASED identifier-3 at its statement-head freeze:
+after the initial evaluation. A property receiver there has the bracket form of the same gap: `COMPUTE NP OF R (I) =
+FUNCTION SQRT (NEG)` selects EC-BOUND-SUBSCRIPT. STRING also identifies a BASED identifier-3 at its statement-head freeze:
 `STRING T (I) DELIMITED BY SIZE INTO BX`, with BX's address NULL, selects EC-DATA-PTR-NULL.
 
 **Self-review.** One mechanism per job holds: the store order stays `PlaceIdentification.SenderFirst`'s, the pre-op

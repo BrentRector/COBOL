@@ -66,6 +66,15 @@ public static class BoundStores
         return kind == StoreKind.Write && visitor.StoredThroughWindow ? StoreKind.WriteInPart : kind;
     }
 
+    /// <summary>The polarity of a whole-receiver store through <paramref name="receiver"/>, the store the walk answers
+    /// <see cref="StoreKind.Write"/> for: <see cref="StoreKind.WriteInPart"/> when the place is a reference-modified
+    /// WINDOW of its item (<see cref="Place.DenotedItem"/> is null: §8.4.3.3.4 GR5 "a unique data item that is a
+    /// subset"), whose other positions are kept. The one statement of that rule: the walk asks it of every store
+    /// position, and a binder that must know the polarity before its statement node exists asks it directly
+    /// (MoveBinder.BindMoveOf, kb/Work PB370).</summary>
+    public static StoreKind WholeReceiverStore(Place receiver) =>
+        receiver.DenotedItem is null ? StoreKind.WriteInPart : StoreKind.Write;
+
     /// <summary>Does <paramref name="s"/>, or any statement nested in it, STORE into an item
     /// <paramref name="matches"/> accepts? The second client (kb/Work PB363, ISO §14.9.49.3 SR11 "A USE BEFORE
     /// REPORTING procedure shall not alter the value of any control data item"): the same emitter-verified
@@ -84,12 +93,12 @@ public static class BoundStores
     {
         /// <summary>Does the statement store through <paramref name="p"/> into a matching item? Every arm asks its store
         /// positions through here (or through a helper that does), so a store into a reference-modified WINDOW of the
-        /// item (<see cref="Place.DenotedItem"/> is null: §8.4.3.3.4 GR5 "a unique data item that is a subset") is
-        /// noted once, for every present and future whole-receiver arm, in <see cref="StoredThroughWindow"/>.</summary>
+        /// item (<see cref="WholeReceiverStore"/>) is noted once, for every present and future whole-receiver arm, in
+        /// <see cref="StoredThroughWindow"/>.</summary>
         private bool Hit(Place? p)
         {
             if (p is null || !matches(p.Item)) return false;
-            if (p.DenotedItem is null) StoredThroughWindow = true;
+            if (WholeReceiverStore(p) is StoreKind.WriteInPart) StoredThroughWindow = true;
             return true;
         }
 

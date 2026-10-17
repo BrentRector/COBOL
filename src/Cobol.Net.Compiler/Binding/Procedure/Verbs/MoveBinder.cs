@@ -192,20 +192,28 @@ internal sealed class MoveBinder(BinderContext ctx, StatementBinder host, Corres
         // statement failing on both sides raises (§14.9.49.4 GR11). That order is the emitter's to keep — each
         // store renders through PlaceIdentification.SenderFirst, which evaluates the sending value into a local
         // ahead of the receiver's address when both sides identify at run time (kb/Work PB3261). The one part of the
-        // order no store can keep is a receiver's PRE-OP — a function-bearing subscript's temporary, a user-defined
-        // function's activation — which runs before the statement does, so `MOVE X (1:L) TO T (FUNCTION SQRT (NEG))`
-        // raised the receiver's EC-ARGUMENT-FUNCTION ahead of the sender's EC-BOUND-REF-MOD. When the receiver
-        // registered one and the sender's evaluation can be overtaken, the sender is frozen at N = 1 too, placed
-        // where it finished binding (senderPreOpsEnd), ahead of those pre-ops (kb/Work PB370).
+        // order no store can keep is what a receiver evaluates AHEAD of its store. Two arms, one question:
+        //   • a PRE-OP — a function-bearing subscript's temporary, a user-defined function's activation — which runs
+        //     before the statement does, so `MOVE X (1:L) TO T (FUNCTION SQRT (NEG))` raised the receiver's
+        //     EC-ARGUMENT-FUNCTION ahead of the sender's EC-BOUND-REF-MOD;
+        //   • an OBJECT-PROPERTY receiver's accessor bracket, opened just before its store (ReceiverBracketEmitter.
+        //     Receive): identifier-3's own pre-ops moved there (its Prelude), its evaluation into the identified-object
+        //     temporary, the GET of a part store (DataBinder.OoReceiverOpensAtRunTime) — so `MOVE X (1:L) TO P OF
+        //     R (I)` raised R's EC-BOUND-SUBSCRIPT first, and `MOVE X (1:L) TO Q OF R (1) (1:2)` ran Q's get method.
+        // When a receiver has either and the sender's evaluation can be overtaken, the sender is frozen at N = 1 too,
+        // placed where it finished binding (senderPreOpsEnd), ahead of every pre-op and so of every bracket
+        // (kb/Work PB370).
         // ⭐ AND the SECOND reason to freeze it, the same rule's other sentence: GR1's "If identifier-1 is a
         // zero-length item, it is as if literal-1 were specified as a zero-length literal" makes the sender's
         // LENGTH decide which value is stored, and "the length … is evaluated only once" then forbids reading a
         // reference modifier or a function-identifier twice to learn it. Materializing lands the value in
         // SendingValueTemp's dynamic-length carrier, whose length the emitted test reads off a field
         // (kb/Work PB425; MoveClassifier.NeedsLengthFreeze names the shapes).
-        bool receiverPreOpsOvertakeSender = senderPreOpsEnd is { } end && ctx.Data.PendingPreOps.Count > end
+        bool receiverEvaluationOvertakesSender = senderPreOpsEnd is { } end
+            && (ctx.Data.PendingPreOps.Count > end
+                || targets.Any(t => ctx.Data.OoReceiverOpensAtRunTime(t, BoundStores.WholeReceiverStore(t))))
             && CobolNet.CodeGen.PlaceIdentification.IdentifiesAtRunTime(source);
-        if ((targets.Count > 1 || MoveClassifier.NeedsLengthFreeze(source, targets) || receiverPreOpsOvertakeSender)
+        if ((targets.Count > 1 || MoveClassifier.NeedsLengthFreeze(source, targets) || receiverEvaluationOvertakesSender)
             && host.SendingValue.Materialize(source, "move", senderPreOpsEnd,
                 ReceivingReach.Of([.. targets.Select(t => t.DenotedItem?.Pic)], ctx.Edition)) is { } frozen)
             source = new BoundFieldOperand(frozen);
