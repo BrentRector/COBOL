@@ -1,4 +1,4 @@
-## PB3311: the wave planner no longer re-plans a review finisher that is running, and one predicate says a dispatch returned
+## Entry 2151 — 2026-10-17 12:16 PDT — PB3311: the wave planner no longer re-plans a review finisher that is running, and one predicate says a dispatch returned
 
 Wave 1105's unit (the loop, account 2) ran `plan_wave.py --from-budget --borrow-days 0` at 17:12 PDT. Its plan held
 eight groups. Group A was a `FINISH-FIRST` for PB3198, answering the round-3 branch review finding of w1101a. An
@@ -56,3 +56,4 @@ new group on its files waits until the carrier lands rather than continuing it; 
 never double work), and continuing a branch whose findings are unanswered would be the wrong default.
 Gate: `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run 20261017T185309Z-55e581;
 `test_plan_wave.py`, `prune_worktrees.py --self-test` and `enqueue.py --self-test` re-run GREEN in it).
+
