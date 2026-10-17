@@ -1,0 +1,43 @@
+*>--- conformance-case
+*> id: pb1273-property-active-class
+*> rules: [SR-13.18.42.3-6]
+*> source-format: free
+*> portable: unverified
+*>---
+      *> kb/Work PB1273 — ISO/IEC 1989:2023 §13.18.42.3 SR6: "The PROPERTY clause shall not be specified for data
+      *> items of usage object reference described with an ACTIVE-CLASS phrase." It compiled clean before.
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. PB1273NAM.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       REPOSITORY.
+           CLASS PB1273NAC.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 A USAGE OBJECT REFERENCE PB1273NAC.
+       PROCEDURE DIVISION.
+       MAIN.
+           INVOKE PB1273NAC "NEW" RETURNING A.
+           CONTINUE.
+           STOP RUN.
+       END PROGRAM PB1273NAM.
+
+       IDENTIFICATION DIVISION.
+       CLASS-ID. PB1273NAC INHERITS FROM BASE.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       REPOSITORY.
+           CLASS BASE.
+       IDENTIFICATION DIVISION.
+       OBJECT.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 O USAGE OBJECT REFERENCE ACTIVE-CLASS PROPERTY.
+       PROCEDURE DIVISION.
+       METHOD-ID. SHOW.
+       PROCEDURE DIVISION.
+       MAIN.
+           CONTINUE.
+       END METHOD SHOW.
+       END OBJECT.
+       END CLASS PB1273NAC.

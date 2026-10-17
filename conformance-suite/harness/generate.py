@@ -78,8 +78,9 @@ VERDICT = "=== CONFORMANCE SUITE: "
 #: The two trees of tests: the suites' (`cases/`) and WiseOwl's own regression tests (`wiseowl/cases/`, §4).
 TREES = {"cases": Path("cases"), "wiseowl": Path("wiseowl") / "cases"}
 UNASSIGNED = "_unassigned"
-#: A clause folder: the ISO clause number, then a hyphen and a name (`14.9.8-COMPUTE`), or `_unassigned`.
-CLAUSE_FOLDER = re.compile(r"^(?P<clause>[0-9]+(?:\.[0-9]+)*)-[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$")
+#: A clause folder: the ISO clause number (an annex's letter first, `A.1`), then a hyphen and a name
+#: (`14.9.8-COMPUTE`), or `_unassigned`.
+CLAUSE_FOLDER = re.compile(r"^(?P<clause>(?:[0-9]+|[A-Z])(?:\.[0-9]+)*)-[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$")
 TEST_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
 OPEN_MARK, CLOSE_MARK = "*>--- conformance-case", "*>---"
 #: The fields of §3.1 (and `constructs`), each with its value's shape.
@@ -1577,6 +1578,10 @@ def self_test() -> int:
     copies = cobol.copy_statements(fixed_tokens("       >>PAGE COPY FOO IS DOCUMENTATION", "           COPY BAR."))
     check("arm: a COPY in a directive's text (a PAGE directive's comment-text, 7.3.19.4 GR 1) is no COPY statement",
           [c.name for c in copies] == ["BAR"], copies)
+    switched = cobol.tokenize(cobol.read_lines("       >>SOURCE FORMAT FREE\nCOPY A.\n>>SOURCE FIXED\n"
+                                              "       COPY B.\n", "fixed"))
+    check("arm: a SOURCE FORMAT directive switches the form of the lines after it (7.3.24.3 GR 1)",
+          [c.name for c in cobol.copy_statements(switched)] == ["A", "B"], [t.text for t in switched])
     text = "       01 X PIC X.\n"
     check("arm: a library text is read in the encoding its byte-order mark names, else UTF-8",
           all(cobol.decode(mark + text.encode(enc)) == text for mark, enc in (

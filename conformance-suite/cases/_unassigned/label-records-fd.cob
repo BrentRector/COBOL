@@ -1,0 +1,23 @@
+*>--- conformance-case
+*> id: label-records-fd
+*> rules: []
+*> source-format: free
+*> portable: unverified
+*>---
+IDENTIFICATION DIVISION.
+PROGRAM-ID. NEGLR01.
+ENVIRONMENT DIVISION.
+INPUT-OUTPUT SECTION.
+FILE-CONTROL.
+    SELECT F ASSIGN TO "neglr01" ORGANIZATION IS SEQUENTIAL.
+DATA DIVISION.
+FILE SECTION.
+FD F LABEL RECORDS ARE STANDARD.
+01 R PIC X(10).
+PROCEDURE DIVISION.
+MAIN.
+    OPEN OUTPUT F.
+    MOVE "X" TO R.
+    WRITE R.
+    CLOSE F.
+    STOP RUN.

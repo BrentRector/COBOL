@@ -1,1 +1,0 @@
-COBOLNET1512: WRITE on file 'RELF': the WITH NO LOCK phrase may not be specified when the file's LOCK MODE is AUTOMATIC

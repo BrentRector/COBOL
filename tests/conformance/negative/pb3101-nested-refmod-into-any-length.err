@@ -1,1 +1,0 @@
-COBOLNET1688: CALL … AS NESTED argument 1 ('Y') does not conform to formal parameter 'L': the formal parameter (an elementary alphanumeric item described with PICTURE X ANY LENGTH USAGE DISPLAY) and the argument (an elementary alphanumeric item described by no PICTURE clause)

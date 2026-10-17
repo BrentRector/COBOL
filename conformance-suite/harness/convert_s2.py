@@ -34,10 +34,8 @@ The mapping (old program -> new test, editions) is written to `--map` for the ne
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import re
-import shutil
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -56,7 +54,8 @@ EDITIONS = ["85", "2002", "2014", "2023"]
 #: The codes WiseOwl reports for a declined facility (docs/CONFORMANCE.md §1): an unclaimed A.4 module refused
 #: (COBOLNET1560 data/environment, COBOLNET1707 procedure) and the declined accept-inert warnings.
 DECLINED_CODES = ("COBOLNET1560", "COBOLNET1707", "COBOLNET1578", "COBOLNET1579", "COBOLNET1580", "COBOLNET2424")
-GENERIC_HEADINGS = {"general", "general format", "general formats", "syntax rules", "general rules"}
+GENERIC_HEADINGS = {"general", "general format", "general formats", "syntax rule", "syntax rules", "general rule",
+                    "general rules"}
 TRAILING_NOUNS = {"statement", "directive", "clause", "entry", "paragraph", "function", "phrase"}
 LIBRARY_SUFFIXES = (".CPY", ".CBL", ".COB", ".cpy", ".cbl", ".cob")
 OPTIONS = "*> options:"
@@ -107,7 +106,7 @@ def is_fixed_form(text: str) -> bool:
 
 def headings() -> dict[str, str]:
     out = {}
-    for m in re.finditer(r"(?m)^#{2,7} ([0-9]+(?:\.[0-9]+)*) (.+?)\s*$", (REPO / "specs" / "ISO_COBOL.md").read_text(
+    for m in re.finditer(r"(?m)^#{2,7} ((?:[0-9]+|[A-Z])(?:\.[0-9]+)*) (.+?)\s*$", (REPO / "specs" / "ISO_COBOL.md").read_text(
             encoding="utf-8")):
         out.setdefault(m.group(1), m.group(2))
     return out
@@ -115,7 +114,7 @@ def headings() -> dict[str, str]:
 
 def clause_folder(section: str, titles: dict[str, str]) -> str:
     parts = section.strip().strip(".").split(".")
-    while len(parts) > 1 and titles.get(".".join(parts), "").strip().lower() in GENERIC_HEADINGS:
+    while len(parts) > 1 and titles.get(".".join(parts), "").strip().rstrip(".").lower() in GENERIC_HEADINGS:
         parts.pop()
     while len(parts) > 1 and ".".join(parts) not in titles:
         parts.pop()
@@ -237,12 +236,12 @@ def copied_files(program: Program, problems: list[str]) -> list[str]:
     names, a library subdirectory included)."""
     directory = OLD / program.directory
     found: list[str] = []
-    queue = [(program.text, directory)]
+    queue = [program.text]
     seen: set[str] = set()
     while queue:
-        text, where = queue.pop()
+        text = queue.pop()
         tokens = cobol.tokenize(cobol.read_lines(text, program.fmt))
-        for i, stmt in enumerate(cobol.copy_statements(tokens)):
+        for stmt in cobol.copy_statements(tokens):
             library = _library_name(tokens, stmt)
             look = directory / library if library else directory
             path = locate(look, stmt.name)
@@ -254,8 +253,22 @@ def copied_files(program: Program, problems: list[str]) -> list[str]:
             if rel not in seen:
                 seen.add(rel)
                 found.append(rel)
-                queue.append((cobol.decode(path.read_bytes()), path.parent))
+                queue.append(cobol.decode(path.read_bytes()))
+            # The texts the search passed over are what makes it witness its order (DOC-A.1-40): every other file
+            # the name could have located, in the library and, for a COPY naming one, in the default library.
+            for other in [*candidates(look, stmt.name), *(candidates(directory, stmt.name) if library else [])]:
+                if (rel_other := other.relative_to(directory).as_posix()) not in seen:
+                    seen.add(rel_other)
+                    found.append(rel_other)
     return found
+
+
+def candidates(directory: Path, name: str) -> list[Path]:
+    """Every file in `directory` the library-text search for `name` tries (locate's spellings)."""
+    if not directory.is_dir():
+        return []
+    spellings = {s.lower() for s in ([name] if "." in name else [name + s for s in LIBRARY_SUFFIXES])}
+    return sorted(p for p in directory.iterdir() if p.is_file() and p.name.lower() in spellings)
 
 
 def _library_name(tokens: list[cobol.Token], stmt: cobol.CopyStatement) -> str | None:
@@ -308,6 +321,11 @@ def main() -> int:
     for p in programs:
         stated = p.options.get("source-format")
         p.fmt = stated if stated in ("fixed", "free") else ("fixed" if is_fixed_form(p.text) else "free")
+        if p.fmt == "free" and not stated and p.directory == "85":
+            # COBOL-85 has no free form (ISO 6.4 is a 2002 introduction): the detector read a fixed-form program
+            # whose comment lines run past column 72 as free form. It is the fixed-form program it was written as.
+            problems.append(f"NOTE {p.ref}: detected free at 85: written as fixed")
+            p.fmt = "fixed"
         rows = cited.get(p.ref, [])
         if not p.negative:
             in_band = [r for r in rows if p.directory in schema.split(r.get("editions", ""), schema.editions_sep)]
@@ -366,6 +384,7 @@ def main() -> int:
     options = json.loads(options_path.read_text(encoding="utf-8")) if options_path.is_file() else {}
     mapping = {}
     placed: dict[Path, bytes] = {}
+    sources: set[Path] = set()
     conflicts = []
     for p in programs:
         target = merged.get(id(p), p)
@@ -380,6 +399,7 @@ def main() -> int:
             src = OLD / p.directory / rel
             dest = folder / rel
             data = src.read_bytes()
+            sources.add(src)
             if dest in placed and placed[dest] != data:
                 conflicts.append(f"{p.ref}: {rel} differs from the {dest.relative_to(SUITE).as_posix()} another test "
                                  f"placed")
@@ -426,6 +446,15 @@ def main() -> int:
         for p in programs:
             for suffix in (".cob", ".out", ".err"):
                 (OLD / p.directory / (p.name + suffix)).unlink(missing_ok=True)
+        for src in sources:
+            src.unlink(missing_ok=True)
+        for d in EDITIONS + ["negative"]:
+            (OLD / d / "manifest.json").unlink(missing_ok=True)
+        for leftover in sorted(f for f in OLD.rglob("*") if f.is_file()) if OLD.is_dir() else []:
+            print(f"  LEFT {leftover.relative_to(REPO).as_posix()}: no program converted it")
+        for d in sorted((d for d in OLD.rglob("*") if d.is_dir()), reverse=True) if OLD.is_dir() else []:
+            if not any(d.iterdir()):
+                d.rmdir()
     if args.map:
         args.map.write_text(json.dumps(mapping, indent=1) + "\n", encoding="utf-8")
     for line in problems:

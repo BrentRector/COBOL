@@ -1,0 +1,15 @@
+*>--- conformance-case
+*> id: memory-size
+*> rules: []
+*> source-format: free
+*> portable: unverified
+*>---
+IDENTIFICATION DIVISION.
+PROGRAM-ID. NEGMS01.
+ENVIRONMENT DIVISION.
+CONFIGURATION SECTION.
+OBJECT-COMPUTER. GENERIC-BOX
+    MEMORY SIZE 64000 WORDS.
+PROCEDURE DIVISION.
+MAIN.
+    STOP RUN.

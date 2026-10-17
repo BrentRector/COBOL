@@ -105,12 +105,26 @@ def _strip_floating(text: str, quote: str | None) -> tuple[str, str | None]:
     return "".join(out), quote
 
 
+#: A SOURCE FORMAT directive (ISO 7.3.24): `>>SOURCE [FORMAT] [IS] {FIXED | FREE}`.
+_SOURCE_FORMAT = re.compile(r"^>>\s*SOURCE(?:\s+FORMAT)?(?:\s+IS)?\s+(FIXED|FREE)\b", re.IGNORECASE)
+
+
 def read_lines(text: str, source_format: str) -> list[SourceLine]:
-    """Every physical line of `text` in `source_format` ("fixed" or "free"), classified, with its program text."""
+    """Every physical line of `text`, starting in `source_format` ("fixed" or "free"), classified, with its program
+    text. A SOURCE FORMAT directive switches the form of the lines after it: "the source text or library text following
+    the directive ... shall be treated as fixed form if FIXED is specified, or as free form if FREE is specified" (ISO
+    7.3.24.3 GR 1)."""
     lines: list[SourceLine] = []
     quote: str | None = None
     for number, raw in enumerate(text.split("\n"), start=1):
         raw = raw.rstrip("\r")
+        directive = _SOURCE_FORMAT.match((raw[SEQUENCE_AREA + 1:FIXED_TEXT_END] if source_format == "fixed"
+                                          else raw).strip())
+        if directive:
+            lines.append(SourceLine(number, raw, "comment", ""))
+            source_format = directive.group(1).lower()
+            quote = None
+            continue
         if source_format == "fixed":
             indicator = raw[SEQUENCE_AREA] if len(raw) > SEQUENCE_AREA else " "
             area = raw[SEQUENCE_AREA + 1:FIXED_TEXT_END]

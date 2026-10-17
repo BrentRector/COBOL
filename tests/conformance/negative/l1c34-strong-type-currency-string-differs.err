@@ -1,1 +1,0 @@
-COBOLNET1688: CALL … program-prototype 'L1C34IS' argument 1 ('A') does not conform to formal parameter 'L': the formal parameter (a strongly-typed group of type tc) and the argument (a strongly-typed group of type tc) are not of the same type

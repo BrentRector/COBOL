@@ -1,1 +1,0 @@
-COBOLNET0869: SET 'WS-P1' 'WS-P2' TO SELF: SELF and SUPER are object references, not data pointers (ISO §14.9.39.2 Format 7 — the sender of a data-pointer SET is NULL or another pointer; SELF and SUPER belong to Format 5, the object-reference assignment)

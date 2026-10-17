@@ -1,0 +1,16 @@
+      *>--- conformance-case
+      *> id: fixed-form-word-continuation
+      *> rules: []
+      *> source-format: fixed
+      *> portable: unverified
+      *>---
+000100 IDENTIFICATION DIVISION.
+000200 PROGRAM-ID. NEGWC01.
+000300 DATA DIVISION.
+000400 WORKING-STORAGE SECTION.
+000500 01 W-LONG-DATA-NA
+000600-    ME PIC 9(3) VALUE 123.
+000700 PROCEDURE DIVISION.
+000800 MAIN.
+000900     DISPLAY W-LONG-DATA-NAME.
+001000     STOP RUN.
