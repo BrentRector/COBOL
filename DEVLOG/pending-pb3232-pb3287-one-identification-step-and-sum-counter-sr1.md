@@ -32,3 +32,8 @@ negatives `pb3232-sum-counter-beside-data-item` and six `pb3287-*`. Drift: `Refe
 Code: sibling arms agree (ResolveForItem screens through PB1249's legs). Performance: `Identified` is a struct, the
 `written` text is built only on failure paths, no delegate on the resolve hot path. Duplication: the displacement term and
 the report+screen pair each exist once. Semgrep verify: PASS, counts unchanged.
+
+**Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run 20261017T011127Z-346699: Conformance 5,677/11,898,
+Unit 32,734/33,889, Characterization 5/36 cases ran). Every golden above ran in leg 1 (`leg-1-Conformance.trx`). The first
+gate attempt was RED at the line-endings audit: my own corpus scans had rewritten 61 tracked report outputs with CRLF
+(`line_endings.py --fix` restored them); run corpus programs from a scratch directory, not the golden's.
