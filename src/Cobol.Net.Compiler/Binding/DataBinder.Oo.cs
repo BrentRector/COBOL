@@ -652,6 +652,39 @@ public sealed partial class DataBinder
         /// receiver in turn, so the accessors go around THIS receiver (<c>BoundReceiverBrackets</c>, kb/Work PB2078)
         /// instead of around the whole statement.</summary>
         public bool Interleaved { get; set; }
+
+        /// <summary>Identifier-3 when a RECEIVING use of this property evaluates it into the identified-object
+        /// temporary, so that the GET and the SET reach the one object identified (§14.6.4; §8.4.3.9.4 GR3; kb/Work
+        /// PB2078): identifier-3 written as an object-reference data item and invoked on as an instance. Null when the
+        /// accessors invoke on identifier-3 as it stands: a FACTORY OF or class receiver, or a computed object, whose
+        /// evaluation is the <see cref="Prelude"/>.</summary>
+        public Place? IdentifiedReceiver =>
+            Form == Bound.InvokeForm.Instance && Receiver is { Item: { IsCompilerTemp: false, Pic.ObjectRef: not null } }
+                ? Receiver : null;
+
+        /// <summary>Whether a use of the property whose store polarity is <paramref name="kind"/> invokes the GET before
+        /// the statement stores it (§8.4.3.9.4 GR1 for a sending use and GR3 for a read-modify-write one; for a part store,
+        /// §14.9.43.4 GR7 and §8.4.3.3.4 GR5, the GET supplies the kept positions where the class has one, kb/Work PB2618).</summary>
+        public bool GetsBefore(Bound.StoreKind kind) =>
+            kind is Bound.StoreKind.None or Bound.StoreKind.ReadWrite || (kind == Bound.StoreKind.WriteInPart && Get is not null);
+    }
+
+    /// <summary>⛔ DOES IDENTIFYING THIS RECEIVER EVALUATE ANYTHING WHEN ITS ACCESSORS OPEN? (kb/Work PB370). A claimed
+    /// object-property receiver (<see cref="OoClaimInterleavedReceiver"/>) has its bracket opened just before its store
+    /// (<c>ReceiverBracketEmitter.Receive</c>): identifier-3's <see cref="OoPendingPropertyOp.Prelude"/>, its evaluation
+    /// into the identified-object temporary, and the GET of a part store (<c>OoBinder.OoWrapPropertyOps</c>, which builds
+    /// those steps from the same three members). True when any of them evaluates something at run time, so a statement
+    /// whose rules evaluate its sending operand first (§14.9.25.4 GR1) knows the bracket would overtake it. A receiver
+    /// that is no claimed property opens nothing.</summary>
+    internal bool OoReceiverOpensAtRunTime(Place receiver, Bound.StoreKind kind)
+    {
+        foreach (var op in OoPendingPropertyOps)
+            if (ReferenceEquals(op.Temp, receiver.Item))
+                return op.Interleaved
+                    && (op.Prelude.Count > 0
+                        || op.IdentifiedReceiver is { } identified && CobolNet.CodeGen.PlaceIdentification.IdentifiesAtRunTime(identified)
+                        || op.GetsBefore(kind));
+        return false;
     }
 
     /// <summary>⛔ THE ONE CLAIM A RECEIVER-PLACING BINDER MAKES (kb/Work PB2078): each of <paramref name="receivers"/> is a

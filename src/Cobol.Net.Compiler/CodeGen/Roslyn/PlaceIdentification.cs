@@ -105,17 +105,28 @@ internal static class PlaceIdentification
         return runTime || EvaluatesBesidesItsAddress(place);
     }
 
+    /// <summary>The run-time steps of identification that leave no fragment for <see cref="Freeze(Place, Func{string,
+    /// string})"/> to hoist. ⛔ A LITERAL SUBSCRIPT IS STILL TESTED AT RUN TIME WHERE THE TABLE'S EXTENT IS (kb/Work
+    /// PB370): §13.18.38.4 GR7 — "At the time the subject of entry is referenced or any data item subordinate or
+    /// superordinate to the subject of entry is referenced, the value of the data item referenced by data-name-1 shall
+    /// fall within the bounds from integer-1 through integer-2" — is tested by the table step itself
+    /// (<see cref="OdoReferenceCheck"/>), and an OCCURS DYNAMIC element is located against the table's current capacity
+    /// (§8.5.1.9.3), so <c>MOVE N (I) TO O (1)</c> over an occurs-depending O raised the receiver's EC-BOUND-ODO before
+    /// the sender's EC-BOUND-SUBSCRIPT while Freeze, which leaves a bare literal alone, answered "nothing".</summary>
     private static bool EvaluatesBesidesItsAddress(Place place) => place switch
     {
-        OdoGroupPlace or RefModPlace => true,
+        OdoGroupPlace or RefModPlace or DynTablePlace => true,
         PlaceDecorator d => EvaluatesBesidesItsAddress(d.Inner),
-        MemberPlace m => Guarded(m.Path),
-        DynTablePlace d => Guarded(d.Path),
-        RedefViewPlace v => Guarded(v.Backing),
+        MemberPlace m => PathEvaluates(m.Path),
+        RedefViewPlace v => PathEvaluates(v.Backing),
         _ => false,
     };
 
-    private static bool Guarded(AccessPath path) => path.Segments is [RootFieldSegment { Guard: not null }, ..];
+    /// <summary>A path step that evaluates whatever its subscript: a formal's omitted-argument guard
+    /// (EC-PROGRAM-ARG-OMITTED), an occurs-depending bound test, an OCCURS DYNAMIC element.</summary>
+    private static bool PathEvaluates(AccessPath path) =>
+        path.Segments is [RootFieldSegment { Guard: not null }, ..]
+        || path.Segments.Any(s => s is FixedTableSegment { Odo: not null } or DynTableSegment);
 
     /// <summary>The operand with its data reference frozen — a field operand's <see cref="Place"/>; a literal, a
     /// figurative or a function result has no run-time address of its own (a function-identifier's argument

@@ -2073,6 +2073,7 @@
   "pb664-unstring-sender-pointer",
   "pb664-string-national-mix",
   "pb891-checking-scope-below-2002",
+  "pb370-move-first-condition-below-2002",
   "pb854-eop-use-name-below-2002",
   "pb907-through-alias-vlg-incompatible",
   "pb960-invalid-picture-no-cascade",

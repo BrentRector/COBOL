@@ -615,6 +615,52 @@ data is moved to the first of the receiving operands" — and without it `MOVE O
 AFTER storing into `N` and sent one character to the second receiver. A DYNAMIC-LENGTH elementary sender is
 frozen by §8.5.1.10.4's own carrier.
 
+**The ORDER of the two identifications has two halves** (kb/Work PB3261, PB370). GR1 evaluates identifier-1's
+reference modifier, subscript or function-identifier "immediately before data is moved to the first of the receiving
+operands" and identifies identifier-2 "immediately before the data is moved to the respective data item" — the
+sender first, as §14.6.4's left-to-right order has it, and §14.9.49.4 GR11 ("the first one that occurs in the order
+of evaluation") makes the order observable. The STORE half is the emitter's: a ref-returning
+`CobolTable.At(T, Occ(I)) = <sender>` identifies its left operand before it evaluates its right, so each store renders
+through `PlaceIdentification.SenderFirst`, which evaluates the sending value into a local first whenever both sides
+identify at run time (`PlaceIdentification.IdentifiesAtRunTime`, which also counts a literal subscript into an
+occurs-depending or OCCURS DYNAMIC table: §13.18.38.4 GR7's bound test rides the table step, so `MOVE N (I) TO O (1)`
+raised the receiver's EC-BOUND-ODO first). The PRE-OP half is the binder's: a receiver's function-bearing subscript or
+user-function activation is a pre-op that runs before the statement, which no store order can reach, so when the
+receiver registered one and the sender identifies at run time `MoveBinder.BindMoveOf` freezes the sender at N = 1 as
+well. An OBJECT-PROPERTY receiver is the same arm in another form: its identifier-3's pre-ops move into its accessor
+bracket (`OoPendingPropertyOp.Prelude`), which `ReceiverBracketEmitter.Receive` opens just before the store, together
+with identifier-3's evaluation into the identified-object temporary and the GET of a part store, so
+`DataBinder.OoReceiverOpensAtRunTime` asks whether that bracket evaluates anything and the binder freezes on it too
+(`MOVE X (1:L) TO P OF R (I)` raised R's EC-BOUND-SUBSCRIPT first; golden `2002/pb370_move_property_receiver_order`).
+The bracket's steps and that question read the same `OoPendingPropertyOp` members (`IdentifiedReceiver`,
+`GetsBefore`). The freeze is placed on the pending list at the point the sender finished binding
+(`SendingValueTemp.Positioned`, the one placement `ArgumentOrder` uses for a function argument too), so it also
+precedes a receiver's pre-ops at N > 1. A NUMERIC function-identifier's temporary is sized for the MOVE's receivers
+(`SendingValueTemp.ReturnedValuePicFor` over `ReceivingReach.Of`): the fixed 30-digit, scale-9 description
+stored `MOVE FUNCTION PI TO S1 S2` into `PIC 9V9(12)` as 3.141592653000 where the single-receiver MOVE stores
+3.141592653589, so the equivalence was exact only for receivers of scale 9 or less and 21 integer digits or fewer.
+`ReceivingReach` decides the intermediate's SHAPE from the receivers, and the binder does not know the function's
+carrier family (binary64, SDIDI or scaled integer, decided by `IntrinsicRenderer`), so each shape is exact for
+every family. When every receiver is a floating-point item the intermediate is a floating-point item too (the
+receivers' one usage, binary32 for several binary32 usages, otherwise binary64), because no scaled integer carries a
+binary64's magnitude or digits — a scale-9 intermediate stored `MOVE FUNCTION PI TO F (I)` into a FLOAT-LONG as
+3.141592653 under a >>TURN that made the N = 1 freeze owed, where the un-frozen MOVE stores 3.141592653589793.
+When every receiver is floating-point and one is a floating-point numeric-edited item, the intermediate is the
+widest such item the PICTURE admits, `+9.9(35)E+9999` (§13.18.40.3 SR15, §13.18.40.4 GR13 b): an edited receiver
+truncates the sender's decimal value to its own significand (§14.6.8.4 2), and truncating to 36 digits first changes
+nothing, where a binary64 intermediate cut `MOVE FUNCTION NUMVAL ("1.2345678901234567890123") TO D (I)` into
+`PIC +9.9(20)E+99` to 17 digits. When every receiver is a fixed-point item, the intermediate is fixed-point at
+exactly the receivers' widest scale and integer digits (`PicInfo.WidestReceiving`): each receiver truncates a
+sub-range of them (§14.6.8.2 4), and the returned value's own 21 integer digits added cut a `PIC S9(3)V9(28)`
+receiver's fraction to 17 digits. When those digits together pass the 38-digit carrier (`ReceivingReach.BeyondCarrier`:
+a `PIC 9(31)` beside a `PIC V9(28)`) no fixed-point window is exact for both, and a non-integer value takes the
+36-digit floating-point edited intermediate instead (an INTEGER function keeps scale 0, which fits). Any other set
+(fixed-point receivers beside floating-point ones, or a character receiver, which takes the returned value's own text
+image) takes the larger of the returned value's description and the fixed-point receivers' digits, and a
+floating-point or floating-point-edited receiver beside them asks for every fraction digit the 38-digit carrier keeps.
+The documented limits are that MIXED set and the beyond-the-carrier set, whose binary64 values reach the receivers
+through their shortest round-trip decimal (DOC-A.1-92).
+
 **The intermediate's CAPACITY is counted in §8.4.3.3.4 GR5 positions, not in characters.** GR5 a) fixes the unit —
 "If the usage of identifier-1 is bit, positions used in evaluation are bit positions; otherwise, positions used
 in evaluation are character positions" — and `DataItem.ImageWidth` answers a different question, the item's
