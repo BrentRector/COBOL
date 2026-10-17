@@ -219,8 +219,9 @@ conformance-suite/
   per edition (the cleared tests of `cases/`, not `_unassigned/`, that apply there, with their expectation: the
   expected-output file per A.1 value, or the flag kind, the marked line and the control), and
   `suites/wiseowl/manifest.json`: every test of both trees at each edition it names, portable or not, and the
-  `wiseowl/diagnostics.json` refusals, which is what WiseOwl's own runner executes (S1c). The suites are build
-  output, never committed.
+  `wiseowl/diagnostics.json` refusals, each with the refused test's source, reference format and declared files,
+  which is what WiseOwl's own runner executes (S1c). The suites are build output, never committed; `--out DIR`
+  writes them elsewhere (the in-process runner's own directory).
 - **Completeness is reported per witness kind**, never as one count that can never reach zero: for each edition, the
   inventory rows witnessed by a suite test, by a documented determination (`docs/CONFORMANCE.md`), by a derivation,
   or only by a WiseOwl unit test, and the rows with no witness. The suite's own measure is "rows whose obligation a
@@ -236,25 +237,55 @@ conformance-suite/
   z/OS); a .NET tool would not run on z/OS. It executes the generator's manifests, never headers.
 - **An adapter is configuration**: command templates for compile, run and flag-mode (how the conformance warning
   mechanism is invoked: GnuCOBOL `-std=<edition>`, IBM `FLAGSTD`), how a diagnostic's line number is read from the
-  compiler's output, how an ASSIGN name maps to a file, any limit on file names (cobc refused long base names), and
-  the edition map. GnuCOBOL: `cobc -std={std} -x {src} -o {exe}`, `{exe}`,
-  `{85: cobol85, 2002: cobol2002, 2014: cobol2014}`. A compiler that needs more (IBM's batch jobs and DD names)
-  supplies a Python hook with the same operations. Shipped: WiseOwl COBOL (`cobol`) and GnuCOBOL; documented shapes
-  for IBM Enterprise COBOL and Rocket Visual COBOL.
+  compiler's output, how an ASSIGN name maps to a file, any limit on file names (cobc refused long base names), the
+  exit codes that mean the compiler crashed, and the edition map. GnuCOBOL: `cobc -std={std} -fformat={source-format}
+  -x -I . -o {program} {source}`, `{work}/{program}`, `{85: cobol85, 2002: cobol2002, 2014: cobol2014}`, base names
+  of at most 31 characters (measured on 3.2.0: "invalid file base name ... length exceeds maximum" at 32). A compiler
+  that needs more (IBM's batch jobs and DD names) supplies a Python hook with the same operations (`compile(ctx)`,
+  `run(ctx)`, `flag(ctx)`, each returning a `Step`). Shipped: WiseOwl COBOL (`cobol`) and GnuCOBOL; documented
+  shapes for IBM Enterprise COBOL and Rocket Visual COBOL in the folder's README. `harness/config.py` is the ONE
+  loader and validator of adapters, profiles and baselines: `run.py` checks their shape, and the generator's audit
+  (`generate.py --check`, §9) checks every one of them against what only the repository knows (the editions, the
+  annexes' names, the A.1 items, each suite's test ids), so a malformed adapter is red in seconds like a malformed test.
+- **A profile is evidence, not assertion**: each claimed A.4 module and A.3 element carries the evidence for the
+  claim. WiseOwl's claims are the rows `docs/CONFORMANCE.md` §5 and §2 dispose Claimed or Partial (§5's preamble: the
+  conformance summary claims what is Claimed or Partial there), held to those tables by
+  `ConformanceSuiteProfileDriftTests`; GnuCOBOL's were measured on cobc 3.2.0, and the S3 pilot verifies them.
+  Every profile states its value of every A.1 item `implementor-defined.json` enumerates (the generator refuses one
+  that does not), and its extra reserved words per edition (GnuCOBOL's: the words `cobc --list-reserved
+  -std=<dialect>` lists that `reserved-words.json` does not reserve there).
 - **Each test runs in its own fresh working directory** with its declared files, stdin closed (end of file, as
-  today), and is cleaned up afterwards; tests run in parallel without sharing a file.
+  today), and is cleaned up afterwards; tests run in parallel without sharing a file. A flagged test's control is
+  compiled (the adapter's compile command) in a directory of its own inside the test's.
 - **Verdicts:** PASS · FAIL (the output difference; an accepted test that did not translate or run; a flagged test
   whose control compiled but no diagnostic was reported at the marked line) · NOT APPLICABLE (the profile lacks the
   edition, module or element; the flagged test's control did not compile; the test uses one of the profile's extra
   reserved words, which §4.2.10 permits an implementation to add) · NO VERDICT (the compiler or harness crashed or
-  exceeded a generous hang guard). NO VERDICT is counted on its own, never folded into PASS or FAIL.
+  exceeded a generous hang guard). NO VERDICT is counted on its own, never folded into PASS or FAIL. A program's exit
+  status is not judged (§3.2: it is not standard); its output is.
+- **"Uses an extra reserved word" means uses it as a user-defined word.** ISO §4.2.10: "An implementation that
+  introduces additional reserved words as nonstandard extensions conforms"; such a word stops translation only where
+  a program uses it as a user-defined word. A context-sensitive word in its own context (ISO §8.10: "reserved in the
+  specified language construct or context") is a keyword use: GnuCOBOL 3.2 reserves PREVIOUS at -std=cobol2002, and
+  `READ ... PREVIOUS` translates there. So the generator writes each manifest entry's `words` as the program's words
+  (copied library text included) that are none of the standard's words (the edition's reserved words, and the
+  context-sensitive words, intrinsic function names and compiler-directive words of ISO §8.10-8.12), together with
+  every name the program defines (data, condition, file, program, paragraph and section names) that its edition
+  does not reserve; a runner intersects them with the profile's list and reads no program. The entry also names its
+  `clause` folder, which the results total by.
 - **Results** as JUnit XML and JSON, totals per edition and per clause, and the CHANGES against the compiler's
-  recorded baseline (`baselines/`), so a second compiler's run is a regression net rather than a permanently red leg.
+  recorded baseline (`baselines/`), so a second compiler's run is a regression net rather than a permanently red leg:
+  a regression (a recorded PASS lost), a new FAIL or NO VERDICT, any other change, an improvement, and a recorded test
+  that did not run. A run is RED when a verdict differs from its recorded one (or has none) and is FAIL or NO VERDICT,
+  or was a recorded PASS; with no baseline, any FAIL or NO VERDICT is RED. `--record-baseline` writes a whole run's
+  verdicts (never a `--test`-narrowed one). `run.py` executes the per-edition suites; the `wiseowl` manifest and its
+  refusals are the in-process xUnit runner's (S1c).
 - **In WiseOwl's own pipeline**: the xUnit runner in `Cobol.Net.Tests.Conformance` executes the same manifests
-  in-process (fast) and also checks `wiseowl/diagnostics.json`; CI also runs `harness/run.py` with the WiseOwl
-  adapter and a drift test requires the two runners' verdict sets to be equal. The output normalization exists in
-  both languages by nature (`CutRunner.Normalize` in C#; LF, per-line trailing-space trim) and both are pinned to
-  one shared fixture. The GnuCOBOL adapter ADDS a signal to the per-batch battery; it does not replace the GnuCOBOL
+  in-process (fast) and also checks `wiseowl/diagnostics.json`; the drift test that requires the two runners'
+  verdict sets to be equal runs `harness/run.py` with the WiseOwl adapter itself, on the same generated suites, so
+  every gate and both of CI's operating systems run it (no CI job of its own, which a local gate would not
+  reproduce). The output normalization exists in both languages by nature (`CutRunner.Normalize` in C#; LF,
+  per-line trailing-space trim) and both are pinned to one shared fixture, `harness/normalization-fixture.json`. The GnuCOBOL adapter ADDS a signal to the per-batch battery; it does not replace the GnuCOBOL
   differential (`scripts/gnucobol_differential.py`), which runs GnuCOBOL's own testsuite through WiseOwl, the other
   direction.
 
@@ -423,11 +454,38 @@ hold the status, this section the scope. Every slice ships its own tests and dri
   of §5, the WiseOwl and GnuCOBOL adapters and profiles, a fresh working directory per test, stdin closed, the
   verdicts and their JUnit XML and JSON, `--record-baseline` and the CHANGES report; `--self-test` drives a stub
   compiler (a Python script) through every verdict, so the logic is tested without `cobc`. Runs on Windows and
-  Linux.
+  Linux. **As landed:** `harness/run.py` (the runner, its results and CHANGES, a 58-arm `--self-test` passing on
+  Windows and under WSL) and `harness/config.py` (the formats); `adapters/` and `profiles/` for `wiseowl` and
+  `gnucobol`; `baselines/gnucobol.json` recorded on the S1a seed under WSL (14 PASS, 6 NOT APPLICABLE at 2023, and 2
+  FAIL: READ PREVIOUS after OPEN is at end at -std=cobol2002 and -std=cobol2014, the 2023 rule, where E.2 item 22
+  records that those editions retrieved the first record); the seed PASSes 22 of 22 on WiseOwl. Three corrections to
+  this design, written above: the manifest entry's `words` and `clause` (the generator reads the program, so no runner
+  does), since a word list that held keyword uses made the READ PREVIOUS seed NOT APPLICABLE on GnuCOBOL, whose
+  -std=cobol2002 reserves the context-sensitive PREVIOUS; profiles carry their evidence, and WiseOwl's is held to
+  `docs/CONFORMANCE.md` by a drift test; and the generator's audit, not a second one, checks every adapter, profile
+  and baseline. On the way, the `cobol` command's exit code for a source the binding phase refuses (a syntax rule the
+  binder checks, an edition diagnostic) became 65, like a parse error, where it had fallen to 70, the code of the
+  compiler's own failure.
 - **S1c — WiseOwl's manifest runner (PB3176).** An xUnit runner in `tests/Cobol.Net.Tests.Conformance` that executes
   the generator's manifests in-process (accept: compile, run, compare through `CutRunner.Normalize`; flag: the
   diagnostic at the marked line; `wiseowl/diagnostics.json`: the refusal and its code or message), and the drift
   tests of §9: equal verdicts with `run.py` on the WiseOwl adapter, and the two normalizations on one shared fixture.
+  **As landed:** `ConformanceSuiteTests` (one row per test and edition of the `wiseowl` manifest, red on FAIL or NO
+  VERDICT as `run.py` is with no baseline; one row per refusal and edition, which the front end or the binder must
+  refuse with its code) over `ConformanceSuiteRunner` (the verdicts of §5, compiling through the compiled-program
+  cache) and `ConformanceSuite` (the manifest, generated once per test process into a directory of its own by the new
+  `generate.py --out`; the adapter's diagnostic pattern and the profile, read rather than restated, since
+  `config.py` validates them at the audit). `ConformanceSuiteRunnerDriftTests` runs `run.py` through the WiseOwl
+  adapter on the same generated suites and names every test whose verdict differs, and holds `CutRunner.Normalize`
+  and `run.py`'s `normalize()` to `harness/normalization-fixture.json`. Two corrections to this design, written
+  above and in §4: the verdict drift test runs `run.py` itself (§5), and a refusal's manifest entry carries the
+  test's declared files, so the refused program compiles as the suite compiles it. The WiseOwl adapter pins a
+  program's default locales to the root locale, as the in-process runner does (`CutRunner.LocalePin`; the defaults
+  are the environment's, DOC-A.1-118), and a drift test holds the two pins equal. The Conformance project builds
+  the `cobol` command for `run.py` (a project reference that references no assembly), since CI's Conformance legs
+  build that project alone. The theories are one class each: the move (S2) partitions them when the corpus arrives,
+  as `CorpusRunnerTests` is (kb/Work PB2527), and decides the verdict drift test's shape at that size, since `run.py`
+  starts one `cobol` process per compile.
 - **S2 — the move (PB3177).** §6 step 1, in one landing: the converter (committed on the branch for review, deleted
   before it lands: the move is its output), the moved tree, `wiseowl/cases/` and `wiseowl/diagnostics.json`, the
   inventory's citations and ref grammar, every consumer of §2's command, the arch-oracle baseline, the hook, CI, the
