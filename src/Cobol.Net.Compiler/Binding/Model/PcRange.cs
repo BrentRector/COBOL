@@ -28,11 +28,13 @@ namespace CobolNet.Binding.Model;
 /// </remarks>
 public readonly record struct PcRange
 {
-    private PcRange(int start, int end, bool isEmpty)
+    private PcRange(int start, int end, bool isEmpty, int spanLow, int spanHigh)
     {
         Start = start;
         End = end;
         IsEmpty = isEmpty;
+        SpanLow = spanLow;
+        SpanHigh = spanHigh;
     }
 
     /// <summary>The pc at which execution of the set begins (§14.9.28.4 GR5 — "control is transferred to the
@@ -52,17 +54,33 @@ public readonly record struct PcRange
     /// space (kb/Work PB440).</summary>
     public bool IsEmpty { get; }
 
+    /// <summary>⛔ THE LEXICAL SPAN, STORED — NEVER DERIVED FROM <see cref="Start"/>/<see cref="End"/> (kb/Work PB3254).
+    /// The lowest pc of the text this range covers. The pair is the RETURN-ADDRESS pair of a composed THRU, so it
+    /// forgets the far end of each operand: <c>INPUT PROCEDURE IS S-B THRU S-A</c> over SECTIONS with S-A (A1, A2)
+    /// physically before S-B (B1, B2, B3) is <c>(B1, A2)</c>, and <c>min(Start, End)..max(Start, End)</c> is
+    /// <c>A2..B1</c> — it drops A1 and B2, B3, which lie in the procedure (§14.9.28.4 GR4: "all statements beginning
+    /// with the first statement of procedure-name-1 and ending with the last statement of procedure-name-2"; GR6: any
+    /// physical order). So every constructor sets the span from the operand's own extent and <see cref="Through"/>
+    /// takes the hull of both operands'. An EMPTY range is the span <c>(s, s−1)</c> — a gap before pc <c>s</c> — so the
+    /// hull of an empty operand and a paragraph run is exactly the paragraphs between them, and a hull that holds no
+    /// pc agrees with <see cref="IsEmpty"/> (pinned by <c>ProcedureRangeEmptinessDriftTests</c>).</summary>
+    private int SpanLow { get; }
+
+    /// <summary>The highest pc of the lexical span (inclusive), see <see cref="SpanLow"/>.</summary>
+    private int SpanHigh { get; }
+
     /// <summary>A single paragraph's range (§8.4.2.2 — a paragraph-name resolves to one pc).</summary>
-    public static PcRange At(int pc) => new(pc, pc, isEmpty: false);
+    public static PcRange At(int pc) => new(pc, pc, isEmpty: false, pc, pc);
 
     /// <summary>A non-empty range spanning <paramref name="start"/>..<paramref name="end"/> inclusive. The pair
     /// may be inverted (GR6): <paramref name="end"/> is the NAMED exit, not a numeric upper bound.</summary>
-    public static PcRange Of(int start, int end) => new(start, end, isEmpty: false);
+    public static PcRange Of(int start, int end) =>
+        new(start, end, isEmpty: false, Math.Min(start, end), Math.Max(start, end));
 
     /// <summary>The EMPTY range of a zero-paragraph section (§14.4.2) whose paragraphs would have begun at
     /// <paramref name="startPc"/>: execution continues at <paramref name="startPc"/>, the return mechanism sits
     /// after <c>startPc − 1</c>, and there is no first statement to transfer to.</summary>
-    public static PcRange EmptyAt(int startPc) => new(startPc, startPc - 1, isEmpty: true);
+    public static PcRange EmptyAt(int startPc) => new(startPc, startPc - 1, isEmpty: true, startPc, startPc - 1);
 
     /// <summary>Compose <c>procedure-name-1 THRU procedure-name-2</c> (§14.9.28.4 GR4 — "all statements beginning
     /// with the first statement of procedure-name-1 and ending with the last statement of procedure-name-2";
@@ -71,7 +89,8 @@ public readonly record struct PcRange
     /// exactly one past the composed exit; any statement in between (or a non-empty endpoint) makes the set
     /// non-empty, including the inverted arrangements GR6 permits.</summary>
     public PcRange Through(PcRange last) =>
-        new(Start, last.End, isEmpty: IsEmpty && last.IsEmpty && Start == last.End + 1);
+        new(Start, last.End, isEmpty: IsEmpty && last.IsEmpty && Start == last.End + 1,
+            Math.Min(SpanLow, last.SpanLow), Math.Max(SpanHigh, last.SpanHigh));
 
     /// <summary>This range is exactly one paragraph — what ALTER's procedure-name-1 requires (a paragraph
     /// containing a single GO TO), so a section name (a multi-pc range) and an empty section are both excluded.</summary>
@@ -90,18 +109,14 @@ public readonly record struct PcRange
     /// both inside and outside the procedure is not "in" it for the syntax rules. No reachability walk replaces this
     /// method (kb/Work PB812's determination). A rule that IS about execution (§14.9.28.3 SR8's "under") builds its
     /// closure in <c>ProcedureReach.Closure</c>, seeded from <see cref="SpannedPcs"/>.</para></summary>
-    public bool Spans(int pc) => !IsEmpty && pc >= SpanLow && pc <= SpanHigh;
+    public bool Spans(int pc) => pc >= SpanLow && pc <= SpanHigh;
 
     /// <summary>The paragraphs <see cref="Spans"/> answers membership of, lowest pc first — the seed set of the
     /// reachability model (<c>ProcedureReach.Closure</c>), so the lexical span is computed in ONE place.</summary>
     public IEnumerable<int> SpannedPcs()
     {
-        if (IsEmpty) yield break;
         for (int pc = SpanLow; pc <= SpanHigh; pc++) yield return pc;
     }
-
-    private int SpanLow => Math.Min(Start, End);
-    private int SpanHigh => Math.Max(Start, End);
 
     public override string ToString() => IsEmpty ? $"[empty @{Start}]" : $"[{Start}..{End}]";
 }

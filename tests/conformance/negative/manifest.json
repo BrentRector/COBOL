@@ -17,6 +17,7 @@
   "pb3164-method-duplicate-constant-unequal",
   "pb374-async-messaging-below-2023",
   "pb374-ec-mcs-name-below-2023",
+  "pb3149-ec-mcs-no-requestor-unknown",
   "pb2532-comment-paragraph-repeated",
   "pb2532-comment-paragraph-out-of-order",
   "pb3129-type-index-in-constant-record",
@@ -2735,7 +2736,10 @@
   "pb656-cobol-reserved-through-2014",
   "pb3233-inspect-figurative-literal1-size",
   "pb3233-inspect-figurative-literal4-size",
-  "pb3233-inspect-symbolic-literal1-size"
+  "pb3233-inspect-symbolic-literal1-size",
+  "pb3254-sort-in-inverted-section-sort-procedure-first",
+  "pb3254-sort-in-inverted-section-sort-procedure-last",
+  "pb3254-merge-in-inverted-section-sort-procedure"
  ],
  "pending": []
 }

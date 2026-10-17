@@ -97,6 +97,41 @@ public sealed class ProcedureRangeEmptinessDriftTests
         }
     }
 
+    // ── kb/Work PB3254: the lexical span of a composed THRU keeps BOTH operands' extents ─────────────────────
+
+    [Fact]
+    public void ThroughSpansEveryParagraphOfBothOperandsInWhicheverOrder()
+    {
+        // §14.9.40.3 SR3 reads the procedure lexically; §14.9.28.4 GR6 lets procedure-name-2 stand BEFORE
+        // procedure-name-1. S-A = pcs 2..3 physically before S-B = pcs 4..6, and `S-B THRU S-A` is the pair (4, 3).
+        PcRange sectionA = PcRange.Of(2, 3);
+        PcRange sectionB = PcRange.Of(4, 6);
+        (string Name, PcRange First, PcRange Thru, int[] Spanned)[] cases =
+        [
+            ("sections, forward",                sectionA,           sectionB,           [2, 3, 4, 5, 6]),
+            ("sections, INVERTED (PB3254)",      sectionB,           sectionA,           [2, 3, 4, 5, 6]),
+            ("paragraphs, inverted",             PcRange.At(9),      PcRange.At(3),      [3, 4, 5, 6, 7, 8, 9]),
+            ("section THRU earlier paragraph",   sectionB,           PcRange.At(1),      [1, 2, 3, 4, 5, 6]),
+            ("empty THRU following section",     PcRange.EmptyAt(4), sectionB,           [4, 5, 6]),
+            ("earlier section THRU empty",       sectionA,           PcRange.EmptyAt(4), [2, 3]),
+            ("later empty THRU earlier section", PcRange.EmptyAt(4), sectionA,           [2, 3]),
+            ("paragraph THRU earlier empty",     PcRange.At(6),      PcRange.EmptyAt(4), [4, 5, 6]),
+            ("empty THRU a LATER empty",         PcRange.EmptyAt(3), PcRange.EmptyAt(8), [3, 4, 5, 6, 7]),
+            ("empty THRU itself",                PcRange.EmptyAt(5), PcRange.EmptyAt(5), []),
+        ];
+
+        foreach (var c in cases)
+        {
+            PcRange composed = c.First.Through(c.Thru);
+            Assert.True(c.Spanned.SequenceEqual(composed.SpannedPcs()),
+                $"{c.Name}: spanned [{string.Join(", ", composed.SpannedPcs())}]");
+            for (int pc = 0; pc <= 10; pc++)
+                Assert.Equal((c.Name, pc, c.Spanned.Contains(pc)), (c.Name, pc, composed.Spans(pc)));
+            // The span and the carried emptiness are one fact: a range that spans no paragraph is the empty set.
+            Assert.Equal((c.Name, c.Spanned.Length == 0), (c.Name, composed.IsEmpty));
+        }
+    }
+
     // ── The dispatcher is never asked to run an empty range ──────────────────────────────────────────────────
 
     [Fact]
