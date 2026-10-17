@@ -2398,11 +2398,13 @@ internal static class RuntimeApi
     /// <summary>The OCCURS DEPENDING table a variable-length group holds as its trailing storage (<c>OdoTail</c>,
     /// kb/Work PB244, PB2497), as the argument of the cell's group helpers and of a record layout; <c>default</c> for
     /// a group that holds none. <paramref name="odo"/> is the table's element width, maximum count and components per
-    /// occurrence (zero when absent), and for a table counted in bits its lead bits and unit (kb/Work PB3030).</summary>
+    /// occurrence (zero when absent), and for a table counted in bits its lead bits, unit and the last occurrence's
+    /// trailing filler (kb/Work PB3030, PB3167 review R1-1).</summary>
     private static string OdoTailOf(OdoTail odo) =>
         odo.Max <= 0 ? "default"
-        : odo.PositionsPerCharacter <= 1 ?$"new {nameof(OdoTail)}({odo.Elem}, {odo.Max}, {odo.Comps})"
-        : $"new {nameof(OdoTail)}({odo.Elem}, {odo.Max}, {odo.Comps}, {odo.Lead}, {odo.PositionsPerCharacter})";
+        : odo.PositionsPerCharacter <= 1 ? $"new {nameof(OdoTail)}({odo.Elem}, {odo.Max}, {odo.Comps})"
+        : $"new {nameof(OdoTail)}({odo.Elem}, {odo.Max}, {odo.Comps}, {odo.Lead}, {odo.PositionsPerCharacter}"
+          + (odo.Trailing == 0 ? ")" : $", {odo.Trailing})");
 
     /// <summary>How many trailing characters of a member's maximum image lie beyond <paramref name="countExpr"/>
     /// occurrences of its OCCURS DEPENDING table — <c>OdoTail.CutAt</c> (kb/Work PB3030).</summary>

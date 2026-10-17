@@ -249,13 +249,20 @@ public static class OdoModel
     /// field) and the holder starts <see cref="BitLayout.BitsBeforeInRun"/> bits into it. Those bits are fixed material
     /// sharing the table's first character exactly as the holder's own leading bits are, so they join
     /// <see cref="OdoTail.Lead"/>. Measured from the holder alone, the table of <c>05 B PIC 1 USAGE BIT. 05 TB PIC 1
-    /// USAGE BIT OCCURS 1 TO 16 DEPENDING ON N.</c> was two characters wide inside a three-character run.</para></summary>
+    /// USAGE BIT OCCURS 1 TO 16 DEPENDING ON N.</c> was two characters wide inside a three-character run.</para>
+    /// <para>⛔ THE LAST OCCURRENCE'S TRAILING FILLER TRAVELS WITH IT (kb/Work PB3167 review R1-1): a table whose
+    /// occurrences stride whole bytes but begins inside a character ends <see cref="OdoGeometry.TrailingUnits"/> short of
+    /// its stride count, a character earlier. Without <see cref="OdoTail.Trailing"/> the tail of <c>05 ABA PIC 1(2) USAGE
+    /// BIT. 05 ASUB GROUP-USAGE BIT OCCURS 0 TO 3 DEPENDING ON N. 10 ASA PIC 1 USAGE BIT. 10 ATA PIC 1(5) USAGE BIT
+    /// ALIGNED.</c> was 7 characters inside a 6-character member: the member's image at N = 0 lost its first character
+    /// and a receiving splice started one character early.</para></summary>
     public static OdoTail FixedImageTail(DataItem holder, DataItem table)
     {
         var g = GeometryOf(holder, table);
         if (!g.InBits) return new OdoTail(g.ElemUnits, g.MaxOccurs);
         int lead = BitLayout.BitsBeforeInRun(holder) + g.FixedUnits;
-        return new OdoTail(g.ElemUnits, g.MaxOccurs, 0, lead % g.PositionsPerCharacter, g.PositionsPerCharacter);
+        return new OdoTail(g.ElemUnits, g.MaxOccurs, 0, lead % g.PositionsPerCharacter, g.PositionsPerCharacter,
+            g.TrailingUnits);
     }
 
     /// <summary>The SEARCH / SEARCH ALL depending item for an OCCURS DEPENDING table (ISO §14.9.37.4 GR4/GR9 →

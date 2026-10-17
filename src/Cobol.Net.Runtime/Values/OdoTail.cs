@@ -35,7 +35,15 @@ namespace CobolNet.Runtime;
 /// places a bit item "at the next bit position in storage", so an occurrence may share a byte and the table's
 /// characters are the CEILING of its bits (§15.50.4 rule 9). The compiler's <c>OdoModel.FixedImageTail</c> is the one
 /// producer of a tail of this shape, from the one geometry <c>OdoModel.GeometryOf</c>.</param>
-public readonly record struct OdoTail(int Elem, int Max, int Comps = 0, int Lead = 0, int PositionsPerCharacter = 1)
+/// <param name="Trailing">The filler, in the table's unit, that pads the LAST occurrence out to the stride
+/// <paramref name="Elem"/> — zero but for a table counted in bits whose occurrences stride whole bytes (an ALIGNED subject
+/// or member, ISO §13.18.1.4 GR2 "applies to each occurrence of that item"; kb/Work PB3156, PB3167). §8.5.1.6.3 generates
+/// filler only "as needed to advance alignment to a required natural boundary for the next item", and the last
+/// occurrence has no next one, so the table ends <paramref name="Trailing"/> units short of its stride count. A table
+/// that begins inside a character (<paramref name="Lead"/> above zero) then ends a character earlier than the stride count
+/// says (kb/Work PB3167 review R1-1).</param>
+public readonly record struct OdoTail(int Elem, int Max, int Comps = 0, int Lead = 0, int PositionsPerCharacter = 1,
+                                      int Trailing = 0)
 {
     /// <summary>True when the group holds the table.</summary>
     public bool Present => Max > 0;
@@ -44,8 +52,11 @@ public readonly record struct OdoTail(int Elem, int Max, int Comps = 0, int Lead
     public int Width => CharactersAt(Max);
 
     /// <summary>The characters <paramref name="count"/> occurrences occupy from the character that holds the table's
-    /// first position (the ceiling of their bits for a table counted in bits).</summary>
-    private int CharactersAt(int count) => (Lead + count * Elem + PerCharacter - 1) / PerCharacter;
+    /// first position (the ceiling of their bits for a table counted in bits): the ONE extent rule
+    /// <see cref="CobolTable.TrimmedExtent"/> the OCCURS DEPENDING extent channels read too, so the last occurrence's
+    /// <see cref="Trailing"/> filler is given back before the ceiling exactly as theirs is.</summary>
+    private int CharactersAt(int count) =>
+        (CobolTable.TrimmedExtent(count, Lead, Elem, Trailing) + PerCharacter - 1) / PerCharacter;
 
     /// <summary><see cref="PositionsPerCharacter"/>, 1 for <c>default</c> (a group that holds no table).</summary>
     private int PerCharacter => PositionsPerCharacter > 1 ? PositionsPerCharacter : 1;

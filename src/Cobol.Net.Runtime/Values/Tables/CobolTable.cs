@@ -233,11 +233,16 @@ public static class CobolTable
     /// <c>fixed</c> for none, which is the extent the same table fixed at <c>c</c> occurrences has
     /// (<c>BitLayout.TableBits</c>), and what FUNCTION LENGTH of a bit group counts in boolean positions (§15.50.4
     /// rule 1). With no trailing filler it is <see cref="OdoExtent"/>.</summary>
-    public static int OdoExtentTrimmed(Occurrence count, int min, int max, int fixedUnits, int strideUnits, int trailingUnits)
-    {
-        long c = CurrentCount(count, min, max);
-        return fixedUnits + (int)c * strideUnits - (c > 0 ? trailingUnits : 0);
-    }
+    public static int OdoExtentTrimmed(Occurrence count, int min, int max, int fixedUnits, int strideUnits, int trailingUnits) =>
+        TrimmedExtent(CurrentCount(count, min, max), fixedUnits, strideUnits, trailingUnits);
+
+    /// <summary>⛔ THE ONE RULE for the extent of <paramref name="count"/> occurrences <paramref name="strideUnits"/>
+    /// apart after <paramref name="fixedUnits"/>, the last of them giving back its <paramref name="trailingUnits"/> of
+    /// filler (<see cref="OdoExtentTrimmed"/>'s rule, over a count already tested and clamped). Read by the extent
+    /// channels here and by <see cref="OdoTail"/>, the variable-length group codec's and a cell window's geometry of the
+    /// same table (kb/Work PB3167 review R1-1: that third channel had restated the rule without the trailing term).</summary>
+    internal static int TrimmedExtent(long count, int fixedUnits, int strideUnits, int trailingUnits) =>
+        fixedUnits + (int)count * strideUnits - (count > 0 ? trailingUnits : 0);
 
     /// <summary>The occurrence count an extent is measured at: data-name-1's value, tested against
     /// integer-1..integer-2 and clamped to 0..integer-2.</summary>

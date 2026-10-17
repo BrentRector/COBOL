@@ -51,6 +51,28 @@ sibling. `BitRunImageDriftTests` BRD13 and BRD14 check that both image lanes agr
 `BitGroupPhaseDriftTests.TheStride_AsksWhetherTheLayoutDependsOnThePhase_AndAGroupBeginsWithItsFirstItem` pins the
 shape. No inventory row is re-verdicted (`closes_rows: []` with its reason).
 
+**Review round 1 (R1-1).** The branch review found a third extent channel the change had missed. `OdoTail`, the
+geometry the variable-length group codec (`GroupImageCodec`: the member's current image, the receiving splice, the
+record layout) and a cell window (`Place.OdoOf`) read, measured the table as `lead + count x stride` with no trailing
+term. For a whole-byte-stride table that begins mid-byte that is one character past the real end. The re-probe
+reproduced both symptoms in a group with a dynamic-length item and the table `05 ABA PIC 1(2). 05 ASUB OCCURS 0 TO 3
+DEPENDING ON N. 10 ASA PIC 1. 10 ATA PIC 1(5) ALIGNED.` (all USAGE BIT). At N = 0 the sent image lost AG's one
+character, so a MOVE gave the receiver ABA = 00. With the receiver's count at 2, the splice that keeps occurrence 3
+started at bit 26 instead of 34, so ATA(2) came back 01111, not 01010. The fix: the rule
+`fixed + c x stride - (c > 0 ? trailing : 0)` is now one internal method, `CobolTable.TrimmedExtent`.
+`OdoExtentTrimmed` and `OdoTail.CharactersAt` both read it. `OdoTail` gains `Trailing`, which
+`OdoModel.FixedImageTail` fills from `OdoGeometry.TrailingUnits`, and `RuntimeApi.OdoTailOf` renders it when it is
+not zero. The `OdoTail` constructor and `Deconstruct` change in the shipped surface; the branch already takes the
+runtime to major 7, so this needs no second bump, only a re-pin (4D14503EE215A383, which also absorbs main's PB3293
+re-pin from the merge). Golden: `tests/conformance/2023/pb3167_bit_odo_tail_in_variable_length_group` (2023, the
+edition that introduced DYNAMIC LENGTH). Every value is hand-derived, and a mutant without the trailing term fails
+both of its arms. `AlignedBitTableExtentDriftTests.OdoTail_AgreesWithTheCharacterExtent_AtEveryCount_WhenTheTableBeginsInsideACharacter`
+pins `OdoTail` to `OdoExtentChars` at every count and checks the splice. Sibling sweep: `OdoModel.GeometryOf` has two
+readers, `OdoGroupPlace` (it already carried `TrailingUnits`) and `FixedImageTail` (fixed here). Every runtime reader
+of `OdoTail` (`StorageCell`, `CobolContiguousLayout`, the codec) goes through `Width`, `CutAt`, `KeepUnused` or
+`RecordMaxUnits`, so all of them now see the trailing term. The other two `OdoTail` producers count characters, so
+their tables carry no trailing filler.
+
 **Self-review.** One mechanism, at its one place: the stride question lives beside the walk and uses its predicate.
 Performance: `HoldsByteStart` returns at the first byte-starting member, and it is reached only by bit tables.
 Duplication: one fewer copy of the placement dispatch.

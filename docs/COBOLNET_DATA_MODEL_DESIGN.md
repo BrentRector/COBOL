@@ -820,9 +820,11 @@ items inside one byte — which is exactly why `RecordLayout`'s `int` character 
    stride `RoundUpToByte(width)` (`BitLayout.StrideBits`), so every occurrence begins at the first one's phase, its
    ALIGNED members land on bytes of the record in EVERY occurrence (§13.18.1.4 GR2), and the one walk at the first
    occurrence's phase is exact for all of them. The filler between occurrences is the table's `TrailingFillerBits`
-   short of the stride after the LAST occurrence (`TableBits`), and BOTH ODO extent channels give it back before any
-   rounding (`CobolTable.OdoExtentTrimmed` / `OdoExtentChars`): such a table can begin mid-byte, where its
-   stride-counted end lies a byte past its real one. An element with no such member is packed bit by bit, stride =
+   short of the stride after the LAST occurrence (`TableBits`), and EVERY ODO extent channel gives it back before any
+   rounding through the one rule `CobolTable.TrimmedExtent`: the operand's extent (`CobolTable.OdoExtentTrimmed` /
+   `OdoExtentChars`) and the variable-length group codec's and a cell window's geometry of the table (`OdoTail`, whose
+   `Trailing` `OdoModel.FixedImageTail` fills from the same `OdoGeometry.TrailingUnits`; kb/Work PB3167 review R1-1).
+   Such a table can begin mid-byte, where its stride-counted end lies a byte past its real one. An element with no such member is packed bit by bit, stride =
    width. The DETERMINATION and the rejected reading are in `docs/CONFORMANCE.md` (USAGE BIT).
 
 **Bits per character position is a pinned implementor choice** (§8.1.2 makes it implementor-specified): **8**,
