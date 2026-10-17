@@ -1878,7 +1878,7 @@ and 6 stand alone; 3 needs 1, 2 and kb/Work PB2087; 4 needs 3; 5 needs 4; 7 need
    `EnsureRegistered()`. No prerequisite.
 2. **The one name allocator — LANDED (kb/Work PB2098, PB2093).** `CsNames.Allocate` with seeded scopes replaced
    `DataBinder.Unique` at every caller (the class-level roots through `CsNameScope.ProgramClass()`, a group's members
-   through `DataItem.AddMember`); the collision fixture `tests/conformance/2002/pb2093_member_names_like_generated_members`
+   through `DataItem.AddMember`); the collision fixture `conformance-suite/cases/_unassigned/pb2093_member_names_like_generated_members`
    (subordinates named `AsImage`, `Equals`, `ToString`, `F` beside `F` and `F-2`, a record named `CloseFiles`, and a
    TYPE clone of a type with such members) compiles and runs; `CsNameReservationDriftTests` keeps the seeds total.
    The published scopes of slice 3 reuse the allocator with their own seeds.

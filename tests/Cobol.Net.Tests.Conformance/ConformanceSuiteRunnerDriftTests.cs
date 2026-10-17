@@ -39,7 +39,7 @@ public sealed class ConformanceSuiteRunnerDriftTests
         try
         {
             string suites = Path.Combine(scratch, "suites");
-            ConformanceSuite.Generate(suites);
+            SuiteManifest.Generate(suites);
             string results = Path.Combine(scratch, "results");
             ProcessObservation run = PythonInstrument.Run(ConformanceSuite.Harness, "--compiler", ConformanceSuite.Compiler,
                 "--set", $"cobol={cli}", "--suites", suites, "--out", results);
@@ -51,7 +51,7 @@ public sealed class ConformanceSuiteRunnerDriftTests
                 t => (Edition: t.GetProperty("edition").GetString()!, Id: t.GetProperty("id").GetString()!),
                 t => new SuiteResult(t.GetProperty("verdict").GetString()!, t.GetProperty("reason").GetString()!));
 
-            var ours = ConformanceSuite.Manifest.Editions
+            var ours = SuiteManifest.Manifest.Editions
                 .SelectMany(e => e.Value.Values.Where(t => t.InSuite).Select(t => (Edition: e.Key, t.Id, Test: t)))
                 .ToDictionary(x => (x.Edition, x.Id), x => ConformanceSuiteRunner.Judge(x.Edition, x.Test));
 
@@ -80,7 +80,7 @@ public sealed class ConformanceSuiteRunnerDriftTests
     [Fact]
     public void BothRunners_RunAProgramUnderTheSameDefaultLocales()
     {
-        string adapter = Path.Combine(ConformanceSuite.Root, "adapters", ConformanceSuite.Compiler + ".json");
+        string adapter = Path.Combine(SuiteManifest.Root, "adapters", ConformanceSuite.Compiler + ".json");
         using var doc = JsonDocument.Parse(File.ReadAllText(adapter));
         Assert.True(doc.RootElement.TryGetProperty("environment", out JsonElement environment),
             $"{adapter} sets no environment, so run.py runs a program under the host's default locales");

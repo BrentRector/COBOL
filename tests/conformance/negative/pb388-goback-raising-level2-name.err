@@ -1,1 +1,0 @@
-COBOLNET0710: GOBACK RAISING: exception-name 'EC-BOUND' is a level-2 name; only a LEVEL-3 exception-name may be raised (ISO §14.9.18.3 SR2)

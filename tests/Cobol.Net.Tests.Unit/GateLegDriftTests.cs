@@ -206,8 +206,8 @@ public sealed class GateLegDriftTests
     /// <summary>The name-key cases, each with the key the contract gives it.</summary>
     private static readonly (string Display, string Key)[] KeyCases =
     [
-        ($"{Ns}.CorpusRunnerTests_P3.Positive(edition: \"2023\", name: \"a\")",
-            $"{Ns}.CorpusRunnerTests.Positive(edition: \"2023\", name: \"a\")"),
+        ($"{Ns}.ConformanceSuiteTests_P3.SuiteTest_IsNoWorseThanItsVerdictAllows(edition: \"2023\", id: \"a\")",
+            $"{Ns}.ConformanceSuiteTests.SuiteTest_IsNoWorseThanItsVerdictAllows(edition: \"2023\", id: \"a\")"),
         ($"{Ns}.VersionMatrixTests_P11.Cobol85Program_StillCompilesAtLaterEdition",
             $"{Ns}.VersionMatrixTests.Cobol85Program_StillCompilesAtLaterEdition"),
         ($"{Ns}.Family_P1_P2.M", $"{Ns}.Family_P1.M"),                          // greedy: only the LAST suffix

@@ -25,7 +25,7 @@ One line per source file you changed: `path#Member` — the entry point that now
 
 ## Goldens
 One line each: path · PROGRAM-ID · editions it runs at · how the expected value was derived (rule, not measurement).
-Negatives: path · `reject-at:` editions · code. (One positive at the introducing edition + one negative below it is the
+Refusals: path · its `wiseowl/diagnostics.json` `refuse-at` editions · code. (One positive at the introducing edition + one negative below it is the
 default; a copy per edition only where the rule's behaviour differs by edition.)
 
 ## Rows

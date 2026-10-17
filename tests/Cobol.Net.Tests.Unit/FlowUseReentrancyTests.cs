@@ -27,8 +27,8 @@ namespace CobolNet.Tests.Unit;
 /// share <c>__RunUse</c> and its guard array but are NOT USE procedures (§14.9.28.4 GR17, not §14.9.49.4 GR3),
 /// so GR2 does not reach them.</para>
 ///
-/// <para>The end-to-end counterpart is <c>conformance:2002/pb368_flow_use_reentrancy</c> (the handled arm with
-/// RESUME AT NEXT STATEMENT) and <c>conformance:negative/pb368-flow-use-name-below-2002</c> (the edition gate).</para>
+/// <para>The end-to-end counterpart is <c>conformance:cases/14.9.49-USE/pb368_flow_use_reentrancy</c> (the handled arm with
+/// RESUME AT NEXT STATEMENT) and <c>conformance:cases/14.9.49-USE/pb368-flow-use-name-below-2002</c> (the edition gate).</para>
 /// </summary>
 public sealed class FlowUseReentrancyTests : CobolNetTestBase
 {

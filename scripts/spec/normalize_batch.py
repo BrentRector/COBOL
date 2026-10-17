@@ -34,7 +34,6 @@ import sys
 from inventory_schema import ADJUDICATED, Schema, load_schema
 
 ALLOWED = set(ADJUDICATED)
-KNOWN_FORMS = ("conformance:", "nist:", "characterization:", "unit:", "conformance-test:")
 
 #: `tests/<project>/<...>/<Class>.cs#<Method>` -> the canonical form, when the project names the form.
 CS_REF = re.compile(r"^tests/(?P<proj>[A-Za-z0-9_.]+)/(?:.*/)?(?P<cls>[A-Za-z0-9_]+)\.cs#(?P<m>[A-Za-z0-9_]+)$")
@@ -42,14 +41,14 @@ PROJECT_FORM = {
     "Cobol.Net.Tests.Unit": "unit",
     "Cobol.Net.Tests.Conformance": "conformance-test",
 }
-#: `tests/conformance/<edition>/<case>.cob` -> `conformance:<edition>/<case>` — the SPEC-DERIVED corpus form,
-#: i.e. the one that can actually CLOSE a row. Missing it in the first draft would have silently dropped a
-#: legitimate closing reference (out-mean.json's `tests/conformance/2002/arith_standard.cob`) and left the row
-#: open for a reason that had nothing to do with the compiler.
-COB_REF = re.compile(r"^tests/conformance/(?P<ed>85|2002|2014|2023|negative)/(?P<case>[A-Za-z0-9_.-]+?)(?:\.cob)?$")
+#: A repository path a file-backed form names (`conformance-suite/cases/<folder>/<id>.cob` -> `conformance:cases/
+#: <folder>/<id>`, the SPEC-DERIVED suite form, the one that can actually CLOSE a row) is spelled by the schema's own
+#: inverse of its path templates (`Schema.ref_for_path`), never by a pattern of this file's: dropping such a path
+#: would remove a legitimate closing reference and leave the row open for a reason that had nothing to do with the
+#: compiler, and a copy of the template here is how the corpus's old spelling outlived its tree (kb/Work PB3177).
 
 
-def normalize_ref(ref: str) -> tuple[str | None, str | None]:
+def normalize_ref(ref: str, schema: Schema) -> tuple[str | None, str | None]:
     """(canonical-ref, why-dropped). Returns (ref, None) unchanged when already canonical.
 
     ⚠ AGENTS APPEND COMMENTARY TO REFS — "…#Median_Even… (CORROBORATION ONLY — does not close this row)". A
@@ -65,15 +64,14 @@ def normalize_ref(ref: str) -> tuple[str | None, str | None]:
     def keep(canon: str) -> tuple[str, str | None]:
         return canon, (f"ref note: {commentary}" if commentary else None)
 
-    if head.startswith(KNOWN_FORMS):
+    if head.partition(":")[0] in schema.test_ref_forms:
         return keep(head)
     norm = head.replace("\\", "/")
     m = CS_REF.match(norm)
     if m and m.group("proj") in PROJECT_FORM:
         return keep(f"{PROJECT_FORM[m.group('proj')]}:{m.group('cls')}.{m.group('m')}")
-    m = COB_REF.match(norm)
-    if m:
-        return keep(f"conformance:{m.group('ed')}/{m.group('case')}")
+    if (canon := schema.ref_for_path(norm if norm.endswith(".cob") else norm + ".cob")) is not None:
+        return keep(canon)
     return None, f"test-ref {ref!r} did not parse and was removed by normalize_batch"
 
 
@@ -102,7 +100,7 @@ def normalize(doc: dict, name: str, log: list[str], schema: Schema) -> dict:
                 part = f"{prev_class}.{stripped[1:].split()[0]}"
                 log.append(f"  {name}[{i}] {rec.get('rule-id','?')}: bare {stripped!r} -> {part!r} "
                            f"(class inherited from the preceding ref)")
-            canon, why = normalize_ref(part)
+            canon, why = normalize_ref(part, schema)
             if canon and ":" in canon:
                 prev_class = canon.rsplit(".", 1)[0]
             if canon:

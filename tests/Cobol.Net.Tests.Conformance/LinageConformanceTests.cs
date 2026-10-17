@@ -790,7 +790,7 @@ public sealed class LinageConformanceTests
     // rules, which are rules about the I-O STATUS — so the violation reports one: '90', §9.1.13.11's
     // implementor-defined value (docs/CONFORMANCE.md §7 DOC-A.1-110). That is what these tests read, because it
     // is what a program with NO >>TURN can see; the exception-NAME half is
-    // tests/conformance/2023/pb526_linage_ec_checking.
+    // conformance-suite/cases/13.18.34-LINAGE/pb526_linage_ec_checking.
 
     /// <summary>A program whose LINAGE operands are data items, with a FILE STATUS item and a format-1 USE
     /// declarative on the file — the shape every test below needs, since the observable of a GR6 b) violation is

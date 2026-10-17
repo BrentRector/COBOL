@@ -58,7 +58,7 @@ Runtime: CobolNet.Runtime — CobolNum (numeric), CobolString (character), Manag
 ISO-derived *spec* artifact) and the clean typed runtime substrates were carried over — owned by the greenfield
 `src/Cobol.Net.Frontend` / `src/Cobol.Net.Runtime` projects. Nothing from the legacy byte
 engine — `ProgramState`, `StorageHelpers`, `StorageLayoutComputer`, `PicRuntime`'s byte-window APIs, the byte
-`IrLocation`/emit spine — is used. The conformance corpus (`tests/nist/`, `tests/conformance/`) and
+`IrLocation`/emit spine — is used. The conformance corpora (`tests/nist/`, `conformance-suite/`) and
 `specs/ISO_COBOL.md` are the target + oracle.
 
 ## 3. Data model (COBOL → .NET types)
@@ -135,4 +135,4 @@ subsets. (Task G4.)
   pattern matching, `using` scopes). Full XML doc comments on public surface + inline rationale on non-obvious code.
 - The generated C# is written to `<name>.g.cs` next to the assembly — always inspectable.
 - Conformance is the oracle: every feature is driven by (and proven against) `tests/nist/valid/*.txt` or a
-  `tests/conformance/<ver>/` `.out`.
+  the conformance suite's `.out` (`conformance-suite/`).

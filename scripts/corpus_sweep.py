@@ -44,7 +44,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # A file-tree population is (name, relative root, suffixes). The external corpus is NOT one of these: it has
 # no files, which is the whole point, so it is loaded through the shared extractor below.
 FILE_POPULATIONS: list[tuple[str, str, tuple[str, ...]]] = [
-    ('conformance',      'tests/conformance',     ('.cob', '.cbl', '.cpy')),
+    ('conformance',      'conformance-suite',     ('.cob', '.cbl', '.cpy')),
     ('nist-programs',    'tests/nist/programs',   ('.cob', '.cbl')),
     ('nist-copylib',     'tests/nist/copylib',    ('.cpy',)),
     ('characterization', 'tests/characterization', ('.cob', '.cbl', '.cpy')),

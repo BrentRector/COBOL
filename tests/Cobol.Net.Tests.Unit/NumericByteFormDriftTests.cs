@@ -216,7 +216,7 @@ public sealed class NumericByteFormDriftTests
     /// <para>The parameter is the item's EFFECTIVE endianness, so this test cannot see WHICH source supplied it.
     /// The two-level derivation §11.9.8.3 SR2/SR3 legislates — the item's own §13.18.60.2 endianness-phrase beats
     /// the OPTIONS-implied one — is merged in <c>DataBinder</c> and pinned END TO END, in BOTH directions, by the
-    /// goldens <c>tests/conformance/2023/pb174_float_item_endianness{,_default}</c> (kb/Work PB174). Adding
+    /// goldens <c>conformance-suite/cases/13.18.60-USAGE/pb174_float_item_endianness{,_default}</c> (kb/Work PB174). Adding
     /// "precedence" rows here would pin nothing: both arms reach FloatItem identically.</para></summary>
     [Theory]
     [InlineData(Usage.FloatBinary32, FloatEndianness.HighOrderRight, true)]

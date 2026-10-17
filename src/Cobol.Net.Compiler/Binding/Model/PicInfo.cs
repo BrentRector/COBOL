@@ -25,7 +25,7 @@ public enum PicCategory
     /// national leaf: the D-N2 refusal went when kb/Work PB231 collapsed the byte-window carriage gate into ONE
     /// predicate, and a national leaf on either side of a REDEFINES
     /// class is a MOVE receiver like its DISPLAY twin (§13.18.60.4 GR2 — kb/Work PB572, pinned by
-    /// <c>conformance:2002/pb572_national_redefines_receiver</c>).</summary>
+    /// <c>conformance:cases/13.18.60-USAGE/pb572_national_redefines_receiver</c>).</summary>
     National,
     /// <summary>Boolean (<c>PIC 1</c>, optionally <c>USAGE BIT</c>, ISO §8.5.2.5 / §13.18.40.4 GR8) — LIVE
     /// (Phase 4a track (a)): one alphanumeric character '0'/'1' per boolean position (the §13.18.40.4 GR14 R14

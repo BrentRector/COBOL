@@ -186,7 +186,7 @@ def part_slug(base: str, index: int, total: int) -> str:
 CORPUS = {
     "source": [("src", "Cobol.Net.*/**/*.cs")],
     "tests": [("tests", "**/*.cs"),
-              ("tests/conformance", "**/*.cob"),
+              ("conformance-suite", "**/*.cob"),
               ("tests/characterization", "**/*.cob")],
 }
 SKIP_DIRS = ("/obj/", "/bin/", "/Generated/")

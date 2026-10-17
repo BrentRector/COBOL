@@ -30,10 +30,12 @@ Write-Host "diag   : $diag"
 $todo = (Select-String -Path 'docs/VERSION_CHANGE_REFERENCE.md' -Pattern '<!-- todo -->' -AllMatches | ForEach-Object { $_.Matches }).Count
 Write-Host "VCR    : $todo todo anchors remaining (P14 Step 1 drives to zero)"
 
-# 4. Corpus + negative counts (drift signal, not a gate)
-$pos = (Get-ChildItem tests/conformance -Recurse -Filter *.out | Measure-Object).Count
-$neg = (Get-ChildItem tests/conformance/negative -Filter *.err | Measure-Object).Count
-Write-Host "corpus : $pos positive goldens · $neg negative fixtures"
+# 4. Conformance suite counts (drift signal, not a gate): the tests of the clause folders and WiseOwl's refusals
+$tests = @('conformance-suite/cases', 'conformance-suite/wiseowl/cases' | ForEach-Object {
+    Get-ChildItem $_ -Directory | ForEach-Object { Get-ChildItem $_.FullName -File -Filter *.cob } }).Count
+$refusals = @((Get-Content 'conformance-suite/wiseowl/diagnostics.json' -Raw | ConvertFrom-Json).PSObject.Properties |
+    Where-Object { -not $_.Name.StartsWith('$') }).Count
+Write-Host "suite  : $tests tests · $refusals WiseOwl refusals (conformance-suite/)"
 
 # 5. Traceability inventory (exists after P14 Step 0)
 if (Test-Path 'tests/version-matrix/traceability-inventory.json') {

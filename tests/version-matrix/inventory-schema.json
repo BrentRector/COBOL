@@ -439,7 +439,7 @@
         "  • 'no active APPLY COMMIT clause' — GR-14.9.7.4-1 / GR-14.9.36.4-1 are conditioned on the module's",
         "    ABSENCE ('it has the same effect as a CONTINUE statement'). That is the TOTAL behaviour under the",
         "    decline, it is implemented, and GR-14.9.7.4-1 already carries CONFORMS/OK on",
-        "    conformance:2023/pb137_commit_inert.",
+        "    conformance:cases/14.9.7-COMMIT/pb137_commit_inert.",
         "  • 'This statement shall not be specified' — SR-14.9.7.3-1/-2 and SR-14.9.36.3-1/-2, landed by kb/Work",
         "    PB137 as a bind-time COBOLNET1690 rejection with three negative goldens. ⚠ Note what the word",
         "    'statement' is doing: §12.4.6.3.3 SR5/SR6 read 'This CLAUSE shall not be specified …' and stay IN,",
@@ -453,7 +453,7 @@
         "item 1), A.4.1 makes a module's exception conditions optional with it, and §14.6.13.1.1 does not require a",
         "level-3 condition of an unimplemented element to be raised. Nothing survives: the STATIC reach is the",
         "SR1/SR2 COBOLNET1690 rejection (excluded above by its own words), and the DYNAMIC reach is GR1's CONTINUE,",
-        "pinned by conformance:2023/pb259_commit_rollback_under_sort and pb259_commit_rollback_recursive.",
+        "pinned by conformance:wiseowl/cases/14.9.7-COMMIT/pb259_commit_rollback_under_sort and pb259_commit_rollback_recursive.",
         "",
         "⚠ THE CLOSEST CALL IN THE SET, recorded because a re-deriver will challenge it. SR-12.4.6.3.3-10 ('No data",
         "items referenced by the FILE STATUS clause, the LINAGE clause, the RECORD clause, or separately specified",
@@ -842,7 +842,7 @@
         "So the clause arm gains 13.18.11 and the 'CLASS clause takes effect' exclusion is REMOVED — it existed only",
         "to hold the question open. Measured, that adds §13.18.11's six rows (SR-13.18.11.3-1, GR-13.18.11.4-1..-4,",
         "FMT-13.18.11.2) and nothing else; all six were blank, so no adjudicated row changes. Their witness is",
-        "conformance:negative/declined-validate-class, landed in the same change set — the clause was, until then,",
+        "conformance:wiseowl/cases/13.18.11-CLASS/declined-validate-class, landed in the same change set — the clause was, until then,",
         "the one member of the group drawing a bare 'COBOL0307: unexpected CLASS' instead of a named refusal.",
         "⚠ CLASS IS NOT LIKE ITS SIBLINGS IN ONE RESPECT, and a re-deriver will trip on it: the other clause words",
         "are user-defined words below 2002 (§8.9), but CLASS is RESERVED AT ALL FOUR EDITIONS (measured against",
@@ -1297,8 +1297,8 @@
     "disqualifying-method-patterns": ["MatchesLegacy$", "MatchesGnuCobol$", "MatchesOracle$"],
     "forms": {
       "conformance": {
-        "syntax": "conformance:<edition>/<case>   where edition is 85 | 2002 | 2014 | 2023 | negative",
-        "path-template": "tests/conformance/{0}.cob",
+        "syntax": "conformance:<tree>/<clause folder>/<id>   a conformance-suite test, where tree is cases | wiseowl/cases (docs/rearchitecture/DESIGN-conformance-suite.md §4)",
+        "path-template": "conformance-suite/{0}.cob",
         "spec-derived": true
       },
       "nist": {

@@ -1,1 +1,0 @@
-WITH LOCK ON MULTIPLE RECORDS may not be specified for a sequential-access or sequential-organization file

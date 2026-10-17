@@ -33,8 +33,8 @@ namespace CobolNet.Tests.Unit;
 /// random READ (§14.9.30.4 GR32) and DELETE (§14.9.10.4 GR3) use. That is what this file pins — one extraction
 /// for three verbs, so a fourth key-valued verb cannot grow a private one, and no arm of START can reintroduce
 /// a manufactured character. The BEHAVIOUR is pinned by the corpus goldens
-/// <c>tests/conformance/2002/pb355_start_length_past_operand.cob</c> and
-/// <c>tests/conformance/2002/pb355_start_length_national_past_operand.cob</c>.
+/// <c>conformance-suite/cases/14.9.41-START/pb355_start_length_past_operand.cob</c> and
+/// <c>conformance-suite/cases/14.9.41-START/pb355_start_length_national_past_operand.cob</c>.
 /// </para>
 /// <para>
 /// ⛔ <see cref="TheTemporaryAreaChecks_ActuallyFail_OnThePb355Shape"/> drives every predicate with the defect's

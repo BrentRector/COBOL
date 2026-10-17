@@ -483,7 +483,7 @@ clause shall be specified for the subject of the entry" — makes `01 P USAGE PO
 the restricted pointer is declared as a **type declaration** and reached through a TYPE clause. With §8.5.3.1
 ("Elementary type definitions shall not be specified with the STRONG phrase") the only legal shape is a GROUP
 strong typedef, a TYPEDEF'd `USAGE POINTER TO` entry, and a `TYPE` item of it — pinned by
-`tests/conformance/2023/pb153_restricted_pointer`.
+`conformance-suite/cases/13.18.60-USAGE/pb153_restricted_pointer`.
 
 **Consumption screens** (all in the 0869 pointer band, where `PtrBinder` already reports every other §14.9.39 /
 §14.9.3 operand rule): `PtrBinder.BindAllocate` — §14.9.3.3 SR5 and its SR4 converse, in both the based form and
@@ -609,10 +609,10 @@ ALIGNED (§13.18.1), ANY LENGTH (§13.18.2) and DYNAMIC LENGTH (§13.18.19) were
    give every property a distinct value first (so the audit is evidence about all of them), and drives its own
    failure branches over a copy that re-introduces the PB522 omission and over the pre-PB888 temp initializer.
 
-`conformance:2002/pb522_group_usage_travels_with_the_description` measures the clauses that exist today, each
+`conformance:cases/8.5.2.5-Boolean-category/pb522_group_usage_travels_with_the_description` measures the clauses that exist today, each
 against a byte-identical inline control; the drift test is what makes the NEXT one automatic.
 
-`conformance:2002/pb888_compiler_temp_takes_the_whole_description` pins the temporary's arm: a user-defined
+`conformance:cases/_unassigned/pb888_compiler_temp_takes_the_whole_description` pins the temporary's arm: a user-defined
 function returning a `GROUP-USAGE NATIONAL` group measures what its working-storage twin measures, and a
 two-receiver MOVE of a national-group table element gives each receiver what the one-receiver MOVE gives.
 

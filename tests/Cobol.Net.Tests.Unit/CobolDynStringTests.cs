@@ -195,7 +195,7 @@ public sealed class CobolDynStringTests
     /// <summary>ISO §14.6.13.2 rule 5 (kb/Work PB1118): content within THIS description's maximum agrees and is
     /// read unchanged; with EC-DATA-INCOMPATIBLE checking off (the default) over-long content is read whole — the
     /// condition does not exist (§14.6.13.1.1) — and is never truncated by the read, which is not a store. The
-    /// checked raise is pinned end to end by conformance:2014/pb1118_dyn_length_agreement.</summary>
+    /// checked raise is pinned end to end by conformance:cases/14.6.13.2-Incompatible-data/pb1118_dyn_length_agreement.</summary>
     [Theory]
     [InlineData("ABCD", 4, "ABCD")]
     [InlineData("", 0, "")]

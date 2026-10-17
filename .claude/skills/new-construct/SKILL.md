@@ -57,7 +57,8 @@ The sharpest trap: the differential tests compile their source at **edition 85 b
 using a 2002+ construct suddenly fails to compile.
 
 In the SAME change set:
-1. `grep -rl "<CONSTRUCT SYNTAX>" tests/` — both `tests/**/*.cs` AND `tests/conformance/<edition>/`
+1. `grep -rl "<CONSTRUCT SYNTAX>" tests/ conformance-suite/` — both `tests/**/*.cs` AND the suite's tests (their
+   `accept` editions)
 2. For each hit compiling below the new edition, bump it to compile at >= `introducedIn`
 3. Re-bake its golden (identical output proves the change was behavior-preserving)
 4. Delete the orphaned old-edition golden — folder-level orphan detection will not catch a single stale file

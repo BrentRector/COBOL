@@ -18,7 +18,7 @@ namespace CobolNet.Tests.Unit.Collation;
 /// seconds argument, EC-ARGUMENT-FUNCTION on invalid arguments; the three locale conditions — EC-LOCALE-MISSING (a
 /// named unavailable locale), EC-LOCALE-INVALID (an available locale without culture data — a site-tailored made-up
 /// tag), and the gating (nothing raised with checking off; the documented stand-in answers). The golden
-/// tests/conformance/2014/pb64t4_locale_functions proves the same through compiled COBOL.
+/// conformance-suite/cases/14.6.6-Locale-identification/pb64t4_locale_functions proves the same through compiled COBOL.
 /// </summary>
 [Collection("process-globals")]   // was "site-tailoring-directory"; widened (kb/Work PB126) — this class
                                   // clears the process-global locale/collation caches (LocaleManager.ClearCache),
@@ -181,7 +181,7 @@ public sealed class CobolLocaleTests
             {
                 ru.Locale.Set(LocaleCategory.All, "");
                 // The T4 golden's TIME-US observable, byte-for-byte: a PLAIN U+0020 before the designator, whatever
-                // the host ICU's CLDR vintage says (the golden tests/conformance/2014/pb64t4_locale_functions.out
+                // the host ICU's CLDR vintage says (the golden conformance-suite/cases/14.6.6-Locale-identification/pb64t4_locale_functions.out
                 // pins the same bytes at the corpus level).
                 Assert.Equal("1:05:09 PM", CobolLocale.Time("130509", "en-US"));
             });

@@ -22,7 +22,7 @@ namespace CobolNet.Tests.Unit;
 /// </summary>
 public sealed class ReturnCovarianceKindDriftTests
 {
-    private const string Golden = "pb1499_interface_return_covariance.cob";
+    private const string Golden = "pb1499_interface_return_covariance";
 
     /// <summary>The LINKAGE declaration of a RETURNING item of each kind, as the golden writes it.</summary>
     private static string Declaration(ObjectRefKind kind) => kind switch
@@ -45,7 +45,7 @@ public sealed class ReturnCovarianceKindDriftTests
     [MemberData(nameof(Kinds))]
     public void EveryKind_HasAnImplementsLeg_AndAnOverrideLeg(ObjectRefKind kind)
     {
-        string text = File.ReadAllText(TestRepo.Tests("conformance", "2002", Golden));
+        string text = File.ReadAllText(TestRepo.SuiteCase(Golden));
         string decl = Declaration(kind);
         Assert.Matches(new Regex(@"METHOD-ID\. GETIT\.\s+DATA DIVISION\.\s+LINKAGE SECTION\.\s+01 R " + decl), text);
         Assert.Matches(new Regex(@"METHOD-ID\. MAKE OVERRIDE\.\s+DATA DIVISION\.\s+LINKAGE SECTION\.\s+01 R " + decl), text);

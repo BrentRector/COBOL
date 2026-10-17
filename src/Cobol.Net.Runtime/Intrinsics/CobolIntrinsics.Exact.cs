@@ -847,7 +847,7 @@ public static partial class CobolIntrinsics
             // So "ignored" is about a space CONTRIBUTING NOTHING where the figure admits one, never about
             // joining digit runs: "1E+1 2345" → the space is the figure's trailing space-string, '2' is the
             // first character in error → 6; "1E+ 1234" and "1E+1234 " → 0. Sub-note 5 fires only on a
-            // CONTIGUOUS fifth digit ("1E+12345" → 8). Witnessed by conformance:2023/pb256_test_numval_f_spaces
+            // CONTIGUOUS fifth digit ("1E+12345" → 8). Witnessed by conformance:cases/15.95.4-Returned-value-rule/pb256_test_numval_f_spaces
             // and recorded in docs/CONFORMANCE.md §3.
             while (i < n && char.IsAsciiDigit(text[i]))               // n = 1..4 exponent digits
             {

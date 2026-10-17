@@ -11,7 +11,7 @@ namespace CobolNet.Tests.Unit;
 /// CALL-boundary consumer. ISO §14.8.2.3.3 1): a program called with no program-specifier and no NESTED phrase
 /// requires only that "the formal parameter shall be of the same length as the corresponding argument", and
 /// §14.2.3 GR9 moves the argument "to this allocated record without conversion". The end-to-end witness is
-/// conformance:2002/pb970_pointer_by_content_storage_image; these pin what the golden cannot see in-process —
+/// conformance:cases/14.2-Procedure-division-structure/pb970_pointer_by_content_storage_image; these pin what the golden cannot see in-process —
 /// absolute token shape, the FUNCTION-POINTER category, and the modes that must stay refused.
 /// </summary>
 public sealed class PointerImageTests

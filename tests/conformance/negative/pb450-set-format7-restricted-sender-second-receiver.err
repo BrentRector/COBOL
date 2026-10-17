@@ -1,1 +1,0 @@
-'P-RESTRICTED' is a RESTRICTED data-pointer of type 'TT' (ISO §13.18.60.4 GR23 — its USAGE POINTER clause specifies a type-name-1), so the receiver shall be a data-pointer restricted to the same type (ISO §14.9.39.3 SR19, third sentence)

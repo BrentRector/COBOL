@@ -84,10 +84,11 @@ public sealed class ArchOracleDriftTests
     public void AnObservation_IsPortable_AndRepeatable()
     {
         var population = ArchOracle.Population().ToDictionary(c => c.Id, StringComparer.Ordinal);
-        string Positive(string text) => population.Keys.First(id => id.StartsWith("corpus/", StringComparison.Ordinal)
-            && File.ReadAllText(Path.Combine(ConformanceCorpus.Root, id["corpus/".Length..] + ".cob")).Contains(text));
-        string missingLibrary = population.Keys.First(id => id.StartsWith("negative/", StringComparison.Ordinal)
-            && File.ReadAllText(Path.Combine(ConformanceCorpus.Root, "negative", id["negative/".Length..] + ".err")).Contains("CBL3620"));
+        string Positive(string text) => population.Keys.First(id => id.Split('/') is ["suite", var edition, var test]
+            && File.ReadAllText(Path.Combine(SuiteManifest.Root, SuiteManifest.Manifest.Editions[edition][test].Source))
+                .Contains(text));
+        string missingLibrary = population.Keys.First(id => id.StartsWith("refusal/", StringComparison.Ordinal)
+            && SuiteManifest.Manifest.Refusals[id["refusal/".Length..].Split('@')[0]].Expect.Contains("CBL3620"));
 
         string[] machineSpecific = [TestRepo.Root, Path.GetTempPath()];
         foreach (string id in new[] { Positive("EXCEPTION-LOCATION"), Positive("WHEN-COMPILED"), missingLibrary })

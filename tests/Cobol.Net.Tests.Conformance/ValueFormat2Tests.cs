@@ -410,7 +410,7 @@ public sealed class ValueFormat2Tests
     }
 
     /// <summary>⛔ THE FORMAT 2 VALUE ON THE CHARACTER-IMAGE STORAGE LANE (kb/Work PB208 half 2), in the fast gate;
-    /// the byte-level pin is <c>conformance:2023/pb208_table_value_image_seed</c>. GroupImageCodec.ImageInitOf —
+    /// the byte-level pin is <c>conformance:cases/13.18.63-VALUE/pb208_table_value_image_seed</c>. GroupImageCodec.ImageInitOf —
     /// THE seeder for every image-stored backing since the PB164 consolidation — read only <c>item.RawValue</c>,
     /// which is null for a table VALUE, and its <c>StrRepeat(one, Occurs)</c> then seeded every occurrence with the
     /// VALUE-LESS default, DISCARDING the table VALUE. The REDEFINES alias is what puts B on that lane

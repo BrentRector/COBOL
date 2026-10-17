@@ -20,8 +20,8 @@ sign the Contributor License Agreement (CLA.md) — once, for all your future pu
 ## Checklist
 
 - [ ] The fix addresses the root cause (no workaround in a test program, no special case for a test).
-- [ ] New or changed behavior has a conformance program under `tests/conformance/` (a golden at the introducing
-      edition, plus a negative for earlier editions where one applies), registered in its `manifest.json`.
+- [ ] New or changed behavior has a test in `conformance-suite/cases/` (accepted from the introducing edition,
+      plus a refused program for earlier editions where one applies; `conformance-suite/README.md`).
 - [ ] I looked for the same defect in sibling code paths.
 - [ ] Documentation that describes the changed behavior is updated in this pull request.
 - [ ] I have signed the CLA.

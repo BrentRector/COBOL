@@ -1331,8 +1331,8 @@ public sealed class SpecTraceabilityInventoryDriftTests
         // …but the SAME row also citing one spec-derived test is fine: corroboration is welcome, it just cannot
         // be the whole basis.
         Assert.Empty(DifferentialOnlyCoverage(
-            [Covered("X-5d", "nist:IF128A; conformance:2023/da2_function_as_text")], s));
-        Assert.Empty(BadStates([Covered("X-5e", "nist:IF128A; conformance:2023/da2_function_as_text")], s));
+            [Covered("X-5d", "nist:IF128A; conformance:cases/15.63.4-Returned-value-rules/da2_function_as_text")], s));
+        Assert.Empty(BadStates([Covered("X-5e", "nist:IF128A; conformance:cases/15.63.4-Returned-value-rules/da2_function_as_text")], s));
 
         // CONFORMS-but-untested: verdict recordable, row NOT closed. This is the category the split exists for.
         Assert.Empty(MissingEvidence(
@@ -1348,7 +1348,7 @@ public sealed class SpecTraceabilityInventoryDriftTests
 
         // Test refs: an unknown form, a golden that does not exist, and an xUnit method that does not exist.
         Assert.Single(UnresolvedTestRefs([Base("X-8") with { TestRef = "vibes:it-looked-right" }], s, root));
-        Assert.Single(UnresolvedTestRefs([Base("X-9") with { TestRef = "conformance:2023/no_such_case" }], s, root));
+        Assert.Single(UnresolvedTestRefs([Base("X-9") with { TestRef = "conformance:cases/14.9.8-COMPUTE/no_such_case" }], s, root));
         Assert.Single(UnresolvedTestRefs(
             [Base("X-10") with { TestRef = "unit:SpecTraceabilityInventoryDriftTests.NoSuchMethod" }], s, root));
 
@@ -1408,7 +1408,7 @@ public sealed class SpecTraceabilityInventoryDriftTests
         Assert.Single(BadStates(
             [Doc("DOC-A.1-19") with
             {
-                CodeLocation = Anchor, TestRef = "conformance:2023/pb154_cancel_active", State = "OK",
+                CodeLocation = Anchor, TestRef = "conformance:cases/14.9.5-CANCEL/pb154_cancel_active", State = "OK",
             }], s));
         // A code location outside src/Cobol.Net.* is not an implementing site: tooling, scripts and test harness
         // code are not the compiler, so a row resting on one is as unobservable as one resting on nothing.
@@ -1416,20 +1416,20 @@ public sealed class SpecTraceabilityInventoryDriftTests
             [Doc("DOC-A.1-19") with
             {
                 CodeLocation = $"{Anchor}; tools/impact/ImpactProbe.cs#Hit",
-                TestRef = "conformance:2023/pb154_cancel_active", State = "OK",
+                TestRef = "conformance:cases/14.9.5-CANCEL/pb154_cancel_active", State = "OK",
             }], s));
         // ✔ And the shape that DOES close: own anchor + a greenfield site + a spec-derived test.
         Assert.Empty(BadStates(
             [Doc("DOC-A.1-19") with
             {
-                CodeLocation = $"{Anchor}; {Src}", TestRef = "conformance:2023/pb154_cancel_active", State = "OK",
+                CodeLocation = $"{Anchor}; {Src}", TestRef = "conformance:cases/14.9.5-CANCEL/pb154_cancel_active", State = "OK",
             }], s));
         // …which is also the row `DifferentialOnlyCoverage` must leave alone — no kind exemption exists there,
         // and none is needed, because every closing DOC row carries a spec-derived test like every other row.
         Assert.Empty(DifferentialOnlyCoverage(
             [Doc("DOC-A.1-19") with
             {
-                CodeLocation = $"{Anchor}; {Src}", TestRef = "conformance:2023/pb154_cancel_active", State = "OK",
+                CodeLocation = $"{Anchor}; {Src}", TestRef = "conformance:cases/14.9.5-CANCEL/pb154_cancel_active", State = "OK",
             }], s));
 
         // ── the anchor is owed by the rows with a determination to point at, and the REGISTER decides ──
@@ -1462,7 +1462,7 @@ public sealed class SpecTraceabilityInventoryDriftTests
         Assert.Empty(BadStates(
             [Declined("DOC-A.1-19") with
             {
-                TestRef = "conformance:2023/pb154_cancel_active", State = "OK",
+                TestRef = "conformance:cases/14.9.5-CANCEL/pb154_cancel_active", State = "OK",
             }], reg));
 
         // ⛔ THE DOCUMENTED DECLINE — same verdict, and §7 DOES carry the row. Item 127 is A.1-optional and its
@@ -1482,12 +1482,12 @@ public sealed class SpecTraceabilityInventoryDriftTests
         // The anchor alone does not close it — PB280 Q2, answered NO: a row with nothing observable stays a GAP
         // whatever its test-ref, and that is the same rule the CONFORMS arm pays above.
         Assert.Single(BadStates(
-            [Documented(Anchor127) with { TestRef = "conformance:2023/pb154_cancel_active", State = "OK" }], reg));
+            [Documented(Anchor127) with { TestRef = "conformance:cases/14.9.5-CANCEL/pb154_cancel_active", State = "OK" }], reg));
         // ✔ And the shape that DOES close: its own computed anchor, a greenfield site, and a witness.
         Assert.Empty(BadStates(
             [Documented($"{Anchor127}; {Src}") with
             {
-                TestRef = "conformance:2023/pb154_cancel_active", State = "OK",
+                TestRef = "conformance:cases/14.9.5-CANCEL/pb154_cancel_active", State = "OK",
             }], reg));
 
         // ── the DERIVATION: §1.1's owner-signed alternative to a test, and every bound the owner set ──
@@ -1549,7 +1549,7 @@ public sealed class SpecTraceabilityInventoryDriftTests
         // explicit bound: a spec-derived test on the same row REFUTES the claim that none can exist. ⚠ The row
         // still computes OK — on the TEST — so the refusal is only visible in the predicate, which is exactly
         // why `record_verdicts` asks it rather than inferring the bound from the state.
-        var tested = Derived("GR-14.9.5.4-11") with { TestRef = "conformance:2023/pb154_cancel_scope" };
+        var tested = Derived("GR-14.9.5.4-11") with { TestRef = "conformance:cases/14.9.5-CANCEL/pb154_cancel_scope" };
         Assert.Equal(["has-spec-derived-test"], Codes(DerivationRefusals(tested, ds)));
         // …and a NON-spec-derived ref does not trip it: a NIST golden is corroboration, not an obligation met.
         Assert.Empty(DerivationRefusals(Derived("GR-14.9.5.4-11") with { TestRef = "nist:IF128A" }, ds));

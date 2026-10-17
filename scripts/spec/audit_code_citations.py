@@ -148,10 +148,27 @@ HEADER = re.compile(r"^\W*(?:ISO\s+)?(?:COBOL-\d{2,4}\s+)?"
                     r"((?:[A-Z][A-Z0-9-]{2,})(?:\s+[A-Z][A-Z0-9-]+)?)"
                     r"[^§\n]{0,60}?§\s?\d")
 
-#: The corpus DIRECTIVE line a negative fixture opens with — machine metadata read by
-#: `CorpusRunnerTests.EnabledNegativeCase_RejectsWithItsDiagnostic`, not prose. It is skipped when looking
-#: for the comment's HEAD; leaving it in place silently disabled the HEADER check on every negative fixture.
-DIRECTIVE = re.compile(r"^\W*reject-at:", re.I)
+#: A suite test's METADATA BLOCK, from `*>--- conformance-case` to `*>---` (conformance-suite/README.md, "A test";
+#: read by conformance-suite/harness/generate.py): machine metadata, not prose. A `.cob` comment's HEAD and SUBJECT
+#: are read after it; left in place, its `--- conformance-case` line is the head every suite test opens with, and
+#: the HEADER check was silently disabled on all of them (kb/Work PB3177: the corpus's `*> reject-at:` line had
+#: the same effect on every negative fixture), while its `rules:` line, a list of rule ids, would read as SUBJECT.
+METADATA_OPEN = re.compile(r"^\s*---\s*conformance-case\s*$")
+METADATA_CLOSE = re.compile(r"^\s*---\s*$")
+
+
+def without_metadata(parts: list[str]) -> list[str]:
+    """A `.cob` comment block's lines with the suite metadata block (`METADATA_OPEN` .. `METADATA_CLOSE`) removed."""
+    out: list[str] = []
+    inside = False
+    for p in parts:
+        if not inside and METADATA_OPEN.match(p):
+            inside = True
+        elif inside:
+            inside = not METADATA_CLOSE.match(p)
+        else:
+            out.append(p)
+    return out
 
 #: Words that make a two-word header name a STRUCTURE rather than a construct (see the HEADER check).
 STRUCTURAL = {"SECTION", "DIVISION", "PARAGRAPH", "ENTRY", "SENTENCE", "HEADING", "FOOTING"}
@@ -274,18 +291,19 @@ def blocks(path: pathlib.Path):
         # still reads the whole block. So SUBJECT/HEADER see the first citation-bearing LINE — the same
         # line HEADER already matched — and a `.g4`/`.cs` comment, which sits ON its declaration and is
         # short, is unchanged: the label is the whole block there.
-        # SUBJECT reads the first CITATION-BEARING line; HEADER reads the first NON-DIRECTIVE line, and
+        # SUBJECT reads the first CITATION-BEARING line; HEADER reads the first PROSE line (after the metadata), and
         # they are not the same line. Taking the citation-bearing one for HEADER too made a CONTINUATION
         # line read as a head: `oo_external_file_shared.cob` wraps "...shared between a PROGRAM and an /
         # OBJECT (§13.18.22.4)", and the second line opens with a capitalised word followed by a citation,
         # which is exactly the header shape. HEADER wants the HEAD of the comment, so it gets the head —
-        # skipping only the corpus DIRECTIVE line (`*> reject-at: …`), which is machine metadata and was
-        # silently disabling the check on every negative fixture that carries one.
+        # skipping only the suite METADATA BLOCK (`without_metadata`), which is machine metadata and would
+        # silently disable the check on every suite test, and read its `rules:` line as the label.
         label = parts
         head = parts
         if path.suffix == ".cob":
-            label = next(([p] for p in parts if CITE.search(p)), [])
-            head = [p for p in parts if not DIRECTIVE.search(p)] or parts
+            prose = without_metadata(parts) or parts
+            label = next(([p] for p in prose if CITE.search(p)), [])
+            head = prose
         yield start + 1, parts, "\n".join(parts).upper() + "\n" + tail, window, label, head
 
 
@@ -585,7 +603,7 @@ def _owning_cite(cites: list[tuple[int, int]], pos: int) -> int:
     Returns the index of the nearest citation span (ties to the earlier one).
 
     Measured on landing train 36: `§8.4.2.2.2 Format 1 … §8.4.3.1 Format 10, qualified-linage-counter`
-    (tests/conformance/negative/pb489-linage-operand-is-linage-counter.cob:6) is CORRECT on both halves — the
+    (conformance-suite/cases/8.4.3.14-LINAGE-COUNTER/pb489-linage-operand-is-linage-counter.cob:6) is CORRECT on both halves — the
     two clauses genuinely print the SAME format name under DIFFERENT numbers — and the whole-line test
     attributed the second citation's name to the first and accused it. No name-uniqueness assumption can
     stand in for this; the POSITION is the only thing that separates the two claims."""
@@ -868,14 +886,16 @@ SELF_TEST = [
     # the narrowed check is still SEEN to fire on the defect it exists for: a golden whose OPENING
     # citation names the wrong construct (feedback_measure_the_selectors_complement — a selector is
     # evidence about what it returned, never about what it dropped).
-    ("SUBJECT", "      *> reject-at: 2023\n"
+    ("SUBJECT", "      *>--- conformance-case\n      *> id: x\n      *> rules: [GR-13.18.34.4-1]\n"
+     "      *>    accept: [2023]\n      *>---\n"
                 "      *> ISO §14.9.4 — the ROUNDED MODE phrase on this ADD.",
      "       ADD 1 TO WS-A ROUNDED MODE IS TRUNCATION.", ".cob"),
-    # ⛔ AND THE HEADER LEG BEHIND THE `reject-at:` LINE. Skipping the corpus DIRECTIVE when looking for
-    # the comment's head is a WIDENING — before it, HEADER matched `reject-at: 2023`, found no capitalised
-    # construct name, and was silently disabled on every negative fixture in the corpus. A widening that
-    # has never been seen to fire is not a widening.
-    ("HEADER", "      *> reject-at: 2023\n"
+    # ⛔ AND THE HEADER LEG BEHIND THE METADATA BLOCK. Skipping the suite metadata when looking for
+    # the comment's head is a WIDENING — without it, HEADER matches `--- conformance-case`, finds no
+    # capitalised construct name, and is silently disabled on every suite test (as the corpus's
+    # `reject-at:` line was). A widening that has never been seen to fire is not a widening.
+    ("HEADER", "      *>--- conformance-case\n      *> id: x\n      *> rules: [GR-13.18.34.4-1]\n"
+     "      *>    accept: [2023]\n      *>---\n"
                "      *> LINAGE clause (ISO §13.16) — page-based printing for sequential files",
      "       DISPLAY \"X\".", ".cob"),
 ]
@@ -887,11 +907,13 @@ SELF_TEST_CLEAN = [
     ("// A figurative constant operand (ISO §8.3.3.6).", "figurative", ".g4"),
     # the repaired twin of the golden leg — AND the false positive the narrowing exists to stop: the
     # label is right and a LATER line cites a DIFFERENT construct's clause on purpose, to contrast.
-    ("      *> reject-at: 2023\n"
+    ("      *>--- conformance-case\n      *> id: x\n      *> rules: [GR-13.18.34.4-1]\n"
+     "      *>    accept: [2023]\n      *>---\n"
      "      *> ISO §14.7.4 — the ROUNDED MODE phrase on this ADD.\n"
      "      *> Unlike §13.18.34, the LINAGE clause, which has no rounding of any kind.",
      "       ADD 1 TO WS-A ROUNDED MODE IS TRUNCATION.", ".cob"),
-    ("      *> reject-at: 2023\n"
+    ("      *>--- conformance-case\n      *> id: x\n      *> rules: [GR-13.18.34.4-1]\n"
+     "      *>    accept: [2023]\n      *>---\n"
      "      *> LINAGE clause (ISO §13.18.34) — page-based printing for sequential files",
      "       DISPLAY \"X\".", ".cob"),
 ]
@@ -919,7 +941,7 @@ ORDINAL_SELF_TEST = [
      "/// <summary>SET data-pointer assignment (§14.9.39 Format 4; Phase-4b increment 1)",
      "/// <summary>SET data-pointer assignment (§14.9.39 Format 7; Phase-4b increment 1)"),
     # ⛔ THE SILENT TWIN IS A LINE WITH TWO CITATIONS, and it is the one this check accused (landing
-    # train 36, tests/conformance/negative/pb489-linage-operand-is-linage-counter.cob:6). §8.4.2.2.2 Format 7
+    # train 36, conformance-suite/cases/8.4.3.14-LINAGE-COUNTER/pb489-linage-operand-is-linage-counter.cob:6). §8.4.2.2.2 Format 7
     # and §8.4.3.1 Format 10 are BOTH named `qualified-linage-counter`, so a whole-line name test cannot tell
     # which citation the name belongs to; `_owning_cite` gives it to the one it stands next to. The DEFECT
     # half is the same name beside the WRONG number with no second citation to own it.

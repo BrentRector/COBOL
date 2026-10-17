@@ -87,7 +87,7 @@ public interface ITestPartitionSlot
 }
 
 // The ladder: 24 identical one-line declarations, kept honest by TestPartitionAudit.AuditSlotLadder. Its top is set
-// by the widest family, CorpusRunnerTests (24 partitions, kb/Work PB2527).
+// by the widest family, ConformanceSuiteTests (24 partitions, kb/Work PB2527, PB3177).
 public readonly struct Slot0 : ITestPartitionSlot { public static int Index => 0; }
 public readonly struct Slot1 : ITestPartitionSlot { public static int Index => 1; }
 public readonly struct Slot2 : ITestPartitionSlot { public static int Index => 2; }

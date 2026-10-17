@@ -1,0 +1,24 @@
+*>--- conformance-case
+*> id: pb10-inspect-fn-replacing
+*> rules: [SR-8.4.3.2.3-1]
+*> source-format: free
+*> portable: unverified
+*>---
+*> PB10 - a FUNCTION-IDENTIFIER as INSPECT identifier-1 in Format 2 (REPLACING).
+*> 8.4.3.1.2 Format 1 makes a function-identifier an IDENTIFIER, so INSPECT identifier-1 admits one - but only
+*> where it is SENDING. 14.9.22.4 GR1 concedes only that "for purposes of determining its length, identifier-1
+*> is treated as a sending data item", a SCOPED concession that would be unnecessary if it were generally
+*> sending. GR7 replaces matched characters IN identifier-1, so it is a RECEIVING operand.
+*> 8.4.3.2.3 SR1: "A function-identifier shall not be specified as a receiving operand."
+*> The SENDING format (Format 1, TALLYING only) IS legal and is pinned by the positive golden
+*> conformance:cases/8.4.3.1-Identifier/pb10_function_identifier_sending.
+IDENTIFICATION DIVISION.
+PROGRAM-ID. NEGPB10INSP.
+DATA DIVISION.
+WORKING-STORAGE SECTION.
+01 WS-X PIC X(11) VALUE "hello world".
+01 N PIC 9(3) VALUE 0.
+PROCEDURE DIVISION.
+MAIN.
+    INSPECT FUNCTION UPPER-CASE(WS-X) REPLACING ALL "O" BY "0"
+    STOP RUN.

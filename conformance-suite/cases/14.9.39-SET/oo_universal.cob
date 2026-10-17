@@ -1,0 +1,81 @@
+*>--- conformance-case
+*> id: oo_universal
+*> rules: [GR-14.9.39.4-9]
+*> accept: [2002]
+*> source-format: free
+*> portable: unverified
+*>---
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. OOUV3.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       REPOSITORY.
+           CLASS CUV1A
+           CLASS CUV1B.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 U USAGE OBJECT REFERENCE.
+       01 A USAGE OBJECT REFERENCE CUV1A.
+       01 B USAGE OBJECT REFERENCE CUV1B.
+       01 N PIC 9(4) VALUE 5.
+       01 R PIC 9(4).
+       01 MNAME PIC X(10).
+       PROCEDURE DIVISION.
+       MAIN.
+           INVOKE CUV1A "NEW" RETURNING A.
+           INVOKE CUV1B "NEW" RETURNING B.
+           SET U TO A.
+           INVOKE U "DESCRIBE".
+           SET U TO B.
+           INVOKE U "DESCRIBE".
+           SET U TO NULL.
+           MOVE "BUMP" TO MNAME.
+           SET U TO A.
+           INVOKE U MNAME USING N RETURNING R.
+           DISPLAY "R=" R " N=" N.
+           STOP RUN.
+       END PROGRAM OOUV3.
+
+       IDENTIFICATION DIVISION.
+       CLASS-ID. CUV1A INHERITS FROM BASE.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       REPOSITORY.
+           CLASS BASE.
+       IDENTIFICATION DIVISION.
+       OBJECT.
+       PROCEDURE DIVISION.
+       METHOD-ID. DESCRIBE.
+       PROCEDURE DIVISION.
+       MAIN.
+           DISPLAY "I-AM-A".
+       END METHOD DESCRIBE.
+       METHOD-ID. BUMP.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01 LK-N PIC 9(4).
+       01 LK-R PIC 9(4).
+       PROCEDURE DIVISION USING LK-N RETURNING LK-R.
+       MAIN.
+           ADD 1 TO LK-N.
+           COMPUTE LK-R = LK-N * 2.
+       END METHOD BUMP.
+       END OBJECT.
+       END CLASS CUV1A.
+
+       IDENTIFICATION DIVISION.
+       CLASS-ID. CUV1B INHERITS FROM BASE.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       REPOSITORY.
+           CLASS BASE.
+       IDENTIFICATION DIVISION.
+       OBJECT.
+       PROCEDURE DIVISION.
+       METHOD-ID. DESCRIBE.
+       PROCEDURE DIVISION.
+       MAIN.
+           DISPLAY "I-AM-B".
+       END METHOD DESCRIBE.
+       END OBJECT.
+       END CLASS CUV1B.

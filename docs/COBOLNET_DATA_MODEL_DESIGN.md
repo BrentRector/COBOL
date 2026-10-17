@@ -1550,7 +1550,7 @@ A `COBOLNET1528` refusal stood at `DynamicResolve` for this, reading GR16b's "no
 as covering a Format 1 `VALUE IS literal-1`; it rejected legal source, and its two arms disagreed with each other —
 the GROUP arm fired only when the OCCURS carried a TO, so `OCCURS DYNAMIC FROM 3.` with subordinate VALUEs compiled
 and seeded correctly while `OCCURS DYNAMIC FROM 3 TO 9.` was refused, while the ELEMENTARY arm ignored the TO and
-refused both. Golden `tests/conformance/2014/pb500_format1_value_dynamic_table` pins all six shapes, including the
+refused both. Golden `conformance-suite/cases/13.18.38-OCCURS/pb500_format1_value_dynamic_table` pins all six shapes, including the
 mixed entry where a Format 1 and a Format 2 VALUE sit over one dynamic table and only the latter moves the capacity.
 
 `CobolDynTable` wires **EC-BOUND-OVERFLOW** since P13 through ONE raise, `RaiseImplicitOverflow`, for every
@@ -1581,7 +1581,7 @@ places at a loop-local occurrence number (`MoveBinder.ReachElement`: from each g
 §14.9.25.3 legality is asked of the element pair (a refusal is a diagnostic at the MOVE), plus the two §14.6.9.1
 current counts (`OccurrenceCounts.Current`, shared with INITIALIZE). `MoveEmitter` renders, after the group transfer
 into that receiver, a loop to the smaller count: §14.6.9.2 rule 1's superfluous sending elements are not moved, and
-rule 2's remaining receiving elements stay space filled. Golden `tests/conformance/2014/pb1144_dyn_move_elements`;
+rule 2's remaining receiving elements stay space filled. Golden `conformance-suite/cases/14.6.9.2-Moving-a-table/pb1144_dyn_move_elements`;
 negative `pb1144-dyn-element-move-illegal`.
 Resolved open questions: the VALUE-derived capacity is §13.18.63.4 GR16's, implemented over the whole FORMAT 2
 surface by `DataBinder.ResolveTableValues` and reaching no FORMAT 1 VALUE (the band-scoping paragraph above);

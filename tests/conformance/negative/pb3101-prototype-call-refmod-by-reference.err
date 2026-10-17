@@ -1,1 +1,0 @@
-COBOLNET1688: CALL … program-prototype 'N3101P' argument 1 ('Y') does not conform to formal parameter 'A': the formal parameter (an elementary alphanumeric item described with PICTURE X(5) USAGE DISPLAY) and the argument (an elementary alphanumeric item described by no PICTURE clause)

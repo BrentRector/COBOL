@@ -572,7 +572,7 @@ internal sealed class VersionConformancePass
         // reports. The mis-parse worry that keeps the report-group and screen entry-name slots UNCHECKED (a
         // greedy `dataName?` under `reportGroupEntry` swallowing a COLUMN keyword) does not arise: each validation-clause
         // alternative diverges from the name reading within one or two tokens. The witness that it stays true
-        // is `conformance:negative/declined-validate-entry-name-still-0901`.
+        // is `conformance:cases/_unassigned/declined-validate-entry-name-still-0901`.
         CobolParserCore.DataNameContext
         {
             Parent: CobolParserCore.DataDescriptionEntryContext

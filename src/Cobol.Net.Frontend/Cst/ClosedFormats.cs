@@ -52,7 +52,7 @@ public static class ClosedFormats
         {
             // §13.16.2 Format 1 — the data description entry. Closed first, alone, by kb/Work PB487; PDF p393 /
             // folio 363. Keeps COBOLNET1941 and its message verbatim: the code was allocated for this format and
-            // is pinned by conformance:negative/pb487-unrecognized-data-clause.
+            // is pinned by conformance:cases/13.16-Data-description/pb487-unrecognized-data-clause.
             [typeof(Core.DataDescriptionClauseContext)] =
                 new("13.16.2", "Format 1 ", "data description entry", "clause", "COBOLNET1941"),
 

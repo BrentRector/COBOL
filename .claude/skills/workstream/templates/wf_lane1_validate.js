@@ -2,7 +2,7 @@ export const meta = {
   name: 'lane1-golden-validate',
   description: 'Golden lane stage 2: one Opus validator per draft file compiles and runs every drafted golden with the built cobol.exe at its edition and compares to the SPEC-DERIVED .out; a mismatch is a suspected compiler defect with a repro, never a golden edit',
   phases: [
-    { title: 'Validate', detail: 'compile-and-run each draft at its --std; negatives must reject at every reject-at edition with the .err substring' },
+    { title: 'Validate', detail: 'compile-and-run each draft at its accept editions; a refusal must be refused at every refuse-at edition with its expect text' },
   ],
 }
 
@@ -41,18 +41,19 @@ for (let i = 0; i < FILES.length; i += N) {
   const rs = await parallel(chunk.map(slug => () => agent(`
 You validate golden DRAFTS for the WiseOwl COBOL compiler (repo E:\\COBOL; read CLAUDE.md first). The drafts and
 the writer/refuter report for file "${slug}" are under ${SCRATCH}/out/${slug}/ (destination paths mirror the repo:
-tests/conformance/<edition>/<name>.cob|.out, tests/conformance/negative/<name>.cob|.err; REPORT.json if a fixer
-rewrote the report, else read the writer report in ${SCRATCH}/reports/${slug}.json).
-RULES. Do NOT write anything inside E:\\COBOL; do NOT run dotnet build/test; do NOT edit any draft .out/.err —
+conformance-suite/cases/<clause folder>/<id>.cob|.out and conformance-suite/wiseowl/cases/...; REPORT.json if a
+fixer rewrote the report, else read the writer report in ${SCRATCH}/reports/${slug}.json, whose `refusals` give each
+refused program's refuse-at editions and expect text).
+RULES. Do NOT write anything inside E:\\COBOL; do NOT run dotnet build/test; do NOT edit any draft .out or refusal —
 the expected values are SPEC-DERIVED and refuter-upheld; if the compiler disagrees, the compiler is the suspect.
 Compiler: E:\\COBOL\\.claude\\worktrees\\lane3-pin-5fe593a0\\src\\Cobol.Net.Cli\\bin\\Debug\\net10.0\\cobol.exe (a PINNED build of battery-green tree 5fe593a0 — landings cannot move it under you; never use the main tree's exe).
 FOR EACH POSITIVE DRAFT: copy the .cob to a fresh scratch dir under ${SCRATCH}/run/${slug}/<name>/ and run
-  cobol.exe <name>.cob --std <edition-from-its-directory> --run
+  cobol.exe <id>.cob --std <each edition of its header's accept> --run
 capturing stdout+stderr. Compare stdout to the draft .out: trailing whitespace per line and the final newline are
-ignored, CRLF == LF (the corpus runner's rule). Anything else is output-mismatch.
-FOR EACH NEGATIVE DRAFT: read its first line "*> reject-at: <years>"; for EACH listed edition run
-  cobol.exe <name>.cob --std <year>
-and require a non-zero exit AND the .err substring in the diagnostics; also run it at one edition NOT listed (if
+ignored, CRLF == LF (the suite runner's rule, CutRunner.Normalize). Anything else is output-mismatch.
+FOR EACH NEGATIVE DRAFT (no accept; its entry under the report's `refusals`): for EACH refuse-at edition run
+  cobol.exe <id>.cob --std <year>
+and require a non-zero exit AND the expect text in the diagnostics; also run it at one edition NOT listed (if
 any exists in {85,2002,2014,2023}) and record whether it compiles clean there (report only; it is evidence about the
 edition band, not a pass/fail criterion unless the rule is edition-limited).
 ⛔ CHECKPOINT PER DRAFT: your checkpoint file is ${SCRATCH}/validate/${slug}.jsonl — FIRST read it if it exists and skip

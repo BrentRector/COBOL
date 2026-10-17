@@ -23,7 +23,7 @@ namespace CobolNet.Tests.Unit;
 /// so laying every occurrence out at the first one's phase is exact, and a group begins where its first item does
 /// (kb/Work PB3167); the placement dispatch is written once (<c>Continues</c>).</item>
 /// </list>
-/// The behaviour is pinned by the goldens <c>tests/conformance/2002/pb3158_aligned_in_mid_byte_bit_group.cob</c> and
+/// The behaviour is pinned by the goldens <c>conformance-suite/cases/_unassigned/pb3158_aligned_in_mid_byte_bit_group.cob</c> and
 /// <c>pb3167_aligned_member_in_bit_group_table.cob</c> and <c>BitRunImageDriftTests</c> (BRD09, BRD10, BRD13, BRD14).
 /// </summary>
 public sealed class BitGroupPhaseDriftTests

@@ -22,7 +22,7 @@ namespace CobolNet.Tests.Unit;
 /// The fix was the extraction — <c>FileConnector.SequentialReadGuard</c> / <c>ReadOpenModeGuard</c> /
 /// <c>RandomReadAbsentOptionalGuard</c> — and this gate is what keeps it true: a fourth organization, or an edit
 /// that "just inlines the check here", re-opens the defect silently otherwise. The behaviour itself is pinned by
-/// the corpus goldens <c>tests/conformance/2023/pb336_optional_absent_read_46.cob</c> and its 1985 twin, which
+/// the corpus goldens <c>conformance-suite/cases/9.1.11-File-position-indicator/pb336_optional_absent_read_46.cob</c> and its 1985 twin, which
 /// walk the two-READ shape on ALL THREE organizations in one program; this file pins the STRUCTURE, because the
 /// uniformity across connectors is what made the defect reproduce three times.
 /// </para>

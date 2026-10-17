@@ -87,7 +87,7 @@ def split(rows, cap):
     return parts
 
 
-corpus = list((REPO / "tests/conformance").rglob("*.cob"))
+corpus = [p for tree in ("cases", "wiseowl/cases") for p in (REPO / "conformance-suite" / tree).glob("*/*.cob")]
 corpus_text = {p: p.read_text(encoding="utf-8", errors="replace").upper() for p in corpus}
 
 
@@ -116,14 +116,15 @@ def row_payload(r):
 
 
 CONVENTIONS = {
-    "positive-golden": "tests/conformance/<edition>/<name>.cob + <name>.out; the directory selects --std. First line a "
-                       "comment `*> ISO §<clause> <rule> — <what is exercised>`. Unique PROGRAM-ID per program (a "
-                       "stale same-named assembly is served otherwise). Deterministic output only. Do NOT edit any "
-                       "manifest.json — return the entry; the director registers it.",
-    "negative-golden": "tests/conformance/negative/<name>.cob + <name>.err (the expected diagnostic substring, e.g. "
-                       "COBOLNET1560). FIRST line of the .cob MUST be `*> reject-at: <year> [<year> ...]`. Do NOT edit "
-                       "the negative manifest — return the entry.",
-    "test-ref-forms": "conformance:<edition>/<case> (positive, spec-derived) · conformance:negative/<case> · "
+    "positive-golden": "conformance-suite/cases/<ISO clause>-<Name>/<id>.cob + <id>.out, opening with the metadata "
+                       "header (id, rules, accept: the editions it is accepted at, source-format; "
+                       "conformance-suite/README.md 'Adding a test'), then a comment `*> ISO §<clause> <rule> — <what "
+                       "is exercised>`. Unique PROGRAM-ID per program (a stale same-named assembly is served "
+                       "otherwise). Deterministic output only. There is no manifest.",
+    "negative-golden": "conformance-suite/cases/<ISO clause>-<Name>/<id>.cob with the metadata header and NO accept; "
+                       "return its refusal {\"refuse-at\": [<editions>], \"expect\": \"<code, e.g. COBOLNET1560>\"} "
+                       "for conformance-suite/wiseowl/diagnostics.json (the director merges it).",
+    "test-ref-forms": "conformance:cases/<clause folder>/<id> (spec-derived) · conformance:wiseowl/cases/<folder>/<id> · "
                       "unit:<Class>.<Method> · conformance-test:<Class>.<Method>. nist:/characterization: and any "
                       "*_MatchesLegacy method are NOT spec-derived and cannot close a row.",
     "compiler": "src/Cobol.Net.Cli/bin/Debug/net10.0/cobol.exe <file.cob> --std <85|2002|2014|2023> --run  (run in a "

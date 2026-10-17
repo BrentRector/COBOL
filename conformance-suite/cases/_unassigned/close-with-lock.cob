@@ -1,0 +1,21 @@
+*>--- conformance-case
+*> id: close-with-lock
+*> rules: []
+*> source-format: free
+*> portable: unverified
+*>---
+IDENTIFICATION DIVISION.
+PROGRAM-ID. NEGCL01.
+ENVIRONMENT DIVISION.
+INPUT-OUTPUT SECTION.
+FILE-CONTROL.
+    SELECT F ASSIGN TO "negcl01" ORGANIZATION IS SEQUENTIAL.
+DATA DIVISION.
+FILE SECTION.
+FD F.
+01 R PIC X(10).
+PROCEDURE DIVISION.
+MAIN.
+    OPEN OUTPUT F.
+    CLOSE F WITH LOCK.
+    STOP RUN.

@@ -80,7 +80,7 @@ internal sealed class DeclinedFacilityPass(EditionContext edition) : CursorFollo
     /// sibling of its <c>procedureDivision?</c> inside <c>methodDefinition</c>; and the FACTORY / OBJECT
     /// paragraphs spell their method list with the LITERAL tokens <c>PROCEDURE DIVISION DOT
     /// methodDefinition*</c> rather than the <c>procedureDivision</c> rule, so this override never fires
-    /// there. <c>conformance:negative/oo-multi-base-super</c> and the OO corpus exercise the method path.</para></summary>
+    /// there. <c>conformance:wiseowl/cases/8.4.3.8-SELF-and-SUPER/oo-multi-base-super</c> and the OO corpus exercise the method path.</para></summary>
     public override object? VisitProcedureDivision(CobolParserCore.ProcedureDivisionContext ctx) => null;
 
     /// <summary>The rule contexts this pass REFUSES WHOLE — exactly the entry-point rules of
@@ -125,7 +125,7 @@ internal sealed class DeclinedFacilityPass(EditionContext edition) : CursorFollo
     /// legs are told apart by WHERE the clause is written, not by how — so the report-writer forms have their
     /// own grammar rules (<c>reportPresentWhenClause</c> / <c>reportVaryingClause</c>) and never reach here.
     /// A change that made this arm reachable from a report group description entry would silently decline a
-    /// claimed facility; <c>conformance:2023/declined_rw_present_varying_control</c> is the witness that it has
+    /// claimed facility; <c>conformance:cases/_unassigned/declined_rw_present_varying_control</c> is the witness that it has
     /// not.</para></summary>
     public override object? VisitValidationClause(CobolParserCore.ValidationClauseContext ctx)
     {
@@ -152,7 +152,7 @@ internal sealed class DeclinedFacilityPass(EditionContext edition) : CursorFollo
     /// and rollback facility's declaration half. Refusing it is what keeps the rest of that decline coherent:
     /// with no clause ever accepted, no APPLY COMMIT clause is ever ACTIVE, which is exactly the state
     /// §14.9.7.4 GR1 / §14.9.36.4 GR1 give COMMIT and ROLLBACK their CONTINUE behaviour in — the behaviour
-    /// <c>conformance:2023/pb137_commit_inert</c> already pins.</summary>
+    /// <c>conformance:cases/14.9.7-COMMIT/pb137_commit_inert</c> already pins.</summary>
     public override object? VisitApplyCommitClause(CobolParserCore.ApplyCommitClauseContext ctx)
     {
         _edition.Declined(DiagnosticCatalog.ApplyCommitClauseUnsupported,

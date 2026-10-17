@@ -1,0 +1,17 @@
+*>--- conformance-case
+*> id: pb1075-character-classification-for-repeated
+*> rules: [FMT-12.4.5.7.2]
+*> source-format: free
+*> portable: unverified
+*>---
+IDENTIFICATION DIVISION.
+PROGRAM-ID. PB1075CC.
+ENVIRONMENT DIVISION.
+CONFIGURATION SECTION.
+OBJECT-COMPUTER. X
+    CHARACTER CLASSIFICATION FOR NATIONAL IS LOC1 FOR NATIONAL IS LOC1.
+SPECIAL-NAMES.
+    LOCALE LOC1 IS "C".
+PROCEDURE DIVISION.
+MAIN.
+    STOP RUN.

@@ -1725,7 +1725,7 @@ ISO-conforming output under the `LEGACY_DIVERGENT` protocol (`scripts/guard.sh` 
 > CBL3601/3605); §18 #10 and the control-flow deep-dive edition table updated in the same change set.
 
 - OO → .NET classes (§10): single-inheritance, NEW/INVOKE/SELF/SUPER, instance vs static scopes, FACTORY, PROPERTY;
-  the conformance corpus (`tests/conformance/<ver>/`).
+  the conformance suite (`conformance-suite/`).
 - Full intrinsic catalog (§12.1); EC exception model (§11: `>>TURN`, RAISE/RESUME, USE…EXCEPTION, PERFORM…WHEN);
   national/boolean; UDF; per the `docs/ISO2023_CONFORMANCE_PLAN.md` §3 catalog. Resolve **Q5** scope for SCREEN/RW/
   JSON-XML.
@@ -1845,7 +1845,7 @@ src/Cobol.Net.Runtime/                (role-based folders — DESIGN-runtime-lib
 
 ### 1.3 Mapping from the pre-extraction tree — retired
 The G0 extraction is complete and the tree in §1.2 is the record. Nothing maps from the legacy engine, which is deleted from
-`main` (`docs/rearchitecture/LEGACY-ARCHIVE.md`); `tests/nist/` and `tests/conformance/` are compiler-agnostic corpora and stay in place.
+`main` (`docs/rearchitecture/LEGACY-ARCHIVE.md`); `tests/nist/` and `conformance-suite/` are compiler-agnostic corpora.
 
 ### 1.4 Front-end extraction — how, precisely
 

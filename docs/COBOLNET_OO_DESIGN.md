@@ -336,7 +336,7 @@ The procedure-division header's BY phrases parse and CARRY on a method (kb/Work 
    and names no `RefModPlace`, and no `if` of `OoBindInvocationArg` branches on one) and behavioral (the binder's entry
    and the relation agree over every elementary, reference-modified and ANY LENGTH pair; PB3098's rows compile to their
    verdicts; a refusal carries no identity key, `ARefusal_SpellsItsClauses_NeverAnIdentityKey`). Goldens:
-   `conformance:2002/pb2077_refmod_argument_both_lanes` and the negatives
+   `conformance:cases/_unassigned/pb2077_refmod_argument_both_lanes` and the negatives
    `pb2077-refmod-into-elementary-by-reference`, `pb2077-refmod-shorter-than-group-formal`,
    `pb2077-elementary-into-group-formal`.
 
@@ -441,11 +441,11 @@ The procedure-division header's BY phrases parse and CARRY on a method (kb/Work 
    every generated group atom for a question only the compiler asks. §9.3.8.2.3 rule 3 names clauses a group does not
    carry, so the pair-mode relation compares two fixed groups by length (as landed in wave 1080) and only §13.7.3 SR2,
    whose "match the description" a group's subordinate entries answer, asks the layout.
-   Goldens: `conformance:2002/pb3101_activation_lanes_one_relation`, `conformance:2002/pb3101_content_one_relation`,
-   `conformance:2002/pb3101_pair_mode_one_relation`; negatives `pb3101-prototype-call-refmod-by-reference`,
+   Goldens: `conformance:cases/_unassigned/pb3101_activation_lanes_one_relation`, `conformance:cases/14.8.2.3.3-Elementary-items-passed-by-content-or/pb3101_content_one_relation`,
+   `conformance:cases/_unassigned/pb3101_pair_mode_one_relation`; negatives `pb3101-prototype-call-refmod-by-reference`,
    `pb3101-function-refmod-by-reference`, `pb3101-nested-refmod-into-any-length`, `pb3127-nested-any-length-clause-differs`,
    `pb3101-content-zero-into-alphabetic`, `pb3101-content-space-into-boolean`, `pb3101-override-group-for-elementary-formal`,
-   `pb3101-property-accessors-group-and-elementary`; for the reduction, `conformance:2002/pb613_gr8_one_reduction` and
+   `pb3101-property-accessors-group-and-elementary`; for the reduction, `conformance:cases/14.9.4-CALL/pb613_gr8_one_reduction` and
    negative `pb613-bare-literal-by-value-formal`.
 
 ### D7. Method attributes: instance methods are `virtual` by default; OVERRIDE→`override`; FINAL→`sealed override` (FINAL root → non-virtual); FACTORY methods → `virtual`/`override` members of the per-class FACTORY SINGLETON class, NEVER C# `static` (factory invocation dispatches on the runtime factory class, §9.3.6, and SELF-in-factory is polymorphic, §8.4.3.8.4 GR2 — statics cannot express either). Never emit C# `new`/method-hiding.
@@ -718,11 +718,11 @@ pair, `OoEmitter.VarGroupShapes`). A REFERENCE-MODIFIED argument is the §8.4.3.
 only a group formal of its class. Drift protection: `PictureClauseIdentityDriftTests.ActivationMatch_AgreesWithThePairModeRelation_OverEveryElementaryPair`
 (the relation's match ⇔ the typed comparator's identity over analyzed elementary pictures, national / boolean /
 numeric-edited included) and `ActivationDescriptionFieldDriftTests` (every description field is read by a relation or
-the carrier and spelled by the renderer); the goldens `conformance:2002/pb480_universal_match_relations`,
-`conformance:2002/pb1112_active_class_universal`, `conformance:2014/pb480_universal_variable_length` and
-`conformance:2014/pb480_universal_variable_length_shapes` pin each arm, and
-`conformance:2002/pb2076_universal_returning_move_match` rules 6 and 7, `conformance:2002/pb2463_universal_returning_set_match`
-rule 6's object-reference arms and `conformance:2002/pb2463_call_object_reference_set_conformance` the CALL lane's; `Table16PrintedTableDriftTests` holds the one
+the carrier and spelled by the renderer); the goldens `conformance:cases/9.3.6-Method-invocation/pb480_universal_match_relations`,
+`conformance:cases/9.3.6-Method-invocation/pb1112_active_class_universal`, `conformance:cases/14.9.23-INVOKE/pb480_universal_variable_length` and
+`conformance:cases/_unassigned/pb480_universal_variable_length_shapes` pin each arm, and
+`conformance:cases/9.3.6-Method-invocation/pb2076_universal_returning_move_match` rules 6 and 7, `conformance:cases/_unassigned/pb2463_universal_returning_set_match`
+rule 6's object-reference arms and `conformance:cases/_unassigned/pb2463_call_object_reference_set_conformance` the CALL lane's; `Table16PrintedTableDriftTests` holds the one
 Table 16 to the printed table cell for cell.
 Rule 6 for an OBJECT REFERENCE returning item is the §14.9.39.3 Format 5 table (`ObjectReferenceSet.Refusal`, the one
 copy the compiler's SET screens ask too) over CLASS FACTS each description carries (`ActivationDescription.ObjectClasses`
@@ -1096,7 +1096,7 @@ FACTORY (§11.4, D7), PROPERTY (§13.18.42), and EC-OO (Table 13) are net-new he
 9. Subclass-own-data detection must not false-fire on synthesized index-names placed in WS (ISO §8.5.1.2).
 10. Three-level SUPER chains; state allocated exactly once across ctor chaining; PERFORM/GO TO method-local resolution incl. backward GO TO; cross-method PERFORM rejected.
 
-**Reusable test assets:** `tests/conformance/2002/oo_hello|oo_instance_data|oo_method_perform|oo_method_args|oo_inherit|oo_super|oo_self|oo_self_polymorphic|oo_object_group` (.cob + .out goldens — 9 pairs), all compiled strict + run + byte-compared by CorpusRunnerTests (oo_instance_data = trap #1 two-object independence; oo_method_args = USING/RETURNING). The adversarial suite is `tests/Cobol.Net.Tests.Conformance/OoSpineTests.cs` (traps #4/#10, the D8 GOBACK/STOP RUN/EXIT METHOD split, the 0813/0820–0827 diagnostic band). The legacy `OoTests` suite (archived at the tag, `docs/rearchitecture/LEGACY-ARCHIVE.md`) was the port checklist reference.
+**Reusable test assets:** `conformance-suite/cases/11.7-METHOD-ID/oo_hello|oo_instance_data|oo_method_perform|oo_method_args|oo_inherit|oo_super|oo_self|oo_self_polymorphic|oo_object_group` (.cob + .out goldens — 9 pairs), all compiled strict + run + byte-compared by CorpusRunnerTests (oo_instance_data = trap #1 two-object independence; oo_method_args = USING/RETURNING). The adversarial suite is `tests/Cobol.Net.Tests.Conformance/OoSpineTests.cs` (traps #4/#10, the D8 GOBACK/STOP RUN/EXIT METHOD split, the 0813/0820–0827 diagnostic band). The legacy `OoTests` suite (archived at the tag, `docs/rearchitecture/LEGACY-ARCHIVE.md`) was the port checklist reference.
 
 ## Greenfield seams (the compiler seams the OO subsystem plugs into)
 

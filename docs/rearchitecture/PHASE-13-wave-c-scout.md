@@ -94,7 +94,7 @@ SL1=1000
 
 (exact bytes: five lines, each terminated by the platform newline the DISPLAY writer emits; the conformance harness's boolean_ops.out shows a trailing newline after the last line.)
 
-Byte-by-byte derivation (A = 1100, category boolean; R is PIC 1(4) so it renders as a 4-char '0'/'1' string per D-B1; DISPLAY concatenates the literal and R with NO separator — confirmed against tests/conformance/2002/boolean_ops.out where `DISPLAY "AND=" R` -> `AND=0100`):
+Byte-by-byte derivation (A = 1100, category boolean; R is PIC 1(4) so it renders as a 4-char '0'/'1' string per D-B1; DISPLAY concatenates the literal and R with NO separator — confirmed against conformance-suite/cases/8.8.4.2-Simple-relation-conditions/boolean_ops.out where `DISPLAY "AND=" R` -> `AND=0100`):
 - SL3: 1100 B-SHIFT-L 3 -> 0000. §8.8.2 rule 8 (logical left, MSB discarded/LSB<-0): 1100->1000->0000->0000; == Annex A Table A.2 row "Shift left | 1100 | B-SHIFT-L | 3 | 0000". Result length 4 = first-operand length (rule 9). => "SL3=0000"
 - SR3: 1100 B-SHIFT-R 3 -> 0001. rule 8 (logical right): 1100->0110->0011->0001; == Table A.2 "Shift right ... 0001". => "SR3=0001"
 - SLC: 1100 B-SHIFT-LC 3 -> 0110. rule 8 (circular left rotate): 1100->1001->0011->0110; == Table A.2 "Shift left circular ... 0110". => "SLC=0110"
@@ -112,7 +112,7 @@ Byte-by-byte derivation (A = 1100, category boolean; R is PIC 1(4) so it renders
 8. Fire-on-RECOGNITION gate (DEVLOG 724): put the 2023 introduction gate in the VersionConformancePass ParseArm HasShiftOp scan, NOT a bound arm — a below-edition shift must name its edition even when binding also fails. Keep the existing HasBoolOp (B-AND family) gate separate: shift is a DIFFERENT construct/edition (2023 vs 2002), so a program using only shifts at --std 2002 must get the shift's COBOLNET0900, not the boolean-operators-2002 message.
 9. Exhaustive-visitor tripwire: adding BoundBoolShift without a Visit method breaks the BooleanRenderer build (intended — BooleanRenderer.cs:16-30 removed the loud `_ =>`); also update any other IBoundBoolExprVisitor impls (Gr3Width switch, BoolExprAllLengthOne at ConditionBinder.cs:183) or they throw/mis-handle.
 10. No EC is defined for boolean shift (no EC-BOUND/EC-SIZE) — do not invent one. The only compile constraints are rule 5 (integer 2nd operand, non-ALL first operand). A non-integer 2nd operand is a formation error (bind-time COBOLNET1511), not a runtime EC.
-11. Ship the conformance test in the SAME commit (memory feedback_conformance_tests_per_feature): tests/conformance/2023/boolean_shift.{cob,out} + the negative below-2023 gate; run the LEGACY guard because Core/*.g4 changed (memory feedback_autonomous_grammar_nist / shared-.g4 => full legacy guard).
+11. Ship the conformance test in the SAME commit (memory feedback_conformance_tests_per_feature): conformance-suite/cases/8.8.2-Boolean-expressions/boolean_shift.{cob,out} + the negative below-2023 gate; run the LEGACY guard because Core/*.g4 changed (memory feedback_autonomous_grammar_nist / shared-.g4 => full legacy guard).
 
 **Complexity:** M — 4 lexer tokens + 1 asymmetric grammar tier (integer RHS) + 1 new bound node + binder/emitter/runtime shift methods + a new 2023 construct/gate + golden & negative are mechanical and mirror the proven boolean-operators-2002 path; the one genuine risk that could push toward L is the rule-7b context-sensitive precedence for shifts MIXED with B-OR/B-XOR — if full spec-faithful mixed-precedence is in scope it needs a precedence-climbing bind rather than a fixed tier.
 
@@ -155,7 +155,7 @@ MISSING (to add):
 - PicInfo: add `bool PackedNoSign` field; branch StorageWidth `Usage.Packed => PackedNoSign ? (Digits + 1) / 2 : Digits / 2 + 1` (PicInfo.cs:330).
 - DataBinder: read `usage.noSignPhrase() is not null` near :1657; carry `noSign` into PicInfo build (:1790); reject NO SIGN on a non-Packed usage (new COBOLNET1565) and reject S-picture + NO SIGN per SR31 (new COBOLNET1566, after Analyze sets pic.Signed).
 - VersionConformancePass: new `VisitUsageClause` ParseArm override; new constructs.json row + regen Constructs.g.cs (UsagePackedNoSign2023).
-- New conformance golden tests/conformance/2023/usage_packed_no_sign.{cob,out}; edition-matrix continuity/introduction rows.
+- New conformance golden conformance-suite/cases/13.18.60-USAGE/usage_packed_no_sign.{cob,out}; edition-matrix continuity/introduction rows.
 
 **Golden program:**
 

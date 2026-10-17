@@ -379,7 +379,7 @@ public sealed class FloatIntegerArgumentPermissiveTests
 
     /// <summary>Strict refuses it on the §15.3 type-6 screen, as it does every other program in this file —
     /// and the negative corpus pins the same verdict per function at
-    /// <c>tests/conformance/negative/pb635-find-string-float-skip</c>.</summary>
+    /// <c>conformance-suite/cases/_unassigned/pb635-find-string-float-skip</c>.</summary>
     [Fact]
     public void Pb635FindString_IsRejectedUnderStrict()
     {

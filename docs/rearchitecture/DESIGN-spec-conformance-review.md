@@ -497,9 +497,9 @@ non-conformance as if the owner had licensed it.
    **witness**: a negative case showing the construct is refused, by name. The 2026-09-02 A.4 landing stamped
    **308 rows** and moved the GAP by **zero**, which is the correct and expected outcome; the PB280 Q1 landing
    stamped **2** and moved it by zero for the same reason (their witness debt was `kb/Work/PB373`, DISCHARGED
-   2026-09-09 — item 127 on `conformance:2023/pb373_object_computer_name_inert`, and item 206 by leaving the
+   2026-09-09 — item 127 on `conformance:cases/A.1-Implementor-defined-language-element-list/pb373_object_computer_name_inert`, and item 206 by leaving the
    selector altogether when owner decision Q30 / `kb/Work/PB592` found the element IS provided, closing CONFORMS
-   on `conformance:2002/pb592_binary_usage_range_bounds`).
+   on `conformance:cases/A.1-Implementor-defined-language-element-list/pb592_binary_usage_range_bounds`).
 
 **What a selector cannot reach is recorded, not silently dropped** (`feedback_measure_the_selectors_complement`).
 The standard also scopes rules by the printed **FORMAT band**, and the catalog does not carry it —

@@ -30,8 +30,8 @@ namespace CobolNet.Tests.Conformance;
 /// prohibition on ACCEPTING, so an unclaimed A.4 module is REFUSED, not warned. The whole module is now an
 /// ERROR by name (COBOLNET1560 data/environment surface, COBOLNET1707 procedure surface) through the one funnel
 /// <see cref="CobolNet.Binding.ScreenFacility"/>, which puts its witnesses where a refusal belongs: the NEGATIVE
-/// corpus, 41 programs under <c>tests/conformance/negative/a42-*</c>, each <c>.err</c> naming the construct as
-/// well as the code. <c>ScreenFacilityConstructDriftTests</c> holds that coverage complete against
+/// refusals, 41 programs <c>a42-*</c> under <c>conformance-suite/wiseowl/cases/</c>, each refusal's expected text
+/// naming the construct as well as the code. <c>ScreenFacilityConstructDriftTests</c> holds that coverage complete against
 /// <c>CobolScreen.g4</c>. Adding a screen test back here would need it to COMPILE, which is exactly what the
 /// module may no longer do.</para>
 ///
@@ -53,9 +53,8 @@ public sealed class DocumentedNonSupportWitnessTests
     private const string McsNonSupport = "COBOLNET1578";               // SEND/RECEIVE — A.3 item 4 / §4.2.6 ¶3
     private const string FloatDecimalClauseNonSupport = "COBOLNET2424"; // OPTIONS FLOAT-DECIMAL — A.3 items 13, 19
 
-    /// <summary>The corpus golden's source text — the witness and the corpus run the SAME file.</summary>
-    private static string Golden(string edition, string name) =>
-        File.ReadAllText(Path.Combine(TestRepo.Tests("conformance"), edition, name + ".cob"));
+    /// <summary>The conformance-suite test's source text — the witness and the suite run the SAME file.</summary>
+    private static string Golden(string id) => File.ReadAllText(TestRepo.SuiteCase(id));
 
     /// <summary>The recognize-and-warn contract: at every named edition the source COMPILES (the facility is
     /// declined ACCEPT-INERT, not refused) and the NAMED non-support diagnostic rides the non-failing
@@ -84,7 +83,7 @@ public sealed class DocumentedNonSupportWitnessTests
     /// parse (the sibling row GR-14.9.7.4-1) — so the compile-time name is the whole witness.</para></summary>
     [Fact]
     public void CommitRollbackFacility_NamedNonSupportWarning_PinnedToSpec() =>
-        AssertRecognizedAndNamed(Golden("2023", "pb261_commit_facility_witness"), CommitNonSupport, 2023);
+        AssertRecognizedAndNamed(Golden("pb261_commit_facility_witness"), CommitNonSupport, 2023);
 
     /// <summary>VALIDATE → COBOLNET1580, at the editions the facility exists (2002+; at --std 85 VALIDATE is
     /// an ordinary user-defined word). §13.18.40.4 GR19's only trigger is the format validation stage of a
@@ -95,7 +94,7 @@ public sealed class DocumentedNonSupportWitnessTests
     /// outcome too, so "SUBJECT UNCHANGED" discriminates nothing. Only this warning does.</para></summary>
     [Fact]
     public void ValidateFacility_NamedNonSupportWarning_PinnedToSpec() =>
-        AssertRecognizedAndNamed(Golden("2023", "dns_validate_picture_locale_witness"),
+        AssertRecognizedAndNamed(Golden("dns_validate_picture_locale_witness"),
             ValidateNonSupport, 2002, 2014, 2023);
 
     /// <summary>RECORD DELIMITER → COBOLNET1778, at EVERY edition (the clause is in the '85 file control entry
@@ -158,7 +157,7 @@ public sealed class DocumentedNonSupportWitnessTests
     [InlineData(2023)]
     public void RecordDelimiterAbsent_DrawsNoWarning_AndOnlyTheThreeClausesDo(int edition)
     {
-        string source = Golden("2023", "pb292_record_delimiter_witness");
+        string source = Golden("pb292_record_delimiter_witness");
         var (ok, errors, warnings) = EditionHarness.CompileFull(source, edition);
         Assert.True(ok, $"--std {edition}: {string.Join("\n", errors)}");
         var raised = warnings.Where(w => w.Contains(RecordDelimiterNonSupport, StringComparison.Ordinal))
@@ -183,7 +182,7 @@ public sealed class DocumentedNonSupportWitnessTests
     [Fact]
     public void McsFacility_NamedNonSupportWarning_AtBothStatements_PinnedToSpec()
     {
-        string source = Golden("2023", "w59_mcs_facility_witness");
+        string source = Golden("w59_mcs_facility_witness");
         var (ok, errors, warnings) = EditionHarness.CompileFull(source, 2023);
         Assert.True(ok, $"an ACCEPT-INERT declined facility must still COMPILE: {string.Join("\n", errors)}");
         Assert.Equal(2, warnings.Count(w => w.Contains(McsNonSupport, StringComparison.Ordinal)));
@@ -200,7 +199,7 @@ public sealed class DocumentedNonSupportWitnessTests
     [InlineData(2014)]
     public void McsStatements_Below2023_AnswerTheIntroductionGate_NotTheFacility(int edition)
     {
-        string source = Golden("negative", "pb374-async-messaging-below-2023");
+        string source = Golden("pb374-async-messaging-below-2023");
         var (ok, errors, warnings) = EditionHarness.CompileFull(source, edition);
         Assert.False(ok, $"the asynchronous messaging formats compiled at COBOL-{edition}");
         Assert.Equal(2, errors.Count(e => e.Contains("COBOLNET0900", StringComparison.Ordinal)));
@@ -218,7 +217,7 @@ public sealed class DocumentedNonSupportWitnessTests
     [Fact]
     public void McsExceptionNames_NamedNonSupportWarning_AtEverySite_AndAccepted()
     {
-        string source = Golden("2023", "pb374_ec_mcs_names_accept_inert");
+        string source = Golden("pb374_ec_mcs_names_accept_inert");
         var (ok, errors, warnings) = EditionHarness.CompileFull(source, 2023);
         Assert.True(ok, $"an accept-inert facility's exception-names must still COMPILE: {string.Join("\n", errors)}");
         var mcs = warnings.Where(w => w.Contains(McsNonSupport, StringComparison.Ordinal)).ToList();
@@ -243,7 +242,7 @@ public sealed class DocumentedNonSupportWitnessTests
     [InlineData("declined-ec-flow-apply-commit-use", "EC-FLOW-APPLY-COMMIT")]
     public void DeclinedModuleExceptionName_Permissive_IsAcceptedAndResolves(string negative, string name)
     {
-        string source = Golden("negative", negative);
+        string source = Golden(negative);
         var (strictOk, _, _) = EditionHarness.CompileFull(source, 2023);
         Assert.False(strictOk, $"{negative} compiled under the strict posture; the refusal it pins is gone");
 
@@ -285,7 +284,7 @@ public sealed class DocumentedNonSupportWitnessTests
         Assert.True(ok, detail);
         Assert.Equal("HANDLER\nAFTER", stdout.ReplaceLineEndings("\n").TrimEnd('\n'));
 
-        var (screenOk, screenErrors, _) = EditionHarness.CompileFull(Golden("negative", "a42-ec-screen-raise"), 2023,
+        var (screenOk, screenErrors, _) = EditionHarness.CompileFull(Golden("a42-ec-screen-raise"), 2023,
                                                                      permissive: true);
         Assert.False(screenOk, "EC-SCREEN is not PermissiveInert; --permissive must not accept its names");
         Assert.Contains(screenErrors, e => e.Contains("COBOLNET1707", StringComparison.Ordinal));
@@ -302,7 +301,7 @@ public sealed class DocumentedNonSupportWitnessTests
     [InlineData(2023)]
     public void FloatDecimalClause_NamedNonSupportWarning_PinnedToSpec(int edition)
     {
-        string source = Golden("2014", "w59_float_decimal_clause_witness");
+        string source = Golden("w59_float_decimal_clause_witness");
         AssertRecognizedAndNamed(source, FloatDecimalClauseNonSupport, edition);
 
         string claimed = source.Replace("FLOAT-DECIMAL DEFAULT IS BINARY-ENCODING HIGH-ORDER-RIGHT.",
@@ -325,7 +324,7 @@ public sealed class DocumentedNonSupportWitnessTests
     [InlineData("FLOAT-DECIMAL HIGH-ORDER-LEFT.")]
     public void FloatDecimalClause_EveryPhraseOrder_ReachesTheWarning_NotAParseError(string clause)
     {
-        string source = Golden("2014", "w59_float_decimal_clause_witness")
+        string source = Golden("w59_float_decimal_clause_witness")
             .Replace("FLOAT-DECIMAL DEFAULT IS BINARY-ENCODING HIGH-ORDER-RIGHT.", clause, StringComparison.Ordinal);
         Assert.Contains(clause, source, StringComparison.Ordinal);
         AssertRecognizedAndNamed(source, FloatDecimalClauseNonSupport, 2014, 2023);
@@ -336,7 +335,7 @@ public sealed class DocumentedNonSupportWitnessTests
     /// inertness half and the decline half never diverge.</summary>
     private static void AssertArmNamed(int edition, string armSpelling)
     {
-        string source = Golden("2023", "pb292_record_delimiter_witness");
+        string source = Golden("pb292_record_delimiter_witness");
         var (ok, errors, warnings) = EditionHarness.CompileFull(source, edition);
         Assert.True(ok, $"--std {edition}: an ACCEPT-INERT declined facility must still COMPILE "
             + $"(docs/CONFORMANCE.md §1): {string.Join("\n", errors)}");

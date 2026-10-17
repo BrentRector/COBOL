@@ -1,0 +1,21 @@
+*>--- conformance-case
+*> id: open-reversed
+*> rules: [FMT-14.9.27.2]
+*> source-format: free
+*> portable: unverified
+*>---
+IDENTIFICATION DIVISION.
+PROGRAM-ID. NEGOR01.
+ENVIRONMENT DIVISION.
+INPUT-OUTPUT SECTION.
+FILE-CONTROL.
+    SELECT F ASSIGN TO "negor01" ORGANIZATION IS SEQUENTIAL.
+DATA DIVISION.
+FILE SECTION.
+FD F.
+01 R PIC X(10).
+PROCEDURE DIVISION.
+MAIN.
+    OPEN INPUT F REVERSED.
+    CLOSE F.
+    STOP RUN.

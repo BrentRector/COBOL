@@ -18,7 +18,7 @@ const ROW = {
   properties: {
     rule_id: { type: 'string' },
     disposition: { type: 'string', enum: ['existing-golden', 'new-golden', 'defect-suspected', 'not-closable'] },
-    test_ref: { type: 'string', description: 'conformance:<edition>/<case> or conformance:negative/<case>; empty when not closable' },
+    test_ref: { type: 'string', description: 'conformance:cases/<clause folder>/<id> (or conformance:wiseowl/cases/<folder>/<id>); empty when not closable' },
     files: { type: 'array', items: { type: 'string' }, description: 'draft files written under out/<slug>/, repo-relative destination paths' },
     derivation: { type: 'string', description: 'how each expected line follows from the quoted rule text — the spec is the only oracle' },
     citations_checked: { type: 'array', items: { type: 'string' }, description: 'each `cite.py --check <clause> "<text>"` command and its verdict line' },
@@ -32,8 +32,7 @@ const WRITER_OUT = {
   properties: {
     slug: { type: 'string' },
     rows: { type: 'array', items: ROW },
-    manifest_entries: { type: 'object', description: 'edition dir -> [case names] for tests/conformance/<edition>/manifest.json enabled', additionalProperties: { type: 'array', items: { type: 'string' } } },
-    negative_manifest_entries: { type: 'array', items: { type: 'string' } },
+    refusals: { type: 'object', description: 'test id -> its conformance-suite/wiseowl/diagnostics.json entry, for a program WiseOwl must refuse', additionalProperties: { type: 'object', properties: { 'refuse-at': { type: 'array', items: { type: 'string' } }, expect: { type: 'string' } }, required: ['refuse-at', 'expect'] } },
     records: { type: 'array', description: 'record_verdicts.py records for rows that would CLOSE once the goldens are validated', items: { type: 'object', additionalProperties: { type: 'string' } } },
     defects: { type: 'array', items: { type: 'object', properties: { rule_id: { type: 'string' }, repro: { type: 'string' }, expected: { type: 'string' }, observed_or_reasoning: { type: 'string' }, clause: { type: 'string' } }, required: ['rule_id', 'repro', 'expected', 'observed_or_reasoning', 'clause'] } },
     summary: { type: 'string' },
@@ -41,7 +40,7 @@ const WRITER_OUT = {
     // registrar can dispatch exactly them and reconcile read == decided + |deferred|.
     deferred: { type: 'array', items: { type: 'string' } },
   },
-  required: ['slug', 'rows', 'manifest_entries', 'negative_manifest_entries', 'records', 'defects', 'summary'],
+  required: ['slug', 'rows', 'refusals', 'records', 'defects', 'summary'],
 }
 const REFUTE_OUT = {
   type: 'object',
@@ -74,7 +73,7 @@ You work in the WiseOwl COBOL repository at E:\\COBOL (read CLAUDE.md first — 
 THE TREE IS FROZEN: a comprehensive battery is running. You may READ anything in the repo and run python scripts
 (scripts/spec/cite.py). You MUST NOT run dotnet, cobol.exe, git, or write ANY file inside E:\\COBOL. Every
 file you produce goes under ${SCRATCH}/out/<slug>/ using the repo-relative destination path as a subpath
-(e.g. ${SCRATCH}/out/<slug>/tests/conformance/2023/<name>.cob). A director copies validated drafts into the tree.
+(e.g. ${SCRATCH}/out/<slug>/conformance-suite/cases/14.9.8-COMPUTE/<id>.cob). A director copies validated drafts into the tree.
 THE SPEC IS THE ONLY ORACLE: specs/ISO_COBOL.md (ISO/IEC 1989:2023). Derive every expected output value from the
 rule text BEFORE thinking about what the compiler does; NIST goldens and GnuCOBOL are regression
 nets, never authority; a *_MatchesLegacy test or a nist: ref cannot close a row. VALIDATE EVERY CITATION:
@@ -105,11 +104,13 @@ YOUR JOB, per row, in this order:
    Coverage means the rule's branch, not merely the function being called.
 3. Otherwise write a NEW golden: a minimal deterministic COBOL program (unique PROGRAM-ID prefixed L1, e.g.
    L1FDT01) that exercises the rule and DISPLAYs a result, plus its .out with every expected line DERIVED from the
-   rule text (show the derivation). Positive: tests/conformance/<edition>/<name>.cob + .out, first line
-   "*> ISO §<clause> <rule> — <what is exercised>"; use the 2023 directory unless the rule is edition-limited, and
-   write one golden per edition where behaviour differs across the row's editions. Negative (a rule that must be
-   REJECTED, or a DNS witness that must DIAGNOSE): tests/conformance/negative/<name>.cob + <name>.err holding the
-   expected diagnostic substring; FIRST line "*> reject-at: <year> ...". Several rows may share one program when
+   rule text (show the derivation). Positive: conformance-suite/cases/<ISO clause>-<Name>/<id>.cob + <id>.out,
+   opening with its metadata header (id, rules, accept: the row's editions, source-format; conformance-suite/
+   README.md 'Adding a test'), then "*> ISO §<clause> <rule> — <what is exercised>"; a per-edition
+   <id>.<edition>.out where behaviour differs across the row's editions. Negative (a rule that must be REJECTED):
+   the same folder, the header with NO accept, and its refusal returned under `refusals` (refuse-at: the editions,
+   expect: the diagnostic code); a DNS witness that must DIAGNOSE goes in conformance-suite/wiseowl/cases/
+   <clause>-<Name>/ the same way. Several rows may share one program when
    the same output pins them all — say which lines pin which rule.
    Never use CURRENT-DATE-dependent values as literal expectations: pin SHAPE (length, separators, digit classes)
    via DISPLAY of derived facts, or use FORMATTED-* over fixed inputs.
@@ -122,7 +123,7 @@ For the dns-witness file: read kb/Work/PB260.md and kb/Work/PB261.md FIRST — t
 to measure; the witness must prove the compiler DIAGNOSES the declined construct (name the diagnostic you expect
 from docs/DIAGNOSTICS.md, or say that none exists yet and the witness therefore needs a compiler change — that is a
 finding, report it under defects).
-Return the manifest entries (per edition directory) and negative entries you need registered, and a
+Return the refusals you need merged into conformance-suite/wiseowl/diagnostics.json, and a
 record_verdicts.py record per row that would close: {"rule-id","verdict","code-location","test-ref","editions",
 "notes"} — verdict unchanged from the input, test-ref your new/existing ref, editions from the row, notes a
 one-line derivation pointer. Strings only.`,
@@ -164,8 +165,7 @@ log(`Lane 1 draft: ${done.length}/${FILES.length} files completed`)
 return done.map(x => ({
   slug: x.w.slug,
   rows: x.w.rows.map(r => ({ rule_id: r.rule_id, disposition: r.disposition, test_ref: r.test_ref })),
-  manifest_entries: x.w.manifest_entries,
-  negative_manifest_entries: x.w.negative_manifest_entries,
+  refusals: x.w.refusals,
   records: x.w.records,
   defects: x.w.defects,
   refuted: x.r ? x.r.verdicts.filter(v => !v.upheld) : 'REFUTER MISSING',

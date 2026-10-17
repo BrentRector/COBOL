@@ -590,8 +590,8 @@ internal sealed class InitializeBinder(BinderContext ctx, StatementBinder host)
         //         character, so GR6c's "Figurative constant alphanumeric SPACES" would otherwise leave the item
         //         at length 1 rather than at §13.18.19.4 GR1's minimum of zero.
         // The empty sender flows through the same dynamic-length store, so the zeroing is the SENDER, not a
-        // second write. (CODE-SPEC-AUDIT CA1.) Pinned at both poles by conformance:2014/initialize_dynamic_length
-        // (the GR6c arm) and conformance:2014/pb418_initialize_dynamic_length_senders (the GR6a/GR6b arms).
+        // second write. (CODE-SPEC-AUDIT CA1.) Pinned at both poles by conformance:cases/14.9.20-INITIALIZE/initialize_dynamic_length
+        // (the GR6c arm) and conformance:cases/14.9.20-INITIALIZE/pb418_initialize_dynamic_length_senders (the GR6a/GR6b arms).
         if (item.IsDynamicLength && q is InitializeQualification.ViaDefault) source = new BoundStringLiteral("");
         return Store(cur.ToPlace(), source);
     }
@@ -791,7 +791,7 @@ internal sealed class InitializeBinder(BinderContext ctx, StatementBinder host)
         // it was hoisted above the loop as "asked once" back when the only class it could refuse was INDEX, and
         // INDEX is not one of INITIALIZE's thirteen category-names. The moment SR1's screen gained its pointer
         // and object arms, `INITIALIZE g REPLACING DATA-POINTER DATA BY PTR` — the exact shape SR4's first
-        // paragraph and §14.9.20.4 GR4 describe, and which conformance:2002/pb415_initialize_replacing_set_form
+        // paragraph and §14.9.20.4 GR4 describe, and which conformance:cases/14.9.20-INITIALIZE/pb415_initialize_replacing_set_form
         // pins — was refused as an invalid MOVE. The hoist stays (one message per REPLACING item, §5.2.6.4's
         // category-name is a SET), guarded by the paragraph that owns it.
         bool anyMoveFormCategory = false;

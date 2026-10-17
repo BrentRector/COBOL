@@ -163,7 +163,7 @@ public sealed class NationalBooleanDataTests
             """;
         // 2023, not 2002: the observation uses FUNCTION CONVERT (§15.19, introduced by ISO/IEC 1989:2023 —
         // COBOLNET1502). The SUBJECT is edition-independent (national data is 2002), and the 2002 arm of the
-        // record layout is covered by `conformance:2002/pb327_national_fd_record`.
+        // record layout is covered by `conformance:cases/14.9.27-OPEN/pb327_national_fd_record`.
         var (ok, stdout, detail) = new CobolNetCompiler(2023).CompileAndRun(src);
         Assert.True(ok, detail);
         // The record is 4 national positions (8 bytes) + 4 alphanumeric (4 bytes) = 12 bytes; F-X therefore
@@ -259,7 +259,7 @@ public sealed class NationalBooleanDataTests
     /// leftmost character positions", then "For data items … described as usage national, national zeros …
     /// national spaces"; "For data items … described as usage bit, bit zeros shall be used for zero fill".
     /// JUSTIFIED is legal on both categories by §13.18.32.3 SR3. The "!" sentinel keeps the national right end
-    /// observable. The DISPLAY-usage half of GR2 is pinned by `conformance:2023/pb339_into_current_record` leg A.
+    /// observable. The DISPLAY-usage half of GR2 is pinned by `conformance:cases/13.18.32-JUSTIFIED/pb339_into_current_record_2023` leg A.
     /// <para>BB is the USAGE BIT arm — the sentence a PIC 1(4) DISPLAY-carrier receiver does NOT exercise, since
     /// GR2 names the fill per USAGE, not per category. Expected `0011` by the same derivation as BJ: a two-
     /// position sender right-aligned in four boolean positions, the leftmost two filled with bit zeros.</para>
@@ -288,7 +288,7 @@ public sealed class NationalBooleanDataTests
     /// "When the receiving data item is described with the JUSTIFIED clause and the sending operand is larger
     /// than the receiving data item, the leftmost character positions or boolean positions of the sending operand
     /// shall be truncated." The DISPLAY-alphanumeric half is pinned by
-    /// `conformance:2023/pb339_into_current_record` leg B and by
+    /// `conformance:cases/13.18.32-JUSTIFIED/pb339_into_current_record_2023` leg B and by
     /// `AcceptDifferentialTests.Day_JustifiedReceiver_RightJustifiesAndLeftTruncates`; the rule's OWN wording
     /// names boolean positions as well, and a national receiver is legal under §13.18.32.3 SR3, so both were
     /// implemented-but-unevidenced until this test.

@@ -1404,7 +1404,7 @@ internal sealed class StatementValidation(DataBinder data)
     /// <see cref="EditionContext.Removed"/> the way its forbidden-phrase mirror is. That seam exists because the
     /// CCVS-85 corpus really does write the phrases §14.9.30.3 SR6 forbids, and tolerating them leaves the bind
     /// UNCHANGED. Nothing is lenient about the omission this screen catches: measured over
-    /// <c>tests/conformance</c> and <c>tests/nist</c>, every RETURN in the corpus writes its AT END, and a
+    /// <c>conformance-suite</c> and <c>tests/nist</c>, every RETURN in them writes its AT END, and a
     /// permissive arm would keep alive exactly the wrong answer PB350 reports — control falling THROUGH a
     /// RETURN at end of data onto an undefined record area (§14.9.34.4 GR3).</para>
     /// <para>⚠ It is screened HERE and not in the grammar on purpose. The grammar already produces a tree the

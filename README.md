@@ -107,9 +107,9 @@ HEAD into the Linux filesystem and builds and tests it there, the way CI's Ubunt
 
 The test populations:
 
-- `tests/Cobol.Net.Tests.Conformance` over `tests/conformance/`: programs derived from the standard with their
-  expected output, one directory per edition; a negative corpus of programs each edition must reject; the NIST CCVS
-  suite under `tests/nist/`; and the version matrix, which compiles one corpus at all four editions.
+- `tests/Cobol.Net.Tests.Conformance` over `conformance-suite/`: the per-edition conformance suites, programs
+  derived from the standard with their expected output in a folder per ISO clause, and the programs WiseOwl must
+  refuse (`conformance-suite/README.md`); the NIST CCVS suite under `tests/nist/`; and the version matrix, which compiles one corpus at all four editions.
 - `tests/Cobol.Net.Tests.Unit`: the runtime and compiler units, and the drift tests that keep two copies of one rule
   from diverging.
 - `tests/Cobol.Net.Tests.Characterization`: snapshots of diagnostics and emitted C# over a fixed corpus.
@@ -165,8 +165,8 @@ COBOL source
   Other compilers and test suites are evidence, never authority.
 - **Work lives in `kb/Work/`.** `python scripts/spec/work.py next` ranks what to fix next by what a defect does to a
   user's program. A new defect becomes a note there before anything else.
-- **Every change ships with its tests and its documents.** A behavior change adds a program under `tests/conformance/`
-  with expected output derived from the standard, and a negative program for each earlier edition that must reject
+- **Every change ships with its tests and its documents.** A behavior change adds a test to `conformance-suite/cases/`
+  with expected output derived from the standard, and a refused program for each earlier edition that must reject
   it. The documents that describe the behavior change in the same pull request.
 - **Every landing carries a DEVLOG entry.** Write `DEVLOG/pending-<slug>.md` with the change; the landing numbers
   and stamps it.

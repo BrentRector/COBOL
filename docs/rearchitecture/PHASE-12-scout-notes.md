@@ -47,7 +47,7 @@ spec/code citation, but confirm at step start).
    P10 Step 7 (after the plan was written) landed the whole PROGRAM-POINTER pipeline: `PROGRAM_POINTER` lexer token,
    `programPointerUsage` in `usageKeyword`, `Usage.ProgramPointer` + `PicCategory.ProgramPointer`, the
    `ProgramPointer` runtime record struct on the ONE `ProgramTable` (`EntryOf`/`CallPointer`), SET Format 9 +
-   `SET … TO ENTRY`, CALL-through-pointer, a runnable `tests/conformance/2002/program_pointer.cob`, 4 negative tests,
+   `SET … TO ENTRY`, CALL-through-pointer, a runnable `conformance-suite/cases/13.18.60-USAGE/program_pointer.cob`, 4 negative tests,
    and **active** matrix rows `usage-program-pointer-2002` + `user-word-program-pointer-2002`. The plan's §7 table
    ("2014", row `program-pointer-2014`, test `2014/program_pointer`) and its `{is2014()}?` gate would be a
    **regression** (rejecting valid `--std 2002`). Step 8's real remaining PROGRAM-POINTER scope = only the **restricted
@@ -244,7 +244,7 @@ SORT/MERGE keys §14.9.40.3 / §14.9.24.3.
   CobolData.g4:393-395; `Usage.ProgramPointer` PicInfo.cs:98 + `PicCategory.ProgramPointer` :46; runtime
   `ProgramPointer` record struct `Control/ProgramPointer.cs:14` (`Null` 17, `SameTarget` 24); resolution on the ONE
   `ProgramTable` (`EntryOf` 173, `CallPointer` 191); SET Format 9 + `SET … TO ENTRY` in `SetBinder.cs` (104/150),
-  emit `PtrEmitter.cs:119` / `SetEmitter.cs:46`; test `tests/conformance/2002/program_pointer.cob` + 4 negatives;
+  emit `PtrEmitter.cs:119` / `SetEmitter.cs:46`; test `conformance-suite/cases/13.18.60-USAGE/program_pointer.cob` + 4 negatives;
   rows `usage-program-pointer-2002` (active, constructs.json:394) + `user-word-program-pointer-2002`. **Row
   `program-pointer-2014` exists nowhere but the plan.** Residues: restricted GR25 form (staged loud 0899) + ISO
   `ADDRESS OF PROGRAM` spelling.
@@ -332,7 +332,7 @@ spec §14.9.20) — a separate gap, note it.
   `ISO2023_CONFORMANCE_PLAN.md:644` + `COBOLNET_DATA_MODEL_DESIGN.md:434`.
 - **[VERIFIED] SAME AS is DONE** (P10 Step 16): `ExpandSameAs` DataBinder.cs:1210 on the ONE `CloneItem` (:1118);
   `sameAsClause` CobolData.g4:317-319; SRs COBOLNET1555/1556/1557 (DiagnosticCatalog.cs:173-192); golden
-  `tests/conformance/2002/typedef_same_as.cob`; `SameAsTests.cs:14`; row `same-as-clause-2002` active. The plan's §7
+  `conformance-suite/cases/13.18.49-SAME-AS/typedef_same_as.cob`; `SameAsTests.cs:14`; row `same-as-clause-2002` active. The plan's §7
   "same-as-2014 (pending)" row does not exist and is not needed. Step 10's commit template "catalogue SAME AS as
   pending" is stale — it's active.
 - **[VERIFIED] TYPEDEF/TYPE/OCCURS DYNAMIC rows all effectively active** (a missing `status` field defaults to

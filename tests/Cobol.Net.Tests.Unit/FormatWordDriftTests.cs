@@ -95,12 +95,10 @@ public sealed class FormatWordDriftTests
         return (fe.Parse(path, new DiagnosticBag()), fe);
     }
 
-    private static List<string> EnabledPositives(string edition)
-    {
-        string manifest = TestRepo.Tests("conformance", edition, "manifest.json");
-        using var doc = JsonDocument.Parse(File.ReadAllText(manifest));
-        return doc.RootElement.GetProperty("enabled").EnumerateArray().Select(e => e.GetString()!).ToList();
-    }
+    /// <summary>The conformance-suite tests accepted at <paramref name="edition"/>: (id, source path).</summary>
+    private static List<(string Name, string Path)> EnabledPositives(string edition) =>
+        [.. SuiteManifest.Manifest.Editions[edition].Values.Where(t => t.Expect == "accept")
+            .OrderBy(t => t.Id, StringComparer.Ordinal).Select(t => (t.Id, Path.Combine(SuiteManifest.Root, t.Source)))];
 
     /// <summary>⛔ THE OBLIGATION. In every ENABLED positive golden that writes a tokenless §8.9-reserved word, each
     /// occurrence at an edition that reserves it is a <c>formatWord</c> (a keyword) — never a <c>cobolWord</c> —
@@ -123,10 +121,8 @@ public sealed class FormatWordDriftTests
             var reservedHere = words.Where(w => ReservedWordSet.Default.RejectsAt(w, edition)).ToList();
             var wordPattern = new Regex(@"(?<![A-Z0-9-])(" + string.Join("|", reservedHere.Select(Regex.Escape)) + @")(?![A-Z0-9-])",
                 RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
-            foreach (string name in EnabledPositives(ed))
+            foreach (var (name, path) in EnabledPositives(ed))
             {
-                string path = TestRepo.Tests("conformance", ed, name + ".cob");
-                if (!File.Exists(path)) continue;
                 string code = string.Join('\n', File.ReadLines(path)
                     .Where(l => !(l.Length > 6 && l[6] is '*' or '/'))
                     .Select(l => l.IndexOf("*>", StringComparison.Ordinal) is int c and >= 0 ? l[..c] : l)

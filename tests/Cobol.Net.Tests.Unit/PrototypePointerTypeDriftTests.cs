@@ -28,8 +28,8 @@ namespace CobolNet.Tests.Unit;
 /// <c>PrototypeSignatures.RestrictionIdentity</c> (the signature class <c>PrototypeSignatureClasses.Classify</c>
 /// attached; while the classes are refined it is the prototype's current block, kb/Work PB2495 / PB3101), and this
 /// test keeps the NEXT relation from comparing the name again: no source line may compare
-/// <c>RestrictedPrototypeName</c>. Behaviour is pinned by <c>conformance:2002/pb2464_prototype_pointer_signature_type</c>,
-/// <c>conformance:2014/pb2464_function_pointer_signature_type</c> and the negative
+/// <c>RestrictedPrototypeName</c>. Behaviour is pinned by <c>conformance:cases/_unassigned/pb2464_prototype_pointer_signature_type</c>,
+/// <c>conformance:cases/_unassigned/pb2464_function_pointer_signature_type</c> and the negative
 /// <c>pb2464-typed-pointer-signature-mismatch</c>.</para>
 /// <para>Proven to FAIL before it was trusted: <see cref="ThePatternThisTestKeysOn_FiresOnThePB2464Defect"/> feeds the
 /// matcher the exact line the tree carried and asserts it is caught, and feeds it the repaired line and the signature
@@ -132,7 +132,7 @@ public sealed class PrototypePointerTypeDriftTests
     /// compiler, as a top-level statement of <c>BinderDriver.Bind</c>'s body (no loop, branch, lambda or helper between),
     /// as is <c>ResolvePointerRestrictions</c>, and the check's statement follows it. Proven to fail on the pre-repair
     /// shape by <see cref="TheOrderPin_FiresOnThePB2495Defect"/>. Behaviour is pinned by
-    /// <c>conformance:2002/pb2495_pointer_type_in_signature_checks</c>.</para></summary>
+    /// <c>conformance:cases/_unassigned/pb2495_pointer_type_in_signature_checks</c>.</para></summary>
     [Theory]
     [InlineData("CheckPrototypeSignaturePairs")]
     [InlineData("ValidateInterfaceInheritance")]

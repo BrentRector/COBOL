@@ -472,7 +472,7 @@ public sealed class FileControlKeyRuleSpecTests
     //    obliges the compiler to say so at compile time, and its closing sentence — "The implementor is not
     //    required to produce executable code when unsupported processor-dependent language elements are used" —
     //    is what makes REFUSING (rather than accepting inert) conforming. kb/Work PB358.
-    //    The refusal itself is pinned by the negative corpus (tests/conformance/negative/pb358-*). What lives
+    //    The refusal itself is pinned by the negative corpus (the suite's pb358-* refusals, conformance-suite/cases/12.4.5.6-ALTERNATE-RECORD-KEY/). What lives
     //    HERE is what that corpus structurally cannot say: the two properties either side of the refusal.
     private const string SourcePhraseDecline = "COBOLNET1954";
 

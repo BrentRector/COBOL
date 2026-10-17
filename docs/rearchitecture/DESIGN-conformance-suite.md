@@ -306,8 +306,8 @@ conformance-suite/
    non-support diagnostic in the `.err`: the 84 negatives among them) go to `wiseowl/cases/` (§4), never to
    `cases/`; `DocumentedNonSupportWitnessTests` and `DeclinedFacilityTests` keep pinning them there.
    The same change rewrites the inventory's 7,928 `conformance:` citations and the ref grammar in
-   `inventory-schema.json`; replaces `CorpusRunnerTests` and `CorpusManifest` with the manifest runner; re-records the
-   arch-oracle baseline (`ArchOracle.cs` enumerates through `CorpusManifest`, kb/Work PB3107); replaces the
+   `inventory-schema.json`; replaces `CorpusRunnerTests` with the manifest runner (`CorpusManifest` is the NIST
+   manifest and stays, step 5; the arch-oracle has no committed baseline since kb/Work PB3107); replaces the
    `golden_registered.py` hook's manifest check with the generator's refusal; moves `gate_plan.py`,
    `impacted_tests.py`, `filter_population.py`, `gen_ledger.py`'s corpus row, `session-probe.ps1`, the `guard-*.sh`
    scripts and CI, `.gitattributes`, `.gitignore`, the skills (`land-a-fix`, `new-construct`, the workstream
@@ -506,6 +506,34 @@ hold the status, this section the scope. Every slice ships its own tests and dri
   adds one refusal to the generator, a file under the removed `tests/conformance/` path, for a branch the drain does
   not hold (an attended or Mythos branch): it is a gate audit (§9), so such a branch is red in seconds, before the
   build, and the fix is moving the file into `cases/`.
+  **As built:** a one-time converter (on the branch for review, deleted before the landing with its map, as this
+  slice says) moved 5,219 programs into 5,110 tests of `cases/` and 109 of `wiseowl/cases/`, 2,752 refusals into
+  `wiseowl/diagnostics.json`, two compile options into `wiseowl/options.json`, and rewrote the inventory's 7,920
+  citations; a sweep rewrote the other files' citations, the moved tests' own comments included. No map
+  survives the move, because none is needed: the witness-loss audit reads a moved test's identity from git's
+  rename record across the change (`audit_witness_loss.respellings`; `inventory_schema.witness_losses` excuses a
+  lost reference whose new spelling the row cites as RE-SPELLED), so the history walk stays right and a clause
+  pass that re-files a test needs nothing either. The corpus runner's own xUnit witness
+  (`CorpusRunnerTests.EnabledNegativeCase_RejectsWithItsDiagnostic`, 59 rows) was retired by a batch for
+  `ConformanceSuiteTests.WiseOwlRefusal_RefusesTheSourceWithItsDiagnostic`. The gate orders a change to a test,
+  to a file its header declares or to its `wiseowl/` entry into leg 1 by the test's id
+  (`impacted_tests.suite_tests`), and the citation audits read the suite (`citation_corpus.declaration_files`,
+  past each test's metadata block). The `golden_registered.py` hook has no manifest to check: it echoes the
+  generator's refusal at the write of a file under the removed tree. `ConformanceSuiteTestsBase` (24 partitions) replaced
+  `CorpusRunnerTests`, and the neutrality proof is that runner over the moved corpus: 10,571 of 10,571 rows pass, every
+  former positive at its former edition and every former negative refused with its former diagnostic. Corrections to
+  this design, as built: the arch-oracle has no committed baseline since kb/Work PB3107 (the
+  comparison captures the base commit), and `CorpusManifest` is the NIST manifest, which stays (§6 step 5); the
+  header's long lists continue on lines indented four spaces past `*>` (fixed form's margin R, free form's 255
+  positions, ISO 6.1); a library text is read by its byte-order mark and staged as bytes; `cobol_source.py` follows
+  SOURCE FORMAT directives (ISO 7.3.24.3 GR 1) and reads no COPY in a directive's text (7.3.19.4 GR 1); a test that
+  is only refused may COPY an unavailable text (7.2.3.4 GR 2); a WiseOwl test may declare a library folder
+  (`<library>/<file>`), take WiseOwl compile options (`wiseowl/options.json`) and use free form at 85 (WiseOwl's
+  extension); an annex clause folder (`A.1-…`) is a clause folder; the in-suite verdict drift test keeps its shape,
+  because a migrated test is `portable: unverified` and in no per-edition suite until its clause pass. The line numbers
+  the header moves are moved in the expectations that quote them (a diagnostic's `(line,column)`, a reported
+  EXCEPTION-LOCATION), and the 14 compile-only programs carry their recorded output as `.out` (§3.1: every accepted
+  test runs).
 - **S3 — the pilot (PB3178).** §8: clause 11, §14.9.8 and `pb355_start_length_past_operand` through §6 steps 2-4 at
   all four editions on WiseOwl and GnuCOBOL; GnuCOBOL's baseline recorded; the cost per test and the share of each of
   step 2's three outcomes measured and written into PB3160 and §8, with the estimate for the remaining clauses.

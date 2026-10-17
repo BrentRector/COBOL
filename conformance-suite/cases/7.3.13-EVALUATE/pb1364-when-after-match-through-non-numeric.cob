@@ -1,0 +1,20 @@
+*>--- conformance-case
+*> id: pb1364-when-after-match-through-non-numeric
+*> rules: [SR-7.3.13.3-12]
+*> source-format: free
+*> portable: unverified
+*>---
+*> 7.3.13.3 SR11 (cite.py --check 7.3.13.3 "All operands of one EVALUATE directive shall be of the same category."
+*> -> OK 11)) and SR4/SR5/SR6: syntax rules hold for EVERY >>WHEN of the directive, not only for those evaluated
+*> before a match. kb/Work PB1364. Fixed form.
+*> 7.3.13.3 SR12: a THROUGH phrase needs numeric operands.
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. PB1364N03.
+       PROCEDURE DIVISION.
+       >>EVALUATE 1
+       >>WHEN 1
+           DISPLAY "W1".
+       >>WHEN 2 THRU "Z"
+           DISPLAY "W2".
+       >>END-EVALUATE
+           STOP RUN.

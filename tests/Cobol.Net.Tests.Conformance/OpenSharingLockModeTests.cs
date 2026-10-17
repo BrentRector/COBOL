@@ -18,10 +18,10 @@ namespace CobolNet.Tests.Conformance;
 /// <c>--permissive</c> (COBOLNET1709 declines the clause but is <c>PermissiveInert</c>), and neither corpus
 /// runner has a permissive axis — <c>EditionHarness.CompileFull(…, permissive: true)</c> is the only seam.</para>
 ///
-/// <para>The behaviour these guard is pinned from the other side by <c>conformance:2002/pb319_sr8_antecedent</c>
+/// <para>The behaviour these guard is pinned from the other side by <c>conformance:cases/14.9.27-OPEN/pb319_sr8_antecedent</c>
 /// (the antecedent falsified by a non-ALL phrase and by a file never opened),
-/// <c>conformance:negative/sharing-all-no-lockmode</c> (disjunct 1) and
-/// <c>conformance:negative/pb316-open-sharing-all-no-lockmode</c> (disjunct 2).</para>
+/// <c>conformance:cases/14.9.27-OPEN/sharing-all-no-lockmode</c> (disjunct 1) and
+/// <c>conformance:cases/14.9.27-OPEN/pb316-open-sharing-all-no-lockmode</c> (disjunct 2).</para>
 /// </summary>
 public sealed class OpenSharingLockModeTests
 {
