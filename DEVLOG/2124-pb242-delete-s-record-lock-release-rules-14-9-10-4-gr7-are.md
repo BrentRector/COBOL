@@ -1,4 +1,4 @@
-## PB242: DELETE's record-lock release rules (§14.9.10.4 GR7) are now observed end to end
+## Entry 2124 — 2026-10-16 17:12 PDT — PB242: DELETE's record-lock release rules (§14.9.10.4 GR7) are now observed end to end
 
 kb/Work PB242 recorded that DELETE's GR7 record-lock release rules had only ever been read in the code. No test drove a DELETE through `FileRegistry.DeleteShared` while the deleting connector held a lock, so neither arm of the single/multiple locking dispatch had been observed. A refactor that reordered the releases or gated a) 2. on success would have passed every gate.
 
@@ -18,3 +18,4 @@ kb/Work PB242 recorded that DELETE's GR7 record-lock release rules had only ever
 **Self-review.** No code changed, so the architecture, performance and duplication lenses had nothing to judge. For the goldens, every PROGRAM-ID is unique, every scenario's expected value comes from the cited rule, and the observer never locks, so a 51 can only come from the connector under test.
 
 **Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN — leg 2 left to CI's whole-population run …` (run 20261016T233445Z-66d9cd: Conformance 6,120/11,891, Unit 33,428/33,884, Characterization 5/36; the two goldens and the negative passed in leg 1). The Linux gate is the landing's (batched gating).
+
