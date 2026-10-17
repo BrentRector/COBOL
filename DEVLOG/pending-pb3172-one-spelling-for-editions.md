@@ -42,4 +42,7 @@ data); no compatibility reader (the old spelling is refused everywhere; only the
 how a pre-S0a row reaches the one form). Silent-failure lens: an unspellable value is never dropped (rebuild stops,
 normaliser leaves it for the validator, converter reports a problem).
 
-**Gate.** See the branch report for the verdict line.
+**Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN — … Conformance 6,084/11,889 · Unit
+33,334/33,884 · Characterization 5/36 cases ran (skipped 0) in 1 of 2 leg(s) …` (run 20261017T003313Z-12dddf);
+`EveryEditionsField_IsTheOneSpelling` and `TheseChecks_ActuallyFail_OnAFabricatedInventory` Passed in leg 1, and
+`inventory_schema.py --self-test` GREEN among the gate's self-tests. Linux gate: the lander's (batched gating).
