@@ -91,3 +91,7 @@ and names the golden as the row's spec-derived test in place of "test-needed". A
 stating a probe result `-> 0820/0821/0822/0838/0839/0840/0849` found the rest current: the 0840 lines of
 SR-11.4.3-1, SR-11.6.3-2 and SR-11.8.3-1 are the not-in-scope funnel (sr2_classname, sr2_norepo and sr2_undefined
 re-run: 0840 citing §11.6.3 SR2), and the 0839 lines are the FINAL-method rule.
+The round-2 finisher's gate, run `20261017T115300Z-00d321` on `00a3735e5`: `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched
+gating, PB2515): GREEN`, with Conformance 8,201/11,964, Unit 33,529/33,932 and Characterization 5/36 run and no
+failure. `EveryTestRef_ResolvesToARealTest` was again left to leg 2, so it was run directly: 1/1 passed (red 1/1 on
+the reviewed inventory).
