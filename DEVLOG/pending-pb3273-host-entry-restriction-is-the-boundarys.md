@@ -29,4 +29,4 @@ design 4.3 / DOC-A.1-141 text now say why.
 
 **Self-review.** Silent failure: the comment fix removes no check, and the new test asserts the absence of an entry
 rather than a catch. Tests: the fixture has both a publishing and a withheld unit, so a regression that withholds
-everything is also red. No type was added. Gate verdict line: see the branch's STATUS.
+everything is also red. No type was added. Gate (`TestResults/build-local/20261017T004840Z-aa28c4`): `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` with the new Fact passed in `leg-1-Unit.trx`; semgrep verify PASS.
