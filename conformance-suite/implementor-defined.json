@@ -1,0 +1,24 @@
+{
+  "$comment": [
+    "The Annex A.1 implementor-defined items WHOSE VALUES THE STANDARD ENUMERATES (DESIGN-conformance-suite.md §3.3).",
+    "A test whose expected output depends on one of them names it in `implementor-defined` and carries one expected",
+    "output per value, <id>.<item>=<value>.out; each compiler's profile states its value. An item whose values the",
+    "standard does not enumerate cannot be an expectation, so its tests are WiseOwl-only (wiseowl/cases/).",
+    "Each entry names its inventory row (DOC-A.1-<item>) and quotes the rule that enumerates the values; the generator",
+    "(harness/generate.py) refuses an entry without them, and a test naming an item not listed here."
+  ],
+  "items": {
+    "148": {
+      "row": "DOC-A.1-148",
+      "element": "RECORD clause (whether fixed or variable records produced for fixed-or-variable-length format)",
+      "citation": "§13.18.43.4 GR 17: \"It is implementor defined whether format 3 of the RECORD clause produces fixed-length records or variable-length records.\"",
+      "values": ["fixed", "variable"]
+    },
+    "204": {
+      "row": "DOC-A.1-204",
+      "element": "TURN directive (whether location information is available when the LOCATION phrase is not specified)",
+      "citation": "§7.3.25.4 GR 7: \"If the LOCATION phrase is not specified, the implementor shall specify whether this information is made available or not.\"",
+      "values": ["available", "not-available"]
+    }
+  }
+}

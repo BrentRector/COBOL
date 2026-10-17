@@ -63,9 +63,11 @@ Counting rule: a "program" is a manifest entry (`enabled` + `pending`); the file
 ## 3. The test case
 
 One test is one COBOL program, plus any files it declares, that witnesses one rule (or a few tightly related rules),
-with a metadata block at its top. The block is comment lines with `*` in column 7 in fixed form (every compiler at
-every edition, COBOL-85 included, reads them as commentary) and `*>` comment lines in free form (2002 and later, as
-free form itself is).
+with a metadata block opening the file (its first line is the block's first line). The block is comment lines with
+`*` in column 7 in fixed form, so `*>` in columns 7-8 (every compiler at every edition, COBOL-85 included, reads them
+as commentary; columns 1-6 are the sequence number area), and `*>` comment lines starting in column 1 in free form
+(2002 and later, as free form itself is). Each field is one line, `*> <field>: <value>`, the value a scalar, a flow
+list `[a, b]` or a flow map `{k: v}`.
 
 ```cobol
       *>--- conformance-case
@@ -84,14 +86,15 @@ its own directory's edition today; which editions each belongs in is what §6 st
 
 | Field | Meaning |
 |---|---|
-| `id` | Equal to the file's base name (the generator checks). Carries no clause: the clause is the folder (§4), so a mis-filed test can move. Ids are stable from the first released suite version (§7) |
-| `rules` | The inventory `rule-id`s witnessed; the generator refuses one the inventory lacks |
-| `accept` | Editions at which the program must compile AND run, its stdout equal to `<id>.out`, or `<id>.<edition>.out` where the standard's behaviour differs by edition. A test that only proves translation ends in `STOP RUN` with an empty `.out` |
+| `id` | Equal to the file's base name (the generator checks), unique across both trees; letters, digits, `-` and `_` (an expected output's name adds `.` parts to it). Carries no clause: the clause is the folder (§4), so a mis-filed test can move. Ids are stable from the first released suite version (§7) |
+| `rules` | The inventory `rule-id`s witnessed; the generator refuses one the inventory lacks, and an edition the test is accepted at that is outside a rule's `editions` band (the rule does not exist there). Required; `[]` only in `cases/_unassigned/` |
+| `accept` | Editions, ascending, at which the program must compile AND run, its stdout equal to `<id>.out`, or `<id>.<edition>.out` where the standard's behaviour differs by edition. A test that only proves translation ends in `STOP RUN` with an empty `.out`. Every accepted edition has its output and every output file is used by one |
+| `constructs` | The `tests/version-matrix/constructs.json` rows the program uses whose window is not every edition (a 2002 introduction, an element 2002 removed). Each accepted edition lies inside each named construct's window (`introducedIn ≤ V < removedIn`, the f(case, V) of `VERSION_TEST_MATRIX_DESIGN.md` §2). The field is how the generator checks a test against the construct registry: a COBOL program's constructs cannot be read from it without compiling it |
 | `flag` | §3.2: the editions at which a standard-conformance diagnostic is required, with its kind |
 | `control` | §3.2: the id of the accepted twin of a flagged test |
-| `requires` | Optional modules (Annex A.4) and processor-dependent elements (Annex A.3) the test needs; a compiler whose profile does not claim one gets NOT APPLICABLE |
-| `implementor-defined` | §3.3: Annex A.1 items whose standard-enumerated value the expected output depends on |
-| `files` | Copybooks, data files and other compilation units the test needs, beside it; the generator refuses a COPY of an undeclared copybook |
+| `requires` | Optional modules (Annex A.4) and processor-dependent elements (Annex A.3) the test needs, spelled `A.4.<n>` (the module's subclause, `A.4.11` Report Writer) and `A.3-<n>` (the element's item); the generator reads the valid names from the standard's annexes. A compiler whose profile does not claim one gets NOT APPLICABLE |
+| `implementor-defined` | §3.3: Annex A.1 items whose standard-enumerated value the expected output depends on, by item number |
+| `files` | Copybooks, data files and other compilation units the test needs, beside it; the generator refuses a COPY (in the program or in a declared copybook) of an undeclared library text, a declared file that is not there, and a file in a clause folder no test declares or expects |
 | `source-format` | `fixed` or `free`, required on every test (compilers differ in their default) |
 | `portable` | `unverified` on every migrated test until its clause pass (§6 step 2) clears it; the suites carry only cleared tests |
 
@@ -106,18 +109,27 @@ COBOL with `FLAGSTD` warns and still translates). So:
 
 - `flag: {kind, at}` replaces revision 1's `reject`. `kind` is one of `syntax`, `obsolete`, `archaic`, `nonstandard`,
   `processor-dependent`; `at` lists the editions. Meaning: with the compiler's standard-conformance warning mechanism
-  invoked (the adapter's `flag-mode`, §5), a diagnostic is reported at the line marked `*> <<` in the test. Whether
-  the compiler also refuses to translate is not judged.
+  invoked (the adapter's `flag-mode`, §5), a diagnostic is reported at the test's marked line. Whether the compiler
+  also refuses to translate is not judged. A test may be accepted at some editions and flagged at others, never both
+  at one. Each edition it is flagged at lies inside every rule's band, or outside the window of a construct it names
+  (the construct does not exist there, so using it is the violation).
+- **The marked line**: in free form the line ends with the floating comment `*> <<`; in fixed form its sequence
+  number area (columns 1-6) opens with `<<`. Fixed form cannot use a floating comment, which COBOL-85 lacks, nor a
+  column past 72, because margin R "is a fixed position defined by the implementor" (ISO §6.3.1); the sequence number
+  area "may consist of any character in the computer's coded character set" (§6.3.2) at every edition. Exactly one
+  line of a flagged test is marked; a mark in a test that is not flagged is refused.
 - Only syntax rules and general formats (inventory `SR-` and `FMT-` rows) may carry `flag: syntax`. A general rule
   (`GR-`) in a flagged test is refused by the generator unless the test states why its violation is syntactically
-  detectable.
+  detectable (`flag: {kind: syntax, at: [...], why: "..."}`); any other kind of row is refused.
 - **Every flagged test has a control**: the same program with the violation removed, named by `control:` and
-  accepted at the same editions. A flagged test is PASS only when its control compiled, so a compiler that lacks the
-  whole feature (no object orientation, no national class) gets NOT APPLICABLE, never a vacuous PASS.
+  accepted at every edition the test is flagged at; a suite test's control is itself a suite test. A flagged test is
+  PASS only when its control compiled, so a compiler that lacks the whole feature (no object orientation, no national
+  class) gets NOT APPLICABLE, never a vacuous PASS. A `control` on a test that is not flagged is refused.
 - **Run-time violations** are judged only where a program can observe them, from 2002 on (exception checking and the
   `EC-` names are 2002 features; at 85 a violated rule's result is undefined): the test turns checking on, traps the
   condition and prints its `EC-` name, which makes it an ordinary `accept` test. The generator refuses a run-time
-  expectation at 85, and abnormal termination is not a portable expectation (exit status is not standard).
+  expectation at 85 (a program that observes an exception condition: a TURN directive, an `EC-` name or an exception
+  function, §15.28-15.33), and abnormal termination is not a portable expectation (exit status is not standard).
 - WiseOwl's own stricter checks (that it refuses, and with which code) stay outside the cases, in
   `wiseowl/diagnostics.json` (§4).
 
@@ -134,12 +146,21 @@ So:
   operand is where it shows: for `PIC N(3) VALUE N"ABC"` at 2002 WiseOwl prints `ABC` (bytes 41 42 43) and GnuCOBOL 3.2 prints the
   UTF-16BE bytes (NUL `A` NUL `B` NUL `C`), both conforming (branch review R1-2). A test that must show a number
   MOVEs it to a numeric-edited item first; a test of national data compares it inside the program (IF, or MOVE to
-  an alphanumeric item) and DISPLAYs an alphanumeric literal naming the outcome.
+  an alphanumeric item) and DISPLAYs an alphanumeric literal naming the outcome. A figurative constant is allowed:
+  DISPLAY shows "the alphanumeric representation of that figurative constant" (§14.9.11.4 GR 3), except an ALL
+  national literal. A reference-modified numeric or numeric-edited item of usage display is alphanumeric (§8.4.3.3.4
+  GR 6 c) and allowed; one of computational usage would show its storage and is not. The lint also refuses `UPON`
+  (an implementor-defined device, §14.9.11.3 SR 2, whose output no expected stdout holds) and, in fixed form,
+  program text past column 72 (margin R, above). It applies to the tests the suites carry; a name the generator
+  cannot classify (a RENAMES item, a special register) is refused rather than guessed.
 - **`implementor-defined`** names Annex A.1 items whose values the standard enumerates. The example is item 148,
   "RECORD clause (whether fixed or variable records produced for fixed-or-variable-length format)": §13.18.43.4 GR 17
   "It is implementor defined whether format 3 of the RECORD clause produces fixed-length records or variable-length
   records" names exactly two values. Such a test carries one expected output per value, `<id>.<item>=<value>.out`
-  (`<id>.148=fixed.out`, `<id>.148=variable.out`), and each compiler's profile (§4) states its value. An A.1 item
+  (`<id>.148=fixed.out`, `<id>.148=variable.out`; with a per-edition file, `<id>.<edition>.<item>=<value>.out`), and
+  each compiler's profile (§4) states its value. The enumerated items and their values are data,
+  `conformance-suite/implementor-defined.json`, each entry naming its inventory row (`DOC-A.1-<item>`) and quoting
+  the rule that enumerates the values; a test naming an item not there is refused. An A.1 item
   whose values the standard does not enumerate cannot be an expectation: that test is WiseOwl-only. The sign
   convention is such an item: §13.18.52.4 GR 4 "The implementor shall specify the position and representation of
   the operational sign" and GR 5 b) "The implementor defines what constitutes valid signs for data items" (items 177
@@ -155,6 +176,8 @@ conformance-suite/
   cases/<clause>/<id>.cob     the tests, filed by ISO clause, e.g. cases/14.9.8-COMPUTE/
   cases/<clause>/<id>[.<ed>].out, and the files a test declares
   cases/_unassigned/          migrated programs not yet given a rule (§6); excluded from the suites
+  implementor-defined.json    the A.1 items whose values the standard enumerates, and those values (§3.3)
+  suites/                     build output, git-ignored: suites/<edition>/, suites/wiseowl/ and completeness.json
   profiles/<compiler>.json    supported editions, claimed A.4 modules and A.3 elements, A.1 values, extra reserved words
   adapters/<compiler>.json    compile, run and flag commands, the edition map, the ASSIGN mapping (§5)
   baselines/<compiler>.json   that compiler's recorded verdicts (§5)
@@ -170,17 +193,30 @@ conformance-suite/
   folder's own LICENSE lets it be licensed apart from the compiler.
 - **Filed by clause**, because edition is metadata: a folder per clause shows coverage against the standard's
   structure, and an inherited rule's test is written once.
-- **The generator** (`harness/generate.py`) is the ONE reader of test headers. It refuses: an unknown rule id; an
-  `id` unequal to its file name; `accept`/`flag` lists that contradict the construct registry
-  (`tests/version-matrix/constructs.json`, the f(case, V) of `VERSION_TEST_MATRIX_DESIGN.md` §2); a flagged test with
-  no control, or a GR-only flagged test without its justification; a run-time expectation at 85; an undeclared COPY;
-  a test missing `source-format`; a portability-lint violation in a test not marked WiseOwl-only. It writes
-  `suites/<edition>/manifest.json` per edition, the tests that apply there with their expectation, and the suites
-  are build output, never committed.
+- **The generator** (`harness/generate.py`, with `harness/cobol_source.py` for the facts it reads from program
+  text) is the ONE reader of test headers. It refuses: an unknown rule id; an `id` unequal to its file name, or one
+  two tests share; `accept`/`flag` lists that contradict the inventory's `editions` bands or the construct registry
+  (`tests/version-matrix/constructs.json`, through the test's `constructs`, §3.1); a flagged test with no control, a
+  control not accepted where the test is flagged, a mark that is missing, doubled or on a test not flagged, or a
+  GR-only flagged test without its justification; a run-time expectation at 85; free form at 85; an undeclared COPY;
+  a test missing `source-format`, or whose block is written in the other form; an unknown field; a missing or unused
+  expected output; an A.1 item or `requires` name the registries lack; a test filed under a clause none of its rules
+  belongs to, or with no rules outside `_unassigned/`; a folder not named `<clause>-<Name>`; a file no test declares;
+  a `wiseowl/diagnostics.json` entry naming no test or refusing a test where it must be accepted, and a flagged test
+  without one; a portability-lint violation in a test the suites carry. It writes `suites/<edition>/manifest.json`
+  per edition (the cleared tests of `cases/`, not `_unassigned/`, that apply there, with their expectation: the
+  expected-output file per A.1 value, or the flag kind, the marked line and the control), and
+  `suites/wiseowl/manifest.json`: every test of both trees at each edition it names, portable or not, and the
+  `wiseowl/diagnostics.json` refusals, which is what WiseOwl's own runner executes (S1c). The suites are build
+  output, never committed.
 - **Completeness is reported per witness kind**, never as one count that can never reach zero: for each edition, the
   inventory rows witnessed by a suite test, by a documented determination (`docs/CONFORMANCE.md`), by a derivation,
   or only by a WiseOwl unit test, and the rows with no witness. The suite's own measure is "rows whose obligation a
   program can observe, witnessed in this suite". A DOCUMENTED-NON-SUPPORT row reads "unwitnessed until implemented".
+  Each row whose band holds the edition is counted once, under the first kind that holds, in the order documented
+  non-support, suite test, determination (a DOC row §7 carries), derivation (one that stands), WiseOwl-only (a
+  spec-derived `test-ref`, or a test of the wiseowl manifest), none; the rows a program can observe are all but the
+  documented non-support and the derivations.
 
 ## 5. The harness, the adapters and the results
 
@@ -188,20 +224,49 @@ conformance-suite/
   z/OS); a .NET tool would not run on z/OS. It executes the generator's manifests, never headers.
 - **An adapter is configuration**: command templates for compile, run and flag-mode (how the conformance warning
   mechanism is invoked: GnuCOBOL `-std=<edition>`, IBM `FLAGSTD`), how a diagnostic's line number is read from the
-  compiler's output, how an ASSIGN name maps to a file, any limit on file names (cobc refused long base names), and
-  the edition map. GnuCOBOL: `cobc -std={std} -x {src} -o {exe}`, `{exe}`,
-  `{85: cobol85, 2002: cobol2002, 2014: cobol2014}`. A compiler that needs more (IBM's batch jobs and DD names)
-  supplies a Python hook with the same operations. Shipped: WiseOwl COBOL (`cobol`) and GnuCOBOL; documented shapes
-  for IBM Enterprise COBOL and Rocket Visual COBOL.
+  compiler's output, how an ASSIGN name maps to a file, any limit on file names (cobc refused long base names), the
+  exit codes that mean the compiler crashed, and the edition map. GnuCOBOL: `cobc -std={std} -fformat={source-format}
+  -x -I . -o {program} {source}`, `{work}/{program}`, `{85: cobol85, 2002: cobol2002, 2014: cobol2014}`, base names
+  of at most 31 characters (measured on 3.2.0: "invalid file base name ... length exceeds maximum" at 32). A compiler
+  that needs more (IBM's batch jobs and DD names) supplies a Python hook with the same operations (`compile(ctx)`,
+  `run(ctx)`, `flag(ctx)`, each returning a `Step`). Shipped: WiseOwl COBOL (`cobol`) and GnuCOBOL; documented
+  shapes for IBM Enterprise COBOL and Rocket Visual COBOL in the folder's README. `harness/config.py` is the ONE
+  loader and validator of adapters, profiles and baselines: `run.py` checks their shape, and the generator's audit
+  (`generate.py --check`, §9) checks every one of them against what only the repository knows (the editions, the
+  annexes' names, the A.1 items, each suite's test ids), so a malformed adapter is red in seconds like a malformed test.
+- **A profile is evidence, not assertion**: each claimed A.4 module and A.3 element carries the evidence for the
+  claim. WiseOwl's claims are the rows `docs/CONFORMANCE.md` §5 and §2 dispose Claimed or Partial (§5's preamble: the
+  conformance summary claims what is Claimed or Partial there), held to those tables by
+  `ConformanceSuiteProfileDriftTests`; GnuCOBOL's were measured on cobc 3.2.0, and the S3 pilot verifies them.
+  Every profile states its value of every A.1 item `implementor-defined.json` enumerates (the generator refuses one
+  that does not), and its extra reserved words per edition (GnuCOBOL's: the words `cobc --list-reserved
+  -std=<dialect>` lists that `reserved-words.json` does not reserve there).
 - **Each test runs in its own fresh working directory** with its declared files, stdin closed (end of file, as
-  today), and is cleaned up afterwards; tests run in parallel without sharing a file.
+  today), and is cleaned up afterwards; tests run in parallel without sharing a file. A flagged test's control is
+  compiled (the adapter's compile command) in a directory of its own inside the test's.
 - **Verdicts:** PASS · FAIL (the output difference; an accepted test that did not translate or run; a flagged test
   whose control compiled but no diagnostic was reported at the marked line) · NOT APPLICABLE (the profile lacks the
   edition, module or element; the flagged test's control did not compile; the test uses one of the profile's extra
   reserved words, which §4.2.10 permits an implementation to add) · NO VERDICT (the compiler or harness crashed or
-  exceeded a generous hang guard). NO VERDICT is counted on its own, never folded into PASS or FAIL.
+  exceeded a generous hang guard). NO VERDICT is counted on its own, never folded into PASS or FAIL. A program's exit
+  status is not judged (§3.2: it is not standard); its output is.
+- **"Uses an extra reserved word" means uses it as a user-defined word.** ISO §4.2.10: "An implementation that
+  introduces additional reserved words as nonstandard extensions conforms"; such a word stops translation only where
+  a program uses it as a user-defined word. A context-sensitive word in its own context (ISO §8.10: "reserved in the
+  specified language construct or context") is a keyword use: GnuCOBOL 3.2 reserves PREVIOUS at -std=cobol2002, and
+  `READ ... PREVIOUS` translates there. So the generator writes each manifest entry's `words` as the program's words
+  (copied library text included) that are none of the standard's words (the edition's reserved words, and the
+  context-sensitive words, intrinsic function names and compiler-directive words of ISO §8.10-8.12), together with
+  every name the program defines (data, condition, file, program, paragraph and section names) that its edition
+  does not reserve; a runner intersects them with the profile's list and reads no program. The entry also names its
+  `clause` folder, which the results total by.
 - **Results** as JUnit XML and JSON, totals per edition and per clause, and the CHANGES against the compiler's
-  recorded baseline (`baselines/`), so a second compiler's run is a regression net rather than a permanently red leg.
+  recorded baseline (`baselines/`), so a second compiler's run is a regression net rather than a permanently red leg:
+  a regression (a recorded PASS lost), a new FAIL or NO VERDICT, any other change, an improvement, and a recorded test
+  that did not run. A run is RED when a verdict differs from its recorded one (or has none) and is FAIL or NO VERDICT,
+  or was a recorded PASS; with no baseline, any FAIL or NO VERDICT is RED. `--record-baseline` writes a whole run's
+  verdicts (never a `--test`-narrowed one). `run.py` executes the per-edition suites; the `wiseowl` manifest and its
+  refusals are the in-process xUnit runner's (S1c).
 - **In WiseOwl's own pipeline**: the xUnit runner in `Cobol.Net.Tests.Conformance` executes the same manifests
   in-process (fast) and also checks `wiseowl/diagnostics.json`; CI also runs `harness/run.py` with the WiseOwl
   adapter and a drift test requires the two runners' verdict sets to be equal. The output normalization exists in
@@ -361,12 +426,32 @@ hold the status, this section the scope. Every slice ships its own tests and dri
   kind (§4), `--check` (the refusals only, writing nothing) as a gate audit (§9), `--self-test` (discovered by
   `scripts/self_tests.py`). Built and proved on a seed of tests written from
   the standard into `cases/` (an accepted test, a per-edition output, a flag test with its control, an A.1-valued
-  test, a test with a copybook), never on the old corpus.
+  test, a test with a copybook), never on the old corpus. **As landed:** six seeds, each probed on WiseOwl at all four
+  editions (`14.9.8-COMPUTE`: a multi-receiver size error, the alphanumeric-receiver flag test of §14.9.8.3 SR 1 and
+  its control; `14.9.30-READ`: READ PREVIOUS after OPEN on an indexed file, the 2023 at-end beside the first record
+  E.2 item 22 records for 2002 and 2014; `7.3.25-TURN`: location information without LOCATION, A.1 item 204, two
+  values; `7.2.3-COPY`: a copybook). Three corrections to this design, written above: the `constructs` field (§3.1),
+  because no reader short of a compiler can tell which registry constructs a program uses; the fixed-form marked line
+  in the sequence number area (§3.2); and the lint's figurative, reference-modification, `UPON` and margin rules
+  (§3.3). The completeness report is printed and written to `suites/completeness.json`. It is not yet on the
+  ledger (§9's last bullet): the ledger's content is the owner's (kb/Work PB2912), so the S1a report raised it as a
+  lead for its own note rather than adding a section to the page.
 - **S1b — the harness (PB3175).** `conformance-suite/harness/run.py` with the adapter, profile and baseline formats
   of §5, the WiseOwl and GnuCOBOL adapters and profiles, a fresh working directory per test, stdin closed, the
   verdicts and their JUnit XML and JSON, `--record-baseline` and the CHANGES report; `--self-test` drives a stub
   compiler (a Python script) through every verdict, so the logic is tested without `cobc`. Runs on Windows and
-  Linux.
+  Linux. **As landed:** `harness/run.py` (the runner, its results and CHANGES, a 58-arm `--self-test` passing on
+  Windows and under WSL) and `harness/config.py` (the formats); `adapters/` and `profiles/` for `wiseowl` and
+  `gnucobol`; `baselines/gnucobol.json` recorded on the S1a seed under WSL (14 PASS, 6 NOT APPLICABLE at 2023, and 2
+  FAIL: READ PREVIOUS after OPEN is at end at -std=cobol2002 and -std=cobol2014, the 2023 rule, where E.2 item 22
+  records that those editions retrieved the first record); the seed PASSes 22 of 22 on WiseOwl. Three corrections to
+  this design, written above: the manifest entry's `words` and `clause` (the generator reads the program, so no runner
+  does), since a word list that held keyword uses made the READ PREVIOUS seed NOT APPLICABLE on GnuCOBOL, whose
+  -std=cobol2002 reserves the context-sensitive PREVIOUS; profiles carry their evidence, and WiseOwl's is held to
+  `docs/CONFORMANCE.md` by a drift test; and the generator's audit, not a second one, checks every adapter, profile
+  and baseline. On the way, the `cobol` command's exit code for a source the binding phase refuses (a syntax rule the
+  binder checks, an edition diagnostic) became 65, like a parse error, where it had fallen to 70, the code of the
+  compiler's own failure.
 - **S1c — WiseOwl's manifest runner (PB3176).** An xUnit runner in `tests/Cobol.Net.Tests.Conformance` that executes
   the generator's manifests in-process (accept: compile, run, compare through `CutRunner.Normalize`; flag: the
   diagnostic at the marked line; `wiseowl/diagnostics.json`: the refusal and its code or message), and the drift

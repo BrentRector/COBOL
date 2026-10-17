@@ -1,0 +1,40 @@
+{
+  "$comment": [
+    "gnucobol's recorded conformance-suite verdicts, per edition and test (DESIGN-conformance-suite.md §5),",
+    "written by `run.py --record-baseline`; a run reports its CHANGES against them, and a verdict that",
+    "differs from its recorded one for the worse (FAIL or NO VERDICT, or a PASS lost) makes the run RED."
+  ],
+  "compiler": "gnucobol",
+  "verdicts": {
+    "85": {
+      "compute-alphanumeric-receiver": "PASS",
+      "compute-multi-receiver-size-error": "PASS",
+      "compute-numeric-receiver": "PASS",
+      "copy-library-text": "PASS"
+    },
+    "2002": {
+      "compute-alphanumeric-receiver": "PASS",
+      "compute-multi-receiver-size-error": "PASS",
+      "compute-numeric-receiver": "PASS",
+      "copy-library-text": "PASS",
+      "read-previous-after-open-indexed": "FAIL",
+      "turn-location-unspecified": "PASS"
+    },
+    "2014": {
+      "compute-alphanumeric-receiver": "PASS",
+      "compute-multi-receiver-size-error": "PASS",
+      "compute-numeric-receiver": "PASS",
+      "copy-library-text": "PASS",
+      "read-previous-after-open-indexed": "FAIL",
+      "turn-location-unspecified": "PASS"
+    },
+    "2023": {
+      "compute-alphanumeric-receiver": "NOT APPLICABLE",
+      "compute-multi-receiver-size-error": "NOT APPLICABLE",
+      "compute-numeric-receiver": "NOT APPLICABLE",
+      "copy-library-text": "NOT APPLICABLE",
+      "read-previous-after-open-indexed": "NOT APPLICABLE",
+      "turn-location-unspecified": "NOT APPLICABLE"
+    }
+  }
+}
