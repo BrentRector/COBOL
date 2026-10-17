@@ -1,4 +1,4 @@
-## PB780: a constant-name stands at every literal slot of the grammar, and a generated check holds it
+## Entry 2147 — 2026-10-17 04:14 PDT — PB780: a constant-name stands at every literal slot of the grammar, and a generated check holds it
 
 kb/Work PB780 is the whole-language admission rule §13.10.3 SR2 ("constant-name-1 may be used anywhere that a format
 specifies a literal of the class and category of constant-name-1"; `cite.py --check` OK), with §13.10.4 GR1's
@@ -113,3 +113,4 @@ code-location in the merged inventory now resolves (4,195 rows).
 gating, PB2515): GREEN — leg 2 left to CI's whole-population run: Conformance 5,787 · Unit 409 · Characterization 31 …`;
 Linux `=== LINUX GATE: GREEN (legs selftests unit characterization conformance guard selftests-built; HEAD 61162c799) ===`,
 with `EveryCodeLocation_ResolvesInTheTree` Passed in its unit leg.
+
