@@ -36,11 +36,9 @@ public sealed class IntrinsicRepeatedArgumentDriftTests
         string spec = File.ReadAllText(TestRepo.Specs("ISO_COBOL.md"));
         // "### 15.60 MEAN function" → section 15.60; its general format is the "#### 15.60.2 General format"
         // block up to "#### 15.60.3".
-        var sections = Regex.Matches(spec, @"\n### (15\.\d+) ([A-Z0-9-]+) function\s*\n");
         var result = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
-        foreach (Match m in sections)
+        foreach (var (sec, name) in SpecClauseText.FunctionSections(spec))
         {
-            string sec = m.Groups[1].Value, name = m.Groups[2].Value;
             var fmt = Regex.Match(spec, @"\n#### " + Regex.Escape(sec) + @"\.2 General format\s*\n(.*?)\n#### " + Regex.Escape(sec) + @"\.3 ", RegexOptions.Singleline);
             if (!fmt.Success) continue;
             result[name] = fmt.Groups[1].Value.Contains('…');
