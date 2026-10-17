@@ -1,4 +1,4 @@
-## PB3232 + PB3287: a data reference is identified in one place, and a sum counter is counted with the data-names of its spelling
+## Entry 2130 — 2026-10-16 19:18 PDT — PB3232 + PB3287: a data reference is identified in one place, and a sum counter is counted with the data-names of its spelling
 
 Two R2 findings on `ReferenceResolver` (reference-resolution), one root: an entry that answers "which item does this
 written name denote" kept its own copy of the rule.
@@ -45,3 +45,4 @@ They are deleted again. R1-2: `pb3287-address-of-constant-name` was scoped `reje
 constant entry is 2023-only; it is 2002-era (constructs.json `constant-entry-2002`) and the new constant-name arm of
 `ReportUnidentified` is edition-independent, so it now runs at 2002, 2014 and 2023 (at 85 the CONSTANT entry and
 SET ADDRESS OF are themselves 2002-era gates, so 85 is not a clean case).
+
