@@ -2,6 +2,7 @@
 """generate.py — the ONE reader of the conformance-suite test headers (DESIGN-conformance-suite.md §3, §4, §9).
 
     python conformance-suite/harness/generate.py            # refuse, or write the manifests and print completeness
+    python conformance-suite/harness/generate.py --out DIR  # the same, written to DIR instead of suites/
     python conformance-suite/harness/generate.py --check    # the refusals only, writing nothing (a gate audit)
     python conformance-suite/harness/generate.py --self-test
 
@@ -26,6 +27,10 @@ WHAT IT WRITES (build output, never committed; `.gitignore` names `conformance-s
   suites/wiseowl/manifest.json    everything WiseOwl COBOL runs: every test of both trees at every edition it names,
                                   portable or not, and `wiseowl/diagnostics.json`'s refusals (§4).
   suites/completeness.json        the completeness report (below), which it also prints.
+`--out DIR` writes the same tree to DIR instead: WiseOwl's in-process runner (S1c) generates into a directory of its
+own, so a test run never rewrites the repository's `suites/` under a concurrent `run.py`. Whichever directory it
+writes, a previous run's manifest directories and report there are replaced, and nothing else is ever removed: a
+directory that holds anything else (or a path that is not a directory) is refused, exit 2, with nothing deleted.
 
 THE COMPLETENESS REPORT (§4) is per edition and per WITNESS KIND, never one count: each inventory row whose band
 holds the edition is counted once, under the first of these that holds — documented non-support ("unwitnessed until
@@ -57,14 +62,19 @@ sys.path.insert(0, str(HARNESS))
 sys.path.insert(0, str(REPO / "scripts" / "spec"))
 
 import cobol_source as cobol  # noqa: E402  (this directory's: the program-text facts the refusals need)
+import config  # noqa: E402  (this directory's: the harness's adapter, profile and baseline formats)
+import generated_output  # noqa: E402  (the one way a generator clears the directory it writes: never wholesale)
 import inventory_schema  # noqa: E402  (the inventory's one schema: its editions, its evidence predicates)
 
 CONSTRUCTS_PATH = REPO / "tests" / "version-matrix" / "constructs.json"
+RESERVED_WORDS_PATH = REPO / "tests" / "version-matrix" / "reserved-words.json"
 SPEC_PATH = REPO / "specs" / "ISO_COBOL.md"
 IMPLEMENTOR_DEFINED_PATH = SUITE / "implementor-defined.json"
 DIAGNOSTICS_PATH = SUITE / "wiseowl" / "diagnostics.json"
 OUT = SUITE / "suites"
 VERDICT = "=== CONFORMANCE SUITE: "
+#: The completeness report's file name, beside the manifest directories in the output directory.
+COMPLETENESS_NAME = "completeness.json"
 
 #: The two trees of tests: the suites' (`cases/`) and WiseOwl's own regression tests (`wiseowl/cases/`, §4).
 TREES = {"cases": Path("cases"), "wiseowl": Path("wiseowl") / "cases"}
@@ -138,6 +148,11 @@ class Case:
     marked_line: int | None
     #: `(edition or None, ((item, value), ...)) -> .out path`: every expected-output file, parsed from its name.
     outputs: dict[tuple[str | None, tuple[tuple[int, str], ...]], Path] = field(default_factory=dict)
+    #: The COBOL words of the program and of the library text it copies (upper case, each holding a letter), and the
+    #: user-defined words among them that the program defines (cobol_source.defined_names): what `entry_for` reduces to
+    #: the words a runner checks against a profile's extra reserved words (§5), so no runner reads the program.
+    words: frozenset[str] = frozenset()
+    defined: frozenset[str] = frozenset()
 
     @property
     def in_suite(self) -> bool:
@@ -161,6 +176,12 @@ class Inputs:
     #: The two evidence predicates of the report, injectable so the self-test can drive every witness kind.
     determined: Callable[[dict[str, Any]], bool]
     derived: Callable[[dict[str, Any]], bool]
+    #: edition -> the words the standard reserves there (tests/version-matrix/reserved-words.json), and the standard's
+    #: other keywords (its context-sensitive words, intrinsic function names and compiler-directive words, ISO 8.10-8.12).
+    #: A manifest entry's `words` are the program's words that are none of these, and the names it defines that its
+    #: edition does not reserve: the uses of a user-defined word a compiler's added reserved word can stop (ISO 4.2.10).
+    reserved: dict[str, frozenset[str]] = field(default_factory=dict)
+    keywords: frozenset[str] = frozenset()
 
     @property
     def editions(self) -> list[str]:
@@ -458,6 +479,9 @@ class Reader:
                                                            f"file of this test (`files`, §3.1)")
         # A run-time expectation at 85 (§3.2), in the program or in the library text it copies.
         expanded = cobol.expand_copies(tokens, lambda name: self._library(case, name))
+        case.words = frozenset(t.text.upper() for t in expanded
+                               if t.kind == cobol.WORD and any(ch.isalpha() for ch in t.text))
+        case.defined = frozenset(cobol.defined_names(expanded))
         observed = cobol.observes_exception(expanded)
         if observed is not None:
             early = [e for e in case.accept if self.inputs.editions.index(e) < self.inputs.editions.index(
@@ -763,10 +787,12 @@ def _posix(p: Path) -> str:
 
 def entry_for(case: Case, edition: str, inputs: Inputs) -> dict[str, Any]:
     """A test's manifest entry at one edition: what a runner needs, and nothing it would have to re-derive."""
+    reserved = inputs.reserved.get(edition, frozenset())
     entry: dict[str, Any] = {
-        "id": case.test_id, "source": _posix(case.path), "source-format": case.source_format,
+        "id": case.test_id, "clause": case.folder, "source": _posix(case.path), "source-format": case.source_format,
         "rules": list(case.rules), "files": [_posix(case.path.parent / f) for f in case.files],
         "requires": list(case.requires),
+        "words": sorted((case.words - reserved - inputs.keywords) | (case.defined - reserved)),
     }
     if edition in case.accept:
         expected = {}
@@ -799,8 +825,11 @@ def manifests(cases: list[Case], inputs: Inputs) -> dict[str, dict[str, Any]]:
     by_id = {c.test_id: c for c in cases}
     for test_id in sorted(inputs.diagnostics):
         entry = inputs.diagnostics[test_id]
-        wiseowl["diagnostics"][test_id] = {"source": _posix(by_id[test_id].path),
-                                           "source-format": by_id[test_id].source_format,
+        case = by_id[test_id]
+        # What a runner needs to compile the refused program as the suite compiles it: its source, its reference
+        # format and its declared files (a copybook it COPYs), never a re-read of its header.
+        wiseowl["diagnostics"][test_id] = {"source": _posix(case.path), "source-format": case.source_format,
+                                           "files": [_posix(case.path.parent / f) for f in case.files],
                                            "refuse-at": list(entry["refuse-at"]), "expect": entry["expect"]}
     out["wiseowl"] = wiseowl
     return out
@@ -896,6 +925,42 @@ def load_implementor_defined(path: Path, rows: dict[str, dict[str, Any]]) -> tup
     return items, problems
 
 
+def reserved_words() -> dict[str, frozenset[str]]:
+    """edition -> the words reserved-words.json records the standard reserving at that edition (its `r<edition>`)."""
+    words = json.loads(RESERVED_WORDS_PATH.read_text(encoding="utf-8"))["words"]
+    editions = inventory_schema.load_schema().editions
+    return {e: frozenset(w["word"] for w in words if w.get(f"r{e}")) for e in editions}
+
+
+#: §8.10 is a table whose first column is the word; §8.11 lists one name a line; §8.12 is a table of words.
+_KEYWORD_SECTIONS = (("8.10", "first cell"), ("8.11", "line"), ("8.12", "every cell"))
+_KEYWORD = re.compile(r"^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*$")
+
+
+def standard_keywords(spec_text: str) -> frozenset[str]:
+    """The standard's context-sensitive words (ISO 8.10), intrinsic function names (8.11) and compiler-directive
+    words (8.12), read from its transcription."""
+    words: set[str] = set()
+    for number, shape in _KEYWORD_SECTIONS:
+        section = re.search(rf"(?ms)^### {re.escape(number)} .*?(?=^### )", spec_text)
+        if section is None:
+            raise ValueError(f"specs/ISO_COBOL.md has no section {number}")
+        for line in section.group(0).splitlines()[1:]:
+            if shape == "line":
+                cells = [line.strip()]
+            else:
+                cells = [c.strip().strip("*") for c in line.strip().strip("|").split("|")] if line.startswith("|") else []
+                cells = cells[:1] if shape == "first cell" else cells
+            words.update(c for c in cells if _KEYWORD.match(c))
+    return frozenset(words)
+
+
+def suite_ids(cases: list[Case], editions: list[str]) -> dict[str, set[str]]:
+    """edition -> the ids of the tests its suite holds (what a baseline may name)."""
+    return {e: {c.test_id for c in cases if c.in_suite and (e in c.accept or (c.flag is not None and e in c.flag.at))}
+            for e in editions}
+
+
 def repository_inputs() -> tuple[Inputs, list[str]]:
     schema = inventory_schema.load_schema()
     rows = {r["rule-id"]: r for r in inventory_schema.load_inventory()}
@@ -904,11 +969,12 @@ def repository_inputs() -> tuple[Inputs, list[str]]:
     a1, problems = load_implementor_defined(IMPLEMENTOR_DEFINED_PATH, rows)
     diagnostics = json.loads(DIAGNOSTICS_PATH.read_text(encoding="utf-8")) if DIAGNOSTICS_PATH.is_file() else {}
     register = schema.register_items()
+    spec = SPEC_PATH.read_text(encoding="utf-8")
     inputs = Inputs(
-        schema=schema, rows=rows, constructs=constructs, requirable=annex_names(SPEC_PATH.read_text(encoding="utf-8")),
+        schema=schema, rows=rows, constructs=constructs, requirable=annex_names(spec),
         implementor_defined=a1, diagnostics={k: v for k, v in diagnostics.items() if not k.startswith("$")},
         determined=lambda row: schema.anchor_for(row) is not None and row.get("rule-id") in register,
-        derived=schema.derivation_stands)
+        derived=schema.derivation_stands, reserved=reserved_words(), keywords=standard_keywords(spec))
     return inputs, problems
 
 
@@ -922,6 +988,10 @@ def generate(root: Path, inputs: Inputs, problems: list[str], out: Path | None,
     check_cases(reader)
     for p in problems:
         reader.refuse(IMPLEMENTOR_DEFINED_PATH.name, 1, p)
+    # The harness's configuration (§5): every adapter, profile and baseline, against what only the repository knows.
+    for rel, message in config.check_tree(root, inputs.editions, inputs.requirable, inputs.implementor_defined,
+                                          suite_ids(reader.cases, inputs.editions)):
+        reader.refuse(rel, 1, message)
     if reader.refusals:
         if echo:
             for r in sorted(reader.refusals, key=lambda r: (r.path, r.line, r.message)):
@@ -929,14 +999,18 @@ def generate(root: Path, inputs: Inputs, problems: list[str], out: Path | None,
         print(f"{VERDICT}RED — {len(reader.refusals)} refusal(s) over {len(reader.cases)} test(s) ===")
         return 1, reader
     if out is not None:
-        if out.exists():
-            shutil.rmtree(out)
-        for name, content in manifests(reader.cases, inputs).items():
+        written = manifests(reader.cases, inputs)
+        unusable = generated_output.prepare(out, (set(written) | {COMPLETENESS_NAME}).__contains__)
+        if unusable is not None:
+            print(f"{VERDICT}RED — cannot write to {_posix(out)}: {unusable}; name a new directory, or one holding "
+                  f"only a previous run's output (nothing was deleted) ===")
+            return 2, reader
+        for name, content in written.items():
             (out / name).mkdir(parents=True, exist_ok=True)
             (out / name / "manifest.json").write_text(json.dumps(content, indent=2) + "\n", encoding="utf-8",
                                                        newline="\n")
         report = completeness(reader.cases, inputs)
-        (out / "completeness.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8", newline="\n")
+        (out / COMPLETENESS_NAME).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8", newline="\n")
         print_report(report)
     suites = sum(1 for c in reader.cases if c.in_suite)
     print(f"{VERDICT}GREEN — {len(reader.cases)} test(s), {suites} in the suites, none refused"
@@ -948,11 +1022,14 @@ def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--check", action="store_true", help="the refusals only, writing nothing (the gate audit)")
     ap.add_argument("--self-test", action="store_true", help="prove every refusal and the manifests on planted trees")
+    ap.add_argument("--out", type=Path, metavar="DIR", help="write the manifests and the report to DIR (default: suites/)")
     args = ap.parse_args(argv)
     if args.self_test:
         return self_test()
+    if args.check and args.out is not None:
+        ap.error("--check writes nothing, so it takes no --out")
     inputs, problems = repository_inputs()
-    rc, _ = generate(SUITE, inputs, problems, None if args.check else OUT)
+    rc, _ = generate(SUITE, inputs, problems, None if args.check else (args.out or OUT))
     return rc
 
 
@@ -986,7 +1063,10 @@ def _planted_inputs(diagnostics: dict[str, dict[str, Any]] | None = None) -> Inp
         diagnostics=diagnostics if diagnostics is not None else {
             "flagged": {"refuse-at": ["85", "2002", "2014", "2023"], "expect": "X1"},
             "free-flag": {"refuse-at": ["2002"], "expect": "X2"}},
-        determined=lambda r: r["rule-id"] in ("DOC-A.1-9", "DOC-A.1-10"), derived=lambda r: bool(r.get("derivation")))
+        determined=lambda r: r["rule-id"] in ("DOC-A.1-9", "DOC-A.1-10"), derived=lambda r: bool(r.get("derivation")),
+        reserved={"85": frozenset({"IDENTIFICATION", "DIVISION", "PROGRAM-ID", "DATA", "WORKING-STORAGE", "SECTION",
+                                   "PIC", "VALUE", "PROCEDURE", "DISPLAY", "STOP", "RUN"})},
+        keywords=frozenset({"STOP", "W-E"}))
 
 
 def _fixed(header: list[str], body: list[str]) -> str:
@@ -1089,6 +1169,14 @@ def self_test() -> int:
                   m2002["free-flag"]["line"] == 11 and m2002["free-flag"]["control"] == "free-test", m2002)
             check("arm: a test's declared files reach its entry",
                   m85["tests"][1]["files"] == ["cases/1.1.1-Rule/CPY1.cpy"], m85["tests"][1])
+            check("arm: an entry names its clause folder, and its words without the edition's reserved ones (a "
+                  "copied library text's words included)",
+                  m85["tests"][1]["clause"] == "1.1.1-Rule"
+                  and m85["tests"][1]["words"] == ["MAIN-PARA", "P", "W-A", "W-C", "W-E", "W-N"], m85["tests"][1])
+            check("arm: ... a word that is neither reserved nor a keyword stays (2023 here reserves none); a keyword "
+                  "the program does not define goes (STOP); a keyword it defines as a name stays (W-E)",
+                  "DISPLAY" in pe["accepted"]["words"] and "STOP" not in pe["accepted"]["words"]
+                  and "W-E" in pe["accepted"]["words"], pe["accepted"]["words"])
             check("arm: an unverified test, an _unassigned test and a wiseowl test are in no suite",
                   not {"unverified", "loose", "own"} & {t["id"] for m in (m85, m2023) for t in m["tests"]})
             w2023 = {t["id"]: t for t in mw["editions"]["2023"]}
@@ -1096,6 +1184,10 @@ def self_test() -> int:
                   {"loose", "own"} <= set(w2023) and "unverified" in {t["id"] for t in mw["editions"]["85"]}, w2023)
             check("arm: the wiseowl manifest carries diagnostics.json's refusals",
                   mw["diagnostics"]["flagged"]["expect"] == "X1", mw["diagnostics"])
+            check("arm: ... each with what compiles the refused program: its source, reference format and files",
+                  {k: mw["diagnostics"]["free-flag"][k] for k in ("source", "source-format", "files", "refuse-at")}
+                  == {"source": "cases/2.2.2-Free/free-flag.cob", "source-format": "free", "files": [],
+                      "refuse-at": ["2002"]}, mw["diagnostics"]["free-flag"])
             report = json.loads((root / "suites/completeness.json").read_text(encoding="utf-8"))
             r85 = report["85"]
             check("arm: completeness counts each row once under its first witness kind",
@@ -1107,6 +1199,32 @@ def self_test() -> int:
         shutil.rmtree(root / "suites", ignore_errors=True)
         rc_check, _ = generate(root, inputs, [], None)
         check("arm: --check writes nothing", rc_check == 0 and not (root / "suites").exists())
+        # --out DIR names a directory the user chose: only what a previous run wrote there is ever removed (R1-1).
+        mine = root / "mine"
+        (mine / "precious").mkdir(parents=True)
+        (mine / "todo.txt").write_text("keep\n", encoding="utf-8", newline="\n")
+        (mine / "precious" / "notes.txt").write_text("keep\n", encoding="utf-8", newline="\n")
+        rc_mine, _ = generate(root, inputs, [], mine, echo=False)
+        check("arm: an output directory holding anything the generator does not write is refused, and nothing in it "
+              "is deleted or written", rc_mine == 2 and sorted(p.name for p in mine.iterdir()) == ["precious", "todo.txt"]
+              and (mine / "todo.txt").is_file() and (mine / "precious" / "notes.txt").is_file(),
+              sorted(p.name for p in mine.iterdir()))
+        rc_file, _ = generate(root, inputs, [], mine / "todo.txt", echo=False)
+        check("arm: an output path that is a file is refused, and the file is kept",
+              rc_file == 2 and (mine / "todo.txt").read_text(encoding="utf-8") == "keep\n")
+        rc_first, _ = generate(root, inputs, [], root / "suites", echo=False)
+        (root / "suites" / "85" / "stale.json").write_text("{}", encoding="utf-8", newline="\n")
+        (root / "suites" / "completeness.json").write_text("{}", encoding="utf-8", newline="\n")
+        rc_again, _ = generate(root, inputs, [], root / "suites", echo=False)
+        check("arm: a previous run's output is replaced whole: its manifest directories and report are rewritten",
+              rc_first == 0 and rc_again == 0 and not (root / "suites" / "85" / "stale.json").exists()
+              and json.loads((root / "suites" / "completeness.json").read_text(encoding="utf-8")) != {}
+              and (root / "suites" / "wiseowl" / "manifest.json").is_file())
+        shutil.rmtree(root / "suites")
+        (root / "suites").mkdir()
+        rc_empty_dir, _ = generate(root, inputs, [], root / "suites", echo=False)
+        check("arm: an empty output directory is written to", rc_empty_dir == 0
+              and (root / "suites" / "85" / "manifest.json").is_file())
 
     bad = {
         "no-header.cob": ("cases/1.1.1-Rule/no-header.cob", "      * nothing\n", "does not open with"),
@@ -1257,6 +1375,16 @@ def self_test() -> int:
                                       "program text past column 72"),
         "lint display in a copybook": ("cases/1.1.1-Rule/DSPCPY.cpy", "           DISPLAY W-N\n",
                                        "DISPLAY W-N: a data item of class numeric"),
+        "a profile claiming no module of the standard": (
+            "profiles/vendor.json", json.dumps({"compiler": "vendor", "editions": ["85"], "modules": {"A.4.99": "x"},
+                                                "implementor-defined": {"9": "one"}}),
+            "A.4.99 is not an Annex A.4 module of the standard"),
+        "a profile with no value of an enumerated A.1 item": (
+            "profiles/silent.json", json.dumps({"compiler": "silent", "editions": ["85"]}),
+            "states no value of Annex A.1 item 9"),
+        "a baseline of no adapter": (
+            "baselines/nobody.json", json.dumps({"compiler": "nobody", "verdicts": {"85": {"ok": "PASS"}}}),
+            "a baseline of 'nobody', which has no adapter"),
         "duplicate id": ("wiseowl/cases/1.1.1-Rule/ok.cob",
                          _fixed(["id: ok", "rules: [GR-1.1.1-1]", "accept: [85]", "source-format: fixed"], _PROGRAM),
                          "is also"),
@@ -1418,6 +1546,24 @@ def self_test() -> int:
     check("arm: a comment line past column 72 is no program text; a code line is",
           cobol.program_text_past_margin("      * comment" + " " * 60 + "SEQ\n" + "       MOVE A TO B." + " " * 53
                                          + "SEQ\n") == [2])
+    named = cobol.defined_names(fixed_tokens(
+        "       PROGRAM-ID. PROG1.",
+        "       FILE-CONTROL. SELECT OPTIONAL F1 ASSIGN TO \"F1\".",
+        "       FD F1.",
+        "       01 PREVIOUS PIC X. 88 IS-Y VALUE \"Y\".",
+        "       01 FILLER PIC X.",
+        "       PROCEDURE DIVISION.",
+        "       MAIN-PARA.",
+        "           READ F1 PREVIOUS RECORD AT END CONTINUE END-READ.",
+        "       S1 SECTION.",
+    ))
+    check("arm: the defined names are the data, condition, file, program, paragraph and section names (a keyword "
+          "use of PREVIOUS is not a definition; FILLER names nothing)",
+          named == {"PROG1", "F1", "PREVIOUS", "IS-Y", "MAIN-PARA", "S1"}, named)
+    keywords = standard_keywords(SPEC_PATH.read_text(encoding="utf-8"))
+    check("arm: the standard's keywords hold a context-sensitive word (8.10), a function name (8.11) and a "
+          "directive word (8.12), and no table heading", {"PREVIOUS", "ABS", "IMP"} <= keywords
+          and not {"CONTEXT-SENSITIVE", "LANGUAGE"} & keywords, sorted(keywords)[:12])
     cont = fixed_tokens("           DISPLAY \"ABC", "      -    \"DEF\" W-X.")
     check("arm: a continued literal is one token", [t.text for t in cont][:2] == ["DISPLAY", "\"ABCDEF\""],
           [t.text for t in cont])

@@ -275,6 +275,49 @@ def expand_copies(tokens: list[Token], library: Callable[[str], list[Token] | No
     return out
 
 
+# ── the names a program defines ──────────────────────────────────────────────────────────────────────────────────────
+
+#: The words whose next word is a name the program defines: a file (FD, SD, RD, CD, SELECT [OPTIONAL]) or a source
+#: unit (PROGRAM-ID and its siblings).
+_DEFINERS = frozenset({"FD", "SD", "RD", "CD", "SELECT", "PROGRAM-ID", "CLASS-ID", "FUNCTION-ID", "INTERFACE-ID",
+                       "METHOD-ID"})
+#: The level numbers 01-49 (written with or without the leading zero), 66, 77 and 88: a data description entry's
+#: name follows its level number.
+_LEVELS = frozenset({*(f"{n:02d}" for n in range(1, 50)), *(str(n) for n in range(1, 10)), "66", "77", "88"})
+
+
+def defined_names(tokens: list[Token]) -> set[str]:
+    """The user-defined words the program DEFINES (upper case): its data names and condition-names (the word after a
+    level number that opens an entry), its file and source-unit names, and its paragraph and section names (a word
+    opening a sentence of the Procedure Division and followed by a period or SECTION). A word a compiler reserves
+    beyond the standard (ISO 4.2.10) stops a program from translating only where the program uses it as a
+    user-defined word, and a user-defined word is defined in the program that uses it; a standard keyword, a
+    context-sensitive word in its context included, is no such use. Not a parser: a name this misses is a test a
+    runner judges rather than marks NOT APPLICABLE."""
+    names: set[str] = set()
+    procedure = False
+    for i, tok in enumerate(tokens):
+        prev = tokens[i - 1] if i else None
+        nxt = tokens[i + 1] if i + 1 < len(tokens) else None
+        if tok.kind == WORD and tok.upper == "PROCEDURE" and nxt is not None and nxt.upper == "DIVISION":
+            procedure = True
+        if nxt is None:
+            continue
+        if not procedure and tok.kind == NUMBER and tok.text in _LEVELS and (prev is None or prev.kind == PERIOD):
+            if nxt.kind == WORD and nxt.upper != "FILLER":
+                names.add(nxt.upper)
+        elif tok.kind == WORD and tok.upper in _DEFINERS:
+            j = i + 1
+            while j < len(tokens) and (tokens[j].kind == PERIOD or tokens[j].upper == "OPTIONAL"):
+                j += 1
+            if j < len(tokens) and tokens[j].kind == WORD:
+                names.add(tokens[j].upper)
+        elif (procedure and tok.kind == WORD and prev is not None and prev.kind == PERIOD
+              and (nxt.kind == PERIOD or nxt.upper == "SECTION")):
+            names.add(tok.upper)
+    return names
+
+
 # ── run-time expectations ────────────────────────────────────────────────────────────────────────────────────────────
 
 #: The intrinsic functions that report the last exception status (ISO 15.28-15.33).

@@ -1,0 +1,164 @@
+## Entry 2143 — 2026-10-17 01:11 PDT — PB3175 — the conformance suite's harness (slice S1b): run.py, adapters, profiles and baselines for WiseOwl COBOL and GnuCOBOL; PB3176 — the conformance suite's in-process runner (slice S1c): WiseOwl COBOL runs the suite on itself, and both runners agree
+
+### PB3175 — the conformance suite's harness (slice S1b): run.py, adapters, profiles and baselines for WiseOwl COBOL and GnuCOBOL
+
+kb/Work PB3175, design `docs/rearchitecture/DESIGN-conformance-suite.md` §5 and §13 S1b (approved by the owner
+2026-10-14). Wave 1104 C4, on PB3174's branch, so PB3172, PB3173 and PB3174 land with it: the harness runs the
+manifests the S1a generator writes.
+
+**The runner.** `conformance-suite/harness/run.py`, Python 3 standard library only, executes
+`suites/<edition>/manifest.json` against a compiler described by `adapters/<compiler>.json` (compile, run and
+flag-mode command templates, the edition map, the diagnostic-line pattern, the file-name limit, crash exit codes,
+the ASSIGN mapping, an optional Python hook) under the claims of `profiles/<compiler>.json` (editions, Annex A.4
+modules and A.3 elements each with its evidence, A.1 values, extra reserved words per edition). Each test runs in a
+fresh working directory with its declared files, stdin closed and a hang guard on every process. The verdicts are
+design §5's: PASS; FAIL (output differs, did not translate, did not run, no diagnostic at a flagged test's marked
+line); NOT APPLICABLE (edition, module or element not claimed, an extra reserved word used as a user-defined word,
+or a flagged test's control that did not compile); NO VERDICT (a crash, the hang guard, a harness failure), counted
+on its own. A program's exit status is not judged. Results: `results/<compiler>/results.json` (totals per edition
+and per clause, every reason, the CHANGES) and `junit.xml` (git-ignored). `--record-baseline` writes
+`baselines/<compiler>.json`; a run is RED only on a verdict worse than its recorded one, or, with no baseline, on
+any FAIL or NO VERDICT. The output normalization is `CutRunner.Normalize` restated (the .NET line ends, trailing
+spaces, trailing line ends), for S1c's shared-fixture drift test.
+
+**The formats.** `harness/config.py` is the one loader and validator of adapters, profiles and baselines, and holds
+the hook interface (`Step`, `StepContext`, so a hook builds the class the runner checks). `run.py` checks shape
+only (a released suite carries no inventory); the generator's audit (`generate.py --check`, already a gate audit
+and a CI `audits` step) now also refuses a malformed adapter, a profile claiming a module the standard lacks or
+stating no value of an enumerated A.1 item, and a baseline of no adapter or naming no test of its suite.
+
+**Re-probed on this branch.** WiseOwl (`--set cobol=<this build's cobol.exe>`): the seed PASSes 22 of 22 at
+85/2002/2014/2023. GnuCOBOL 3.2.0 under WSL: 14 PASS, 6 NOT APPLICABLE (no 2023 dialect), 2 FAIL —
+`read-previous-after-open-indexed` at -std=cobol2002 and -std=cobol2014 prints `P1=ATEND|10`, the 2023 at-end rule
+(ISO §14.9.30.4 GR 21 d) 3.), where Annex E.2 item 22 records that 2002 and 2014 retrieved the first record: a real
+GnuCOBOL divergence, recorded in `baselines/gnucobol.json`. Measured for the GnuCOBOL adapter and profile: cobc
+refuses a source base name over 31 characters; format 3 of the RECORD clause wrote a 2-character record as 6 bytes
+(variable, A.1 item 148); the TURN seed printed LOCATION AVAILABLE (item 204); a SCREEN SECTION and a Report Writer
+RD translate at -std=cobol2002/2014, the LOCK MODE / SHARING clauses do not; and the extra reserved words are cobc's
+`--list-reserved` per dialect less `reserved-words.json`'s (3, 60 and 82).
+
+**One design correction, found by the first GnuCOBOL run.** The manifest entry's word list first held every word of
+the program, so the READ PREVIOUS seed was NOT APPLICABLE on GnuCOBOL: -std=cobol2002 reserves PREVIOUS, which ISO
+§8.10 makes a context-sensitive word, and `READ ... PREVIOUS` is its keyword use, which translates. ISO §4.2.10 3)
+permits added reserved words because they "may prevent translation of some conforming compilation groups": only a
+use as a user-defined word is stopped. The generator now writes `words` as the program's words that are none of the
+standard's (the edition's reserved words; ISO §8.10-8.12's context-sensitive words, function names and directive
+words, read from the transcription by `standard_keywords`) together with every name the program defines
+(`cobol_source.defined_names`: data, condition, file, program, paragraph and section names) that its edition does
+not reserve; and `clause`, the folder the results total by. Written into design §5 with the other two corrections:
+profiles carry evidence, and the generator's audit (not a second audit) checks the harness configuration.
+
+**WiseOwl's profile** claims the A.4 modules and A.3 elements `docs/CONFORMANCE.md` §5 and §2 dispose Claimed or
+Partial (§5's preamble: the conformance summary claims what is Claimed or Partial there); the new
+`ConformanceSuiteProfileDriftTests` holds the file to those tables through their one parsers
+(`AnnexA3RegisterDriftTests.Register`, `ReadmeDeclinedSummaryDriftTests.AnnexA4Register`, made internal for it).
+
+**Found and fixed on the way (I9).** `cobol` exited 70, "internal software error", for a source the binding phase
+refuses (COBOLNET1675 on the flagged seed, an edition diagnostic): `RunCompile`'s sysexits switch had no BindError
+arm and its `_` default was 70, so a wrong program read as a compiler failure. `Program.ExitCode` names every outcome
+(BindError 65, like a parse error; an unnamed one throws) and `CliParserTests` pins each.
+
+**Tests.** `run.py --self-test` 58 arms (Windows and WSL), `generate.py --self-test` 75 arms (the words, the defined
+names, the standard's keywords, the configuration refusals), `ConformanceSuiteProfileDriftTests`, two `CliParserTests`.
+No inventory row: test infrastructure (`closes_rows: []`, its reason filed). PB3176 (S1c) unblocked.
+
+**Gate:** run `20261017T043946Z-7f15b2` (HEAD 8fe3944d2): `LEG 1 ONLY (batched gating, PB2515): GREEN` — Conformance 6,072/11,913 · Unit 33,411/33,918 · Characterization 5/36 cases ran; the new Unit tests passed in leg 1 and `run.py --self-test` ran GREEN in the audits (29 s). semgrep verify PASS. LINUX GATE: the lander's (batched gating).
+
+### PB3176 — the conformance suite's in-process runner (slice S1c): WiseOwl COBOL runs the suite on itself, and both runners agree
+
+kb/Work PB3176, design `docs/rearchitecture/DESIGN-conformance-suite.md` §5 ("In WiseOwl's own pipeline"), §9 and
+§13 S1c (approved by the owner 2026-10-14). Wave 1104 C5, on PB3175's branch, so PB3172 through PB3175 land with it.
+
+**Re-probe.** Greenfield slice: no test of `tests/Cobol.Net.Tests.Conformance` read a generator manifest, and
+`run.py` was the suite's only runner. The build was 0 warnings, 0 errors before any change.
+
+**The runner.** `ConformanceSuiteTests` has one theory row per test and edition of the generator's `wiseowl`
+manifest (both trees, portable or not) and one per refusal and edition of `wiseowl/diagnostics.json`.
+`ConformanceSuiteRunner` judges a test as `run.py` does through the WiseOwl adapter (PASS, FAIL, NOT APPLICABLE, NO
+VERDICT, §5), compiling with `CompilerDriver` in-process through the compiled-program cache: an accepted test
+compiles, runs in a fresh working directory with its declared files and stdin closed, and its normalized stdout is
+compared with the expected output for the profile's Annex A.1 values; a flagged test's control compiles first, then
+the test compiles with the §4.2.10 warning mechanism invoked, and a diagnostic must name the marked line, read with the
+adapter's own pattern. A row is red on FAIL or NO VERDICT, as `run.py` is with no baseline. A refusal must be refused
+by the front end or the binder (never the backend) with its code. `ConformanceSuite` generates the manifests once per
+test process into its own directory (`generate.py --out`, new), so the runner reads no test header and never
+rewrites the repository's `suites/`; it reads the adapter's diagnostic pattern and the profile instead of restating
+them (`config.py` validates both at the audit).
+
+**The drift tests.** `ConformanceSuiteRunnerDriftTests`: (1) `run.py --compiler wiseowl --set cobol=<this build's
+cobol>` and the in-process runner, on one generated suite, run the same tests and give each the same verdict, every
+difference named with both reasons; (2) `CutRunner.Normalize` and `run.py`'s `normalize()` (run by Python) both map
+the 16 cases of the new shared fixture `conformance-suite/harness/normalization-fixture.json` (every line end .NET
+reads, the vertical tab it does not, tabs and no-break spaces against spaces, leading and trailing empty lines) to
+their stated results; (3) the WiseOwl adapter's new `environment` pins both default locales to the root locale, as
+`CutRunner.RunExit` does (`CutRunner.LocalePin`, now one constant): the defaults are the environment's
+(DOC-A.1-118), so without the pin a host's regional setting could reach one runner's verdict and not the other's.
+The Conformance project now builds `Cobol.Net.Cli` (a project reference with `ReferenceOutputAssembly="false"`),
+because CI's Conformance legs build that project alone.
+
+**Probes.** The 29 new rows pass locally (22 test rows, 4 refusal rows, 3 drift facts; the verdict drift test about
+8 s). A mutation probe, one wrong line appended to `compute-numeric-receiver.out`, turned that test's four rows red
+("the output differs ... at line 2: expected 'WRONG', got '<end of output>'") while both runners still agreed on
+FAIL; a second, the flagged test's `<<` mark moved one line down, turned its four rows red ("no diagnostic at the
+marked line 21 (diagnostics at line(s) 20)"), both runners again agreeing; both reverted. Self-review then made a
+compiler crash's NO VERDICT carry the exception's stack, not only its message.
+
+**Design corrections** (§4, §5, §13): the verdict drift test runs `run.py` itself, so every gate and both CI
+operating systems run it, instead of a CI job of its own that no local gate would reproduce; a refusal's manifest
+entry carries the refused test's declared files; the adapter's locale pin. Left to the move (S2, PB3177) by design:
+partitioning the theories when the corpus arrives, and the verdict drift test's shape at the corpus's size, since
+`run.py` starts one `cobol` process per compile.
+
+**Self-review.** Architecture: the runner reads only the generator's manifests and the validated adapter and
+profile; the verdict logic is stated once per language and held equal by the drift test. Silent failures: a refused
+tree, a missing interpreter, an empty manifest (no sentinel row) and a compiler exception are each a red, never a
+pass; NOT APPLICABLE is the profile's verdict, and a flagged test whose control fails is red on the control's own row.
+Duplication: `CutRunner` is the one program runner and `EditionHarness.AssertHasDiagnostic` the one diagnostic
+assertion; the locale pin became one constant. Performance: compiles go through the cache, so a re-gate recompiles
+nothing; the theories are one class each until S2 partitions them.
+
+No inventory row: test infrastructure (`closes_rows: []`, its reason filed). PB3177 (S2) unblocked.
+
+**Gate:** run `20261017T055145Z-02fca5` (HEAD fb9fe788f): `LEG 1 ONLY (batched gating, PB2515): GREEN` — Conformance
+6,108/11,947 · Unit 33,478/33,924 · Characterization 5/36 cases ran; all 29 new cases passed in leg 1 (an earlier gate,
+run `20261017T054358Z-b28e70` at 3f0eaea13, was GREEN before the self-review fixes). semgrep verify PASS. LINUX GATE:
+the lander's (batched gating).
+
+**Branch review round 1 (kb/Work PB3027).** R1-1: the new `generate.py --out DIR` reached the generator's
+unconditional `shutil.rmtree(out)`, harmless while the output was always the git-ignored `suites/`, but with a
+user-chosen directory it deleted everything there (the reviewer's probe: `--out outprobe` holding `todo.txt` and
+`precious/notes.txt` exited 0 with both gone; `--out .` would have deleted the working tree). Fix at the root: a
+generator now clears its output directory only through `scripts/spec/generated_output.py#prepare`, which removes
+the entries a previous run wrote (named by the caller) and refuses, exit 2 and nothing deleted, a directory holding
+anything else or a path that is not a directory. Sibling sweep (`rmtree(` over a caller's output path in
+`scripts/`, `conformance-suite/`, `tools/`): `scripts/spec/gen_conformance_notes.py --out DIR` had the same
+wholesale wipe and now uses the same helper (its notes: `_Dashboard.md`, `clause-*.md`);
+`scripts/arch/capture_oracle.py` and `compare_oracle.py` wipe only their own `TestResults/arch-oracle/<commit>`
+directories, never a caller's path. Arms: `generated_output.py --self-test` (6) and four new `generate.py
+--self-test` arms (a foreign entry refused and kept, a file path refused, a previous run's output replaced whole, an
+empty directory written). The finisher's merge of main (PB3174's review round 1) resolved one conflict in the
+generator's self-test, keeping both sides' arms. Its first re-gate (run `20261017T072617Z-08ab4b`) was RED at LINE
+ENDINGS: the helper's self-test wrote text without `newline=`. The four new `generate.py` writes had the same shape
+and were not reported, because `scripts/line_endings.py`'s WRITERS arm looked only in `scripts/` and `.claude/` while
+`self_tests.py` runs the suite harness as a live tool; `conformance-suite/harness/` is now one of its live roots. The finisher's gate: run `20261017T072859Z-2174fa` (HEAD
+8e7851db9): `LEG 1 ONLY (batched gating, PB2515): GREEN` — Conformance 6,132/11,947 · Unit 33,491/33,924 ·
+Characterization 5/36 cases ran; all 29 `ConformanceSuite*` cases passed in leg 1, and the SELF-TESTS audit ran
+`generated_output.py` and `generate.py --self-test` GREEN.
+
+**Branch review round 2.** R2-1: the round-1 fix added the harness to `line_endings.py`'s live roots but left
+`temp_names.py`'s copy at `scripts/` and `.claude/`, so a fixed temp name committed in `run.py` or `generate.py`
+passed the temp-name audit (re-probed: a line `p = Path(tempfile.gettempdir()) / "suite.json"` appended to `run.py`
+read GREEN). There were three copies of one list, so the fix is one list: `scripts/live_tools.py#ROOTS` (`scripts/`,
+`.claude/`, `conformance-suite/harness/`), read by `self_tests.py` discovery, the WRITERS arm and the temp-name audit.
+Discovery is unchanged (the same 86 lines from `self_tests.py --list` before and after; `.claude/` holds no
+self-test). The same probe now reads RED. New arms: each audit's self-test checks that its scan reaches every live
+tree, and `SelfTestDiscoveryDriftTests.EveryLiveTreeReader_ReadsTheOneList` checks that the three readers read
+`live_tools.ROOTS` and declare no copy of their own. The probe also turned up a second defect: the finding named
+line 862 but printed line 856's text. `temp_names.py` took a finding's text from `str.splitlines()`, which also
+breaks at the two U+2028/U+2029 characters in `run.py`'s normalization cases. Lines now split at LF only
+(`source_lines`). Two new self-test arms (`.py` and `.ps1`, a U+2028 in a literal before the finding) cover it, and the
+other live scripts that number lines with `splitlines` (`test_population.py#_code_lines`, `spec/where.py`,
+`spec/repairs/latex_diagrams_to_house_style.py`) are fixed the same way. The round-2 finisher's gate: run `20261017T074916Z-1fbbbd` (HEAD 9164c6097):
+`LEG 1 ONLY (batched gating, PB2515): GREEN` — Conformance 6,126/11,947 · Unit 33,497/33,925 · Characterization
+5/36 cases ran; `EveryLiveTreeReader_ReadsTheOneList` passed in leg 1, and the SELF-TESTS audit ran 84 GREEN.
+
