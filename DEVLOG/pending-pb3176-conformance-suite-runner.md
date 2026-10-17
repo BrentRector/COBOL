@@ -57,3 +57,18 @@ No inventory row: test infrastructure (`closes_rows: []`, its reason filed). PB3
 6,108/11,947 · Unit 33,478/33,924 · Characterization 5/36 cases ran; all 29 new cases passed in leg 1 (an earlier gate,
 run `20261017T054358Z-b28e70` at 3f0eaea13, was GREEN before the self-review fixes). semgrep verify PASS. LINUX GATE:
 the lander's (batched gating).
+
+**Branch review round 1 (kb/Work PB3027).** R1-1: the new `generate.py --out DIR` reached the generator's
+unconditional `shutil.rmtree(out)`, harmless while the output was always the git-ignored `suites/`, but with a
+user-chosen directory it deleted everything there (the reviewer's probe: `--out outprobe` holding `todo.txt` and
+`precious/notes.txt` exited 0 with both gone; `--out .` would have deleted the working tree). Fix at the root: a
+generator now clears its output directory only through `scripts/spec/generated_output.py#prepare`, which removes
+the entries a previous run wrote (named by the caller) and refuses, exit 2 and nothing deleted, a directory holding
+anything else or a path that is not a directory. Sibling sweep (`rmtree(` over a caller's output path in
+`scripts/`, `conformance-suite/`, `tools/`): `scripts/spec/gen_conformance_notes.py --out DIR` had the same
+wholesale wipe and now uses the same helper (its notes: `_Dashboard.md`, `clause-*.md`);
+`scripts/arch/capture_oracle.py` and `compare_oracle.py` wipe only their own `TestResults/arch-oracle/<commit>`
+directories, never a caller's path. Arms: `generated_output.py --self-test` (6) and four new `generate.py
+--self-test` arms (a foreign entry refused and kept, a file path refused, a previous run's output replaced whole, an
+empty directory written). The finisher's merge of main (PB3174's review round 1) resolved one conflict in the
+generator's self-test, keeping both sides' arms.

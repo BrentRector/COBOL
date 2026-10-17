@@ -28,7 +28,9 @@ WHAT IT WRITES (build output, never committed; `.gitignore` names `conformance-s
                                   portable or not, and `wiseowl/diagnostics.json`'s refusals (§4).
   suites/completeness.json        the completeness report (below), which it also prints.
 `--out DIR` writes the same tree to DIR instead: WiseOwl's in-process runner (S1c) generates into a directory of its
-own, so a test run never rewrites the repository's `suites/` under a concurrent `run.py`.
+own, so a test run never rewrites the repository's `suites/` under a concurrent `run.py`. Whichever directory it
+writes, a previous run's manifest directories and report there are replaced, and nothing else is ever removed: a
+directory that holds anything else (or a path that is not a directory) is refused, exit 2, with nothing deleted.
 
 THE COMPLETENESS REPORT (§4) is per edition and per WITNESS KIND, never one count: each inventory row whose band
 holds the edition is counted once, under the first of these that holds — documented non-support ("unwitnessed until
@@ -61,6 +63,7 @@ sys.path.insert(0, str(REPO / "scripts" / "spec"))
 
 import cobol_source as cobol  # noqa: E402  (this directory's: the program-text facts the refusals need)
 import config  # noqa: E402  (this directory's: the harness's adapter, profile and baseline formats)
+import generated_output  # noqa: E402  (the one way a generator clears the directory it writes: never wholesale)
 import inventory_schema  # noqa: E402  (the inventory's one schema: its editions, its evidence predicates)
 
 CONSTRUCTS_PATH = REPO / "tests" / "version-matrix" / "constructs.json"
@@ -70,6 +73,8 @@ IMPLEMENTOR_DEFINED_PATH = SUITE / "implementor-defined.json"
 DIAGNOSTICS_PATH = SUITE / "wiseowl" / "diagnostics.json"
 OUT = SUITE / "suites"
 VERDICT = "=== CONFORMANCE SUITE: "
+#: The completeness report's file name, beside the manifest directories in the output directory.
+COMPLETENESS_NAME = "completeness.json"
 
 #: The two trees of tests: the suites' (`cases/`) and WiseOwl's own regression tests (`wiseowl/cases/`, §4).
 TREES = {"cases": Path("cases"), "wiseowl": Path("wiseowl") / "cases"}
@@ -994,14 +999,18 @@ def generate(root: Path, inputs: Inputs, problems: list[str], out: Path | None,
         print(f"{VERDICT}RED — {len(reader.refusals)} refusal(s) over {len(reader.cases)} test(s) ===")
         return 1, reader
     if out is not None:
-        if out.exists():
-            shutil.rmtree(out)
-        for name, content in manifests(reader.cases, inputs).items():
+        written = manifests(reader.cases, inputs)
+        unusable = generated_output.prepare(out, (set(written) | {COMPLETENESS_NAME}).__contains__)
+        if unusable is not None:
+            print(f"{VERDICT}RED — cannot write to {_posix(out)}: {unusable}; name a new directory, or one holding "
+                  f"only a previous run's output (nothing was deleted) ===")
+            return 2, reader
+        for name, content in written.items():
             (out / name).mkdir(parents=True, exist_ok=True)
             (out / name / "manifest.json").write_text(json.dumps(content, indent=2) + "\n", encoding="utf-8",
                                                        newline="\n")
         report = completeness(reader.cases, inputs)
-        (out / "completeness.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8", newline="\n")
+        (out / COMPLETENESS_NAME).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8", newline="\n")
         print_report(report)
     suites = sum(1 for c in reader.cases if c.in_suite)
     print(f"{VERDICT}GREEN — {len(reader.cases)} test(s), {suites} in the suites, none refused"
@@ -1190,6 +1199,32 @@ def self_test() -> int:
         shutil.rmtree(root / "suites", ignore_errors=True)
         rc_check, _ = generate(root, inputs, [], None)
         check("arm: --check writes nothing", rc_check == 0 and not (root / "suites").exists())
+        # --out DIR names a directory the user chose: only what a previous run wrote there is ever removed (R1-1).
+        mine = root / "mine"
+        (mine / "precious").mkdir(parents=True)
+        (mine / "todo.txt").write_text("keep\n", encoding="utf-8")
+        (mine / "precious" / "notes.txt").write_text("keep\n", encoding="utf-8")
+        rc_mine, _ = generate(root, inputs, [], mine, echo=False)
+        check("arm: an output directory holding anything the generator does not write is refused, and nothing in it "
+              "is deleted or written", rc_mine == 2 and sorted(p.name for p in mine.iterdir()) == ["precious", "todo.txt"]
+              and (mine / "todo.txt").is_file() and (mine / "precious" / "notes.txt").is_file(),
+              sorted(p.name for p in mine.iterdir()))
+        rc_file, _ = generate(root, inputs, [], mine / "todo.txt", echo=False)
+        check("arm: an output path that is a file is refused, and the file is kept",
+              rc_file == 2 and (mine / "todo.txt").read_text(encoding="utf-8") == "keep\n")
+        rc_first, _ = generate(root, inputs, [], root / "suites", echo=False)
+        (root / "suites" / "85" / "stale.json").write_text("{}", encoding="utf-8")
+        (root / "suites" / "completeness.json").write_text("{}", encoding="utf-8")
+        rc_again, _ = generate(root, inputs, [], root / "suites", echo=False)
+        check("arm: a previous run's output is replaced whole: its manifest directories and report are rewritten",
+              rc_first == 0 and rc_again == 0 and not (root / "suites" / "85" / "stale.json").exists()
+              and json.loads((root / "suites" / "completeness.json").read_text(encoding="utf-8")) != {}
+              and (root / "suites" / "wiseowl" / "manifest.json").is_file())
+        shutil.rmtree(root / "suites")
+        (root / "suites").mkdir()
+        rc_empty_dir, _ = generate(root, inputs, [], root / "suites", echo=False)
+        check("arm: an empty output directory is written to", rc_empty_dir == 0
+              and (root / "suites" / "85" / "manifest.json").is_file())
 
     bad = {
         "no-header.cob": ("cases/1.1.1-Rule/no-header.cob", "      * nothing\n", "does not open with"),

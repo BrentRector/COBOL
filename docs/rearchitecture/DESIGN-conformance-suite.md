@@ -221,7 +221,8 @@ conformance-suite/
   `suites/wiseowl/manifest.json`: every test of both trees at each edition it names, portable or not, and the
   `wiseowl/diagnostics.json` refusals, each with the refused test's source, reference format and declared files,
   which is what WiseOwl's own runner executes (S1c). The suites are build output, never committed; `--out DIR`
-  writes them elsewhere (the in-process runner's own directory).
+  writes them elsewhere (the in-process runner's own directory). A rerun replaces only what a previous run wrote (the
+  manifest directories and the completeness report) and refuses a directory holding anything else, deleting nothing.
 - **Completeness is reported per witness kind**, never as one count that can never reach zero: for each edition, the
   inventory rows witnessed by a suite test, by a documented determination (`docs/CONFORMANCE.md`), by a derivation,
   or only by a WiseOwl unit test, and the rows with no witness. The suite's own measure is "rows whose obligation a
