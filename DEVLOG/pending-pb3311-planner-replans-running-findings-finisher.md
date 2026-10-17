@@ -9,10 +9,10 @@ two holes; the branch review of that filing (R1-1) found the note's second fix s
 open PB3152 already owned.
 
 **Hole 1, fixed.** A finisher group's own branch is exempt from the file-set collision (`Group.continues`), and the
-FINDINGS arm never asked whether that branch has a live owner. `plan()` now takes `states` ({branch: the branch
-survey's lifecycle state}, the map `classify_inflight` reads) and a FINDINGS report whose branch the survey reads IN
-FLIGHT (a live agent's lock, a dispatch out, a touch inside `--min-age`: the way a resumed branch whose tip moved past
-the reviewed head reads) goes to `waiting` with the reason named, in the fix lane and under `--drain`, for an open note
+FINDINGS arm never asked whether that branch has a live owner. `plan()` now takes `owned`
+(`prune_worktrees.owned` over the branch survey) and a FINDINGS report whose branch is IN FLIGHT by its own lifecycle
+(a live agent's lock, a dispatch out, a touch inside `--min-age`: the way a resumed branch whose tip moved past the
+reviewed head reads) goes to `waiting` with the reason named, in the fix lane and under `--drain`, for an open note
 and an unseen lead alike. The SPLIT and unlanded arms are untouched on purpose: a just-returned SPLIT branch is IN
 FLIGHT for `--min-age` after its last touch, so the rule there would stall every SPLIT finisher three hours; PB2974
 owns that arm. Live probe on this build: PB3174, whose FINDINGS branch is IN FLIGHT, printed as waiting with no
@@ -35,3 +35,22 @@ either mode and DECISION plans one; a SPLIT branch IN FLIGHT is still planned; a
 dispatch's report, a header that mentions the note and an earlier dispatch's report of the slug leave both the hold and
 the file set; the group's own report releases both; an unreadable report answers nothing. Each fails against the old
 rule (mutated and run). The old PB2795 test now uses a real report file with a post-dispatch mtime.
+
+**Branch review R1-1 (wave 1109 B): IN FLIGHT has two meanings, and the arm read both.** The first version keyed the
+wait on the survey's bare state, `states[branch] == "IN FLIGHT"`. But `prune_worktrees.contained()` also writes IN
+FLIGHT on a FINDINGS-stamped DECISION branch merely because it is an ancestor of a carrier, which may be ANOTHER
+note's finished same-file successor (WAITING TO LAND, ENQUEUED, STOPPED). That says the branch's commits land through
+the carrier; it says nothing about who answers its findings. So the arm reversed the PB3150 R1-2 rule (a carried
+FINDINGS branch still gets its finisher, its pred naming the carrier), and its own self-test pinned the reversal by
+setting the R1-2 carried fixture IN FLIGHT. Worse, once the carrier lands the FINDINGS branch reads LANDED and no arm
+ever plans the finisher, so the finding would reach main unanswered and unreported. Fix at the survey: `Row.carrier`
+records the branch `contained()` found, and `prune_worktrees.owned(rows)` is THE "a live owner of its own" set (IN
+FLIGHT and no carrier); `plan_wave.main` passes it as `plan(owned=...)`, and `plan()` no longer takes `states`. Tests:
+`test_plan_wave.py` drives `contained()` and `owned()` on survey rows of the reviewer's scenario into `plan()` (PB79's
+FINDINGS branch contained in PB7's branch: with the carrier locked IN FLIGHT, PB7 waits and PB79 gets its finisher
+naming the carrier; with the carrier WAITING TO LAND, both are planned), 216 checks; the prune_worktrees self-test (a
+real git repository) checks that `contained()` names each carrier and that `owned()` is exactly the IN FLIGHT rows by
+lock, ledger or touch. Mutating `owned()` back to the bare state turns both red with the reviewer's outcome (PB79
+waits, no finisher). Sibling arm, left as it is: `classify_inflight` still reads a contained branch as RUNNING, so a
+new group on its files waits until the carrier lands rather than continuing it; that is the safe side (a later plan,
+never double work), and continuing a branch whose findings are unanswered would be the wrong default.

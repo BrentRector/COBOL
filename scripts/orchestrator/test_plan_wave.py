@@ -298,16 +298,15 @@ check("drain: a SPLIT whose branch landed left only unstarted work", "never star
 check("drain: the clusters' notes wait, counted", ("PB2" in pd["drain_not_started"], "PB4" in pd["drain_not_started"]),
       (True, True))
 check("an unseen lead's branch with a finisher is no judgment row", pd["unlanded_without_note"], [])
-# kb/Work PB3311 hole 1: a FINDINGS report's branch that the branch survey reads IN FLIGHT (a resumed branch whose tip
-# moved past the reviewed head, a live agent's worktree, a dispatch out) is being finished: no second finisher, in
-# either mode, for an open note (PB7, branch wf_dr-2) and an unseen lead (PB79, wf_dr-5) alike, with the reason named.
-# The same plan with the branch DECISION (nobody working on it: the stamp covers the tip) plans both.
+# kb/Work PB3311 hole 1: a FINDINGS report's branch with a live owner of its OWN (prune_worktrees.owned: a resumed
+# branch whose tip moved past the reviewed head, a live agent's worktree, a dispatch out) is being finished: no second
+# finisher, in either mode, for an open note (PB7, branch wf_dr-2) and an unseen lead (PB79, wf_dr-5) alike, with the
+# reason named. The same plan with neither branch owned (nobody working on it: the stamp covers the tip) plans both.
 for drain in (False, True):
-    for state, planned in (("IN FLIGHT", False), ("DECISION", True)):
+    for owned, planned in (({"worktree-wf_dr-2", "worktree-wf_dr-5"}, False), (set(), True)):
         pf1 = pw.plan(dr_notes, CLUSTERS, HALF, dr_reports, lambda b: DR_CLASS.get(b, "ABSENT"), DR_UNLANDED, RULES,
-                      budget_points=100, drain=drain, carrier=DR_CARRIER.get,
-                      states={"worktree-wf_dr-2": state, "worktree-wf_dr-5": state})
-        check(f"{'drain' if drain else 'normal'}: a FINDINGS branch that is {state} "
+                      budget_points=100, drain=drain, carrier=DR_CARRIER.get, owned=owned)
+        check(f"{'drain' if drain else 'normal'}: a FINDINGS branch {'not ' if planned else ''}owned "
               f"{'plans' if planned else 'waits, no'} finisher (PB3311)",
               [(any(i in g.notes for g in pf1["groups"]), "IN FLIGHT" in pf1["waiting"].get(i, ""))
                for i in ("PB7", "PB79")], [(planned, not planned)] * 2)
@@ -316,9 +315,38 @@ for drain in (False, True):
                   all(w in pf1["waiting"].get("PB7", "") for w in ("worktree-wf_dr-2", "being answered")), True)
     # a SPLIT report's branch IN FLIGHT is a different arm (kb/Work PB2974): untouched by this rule
     pf2 = pw.plan(dr_notes, CLUSTERS, HALF, dr_reports, lambda b: DR_CLASS.get(b, "ABSENT"), DR_UNLANDED, RULES,
-                  budget_points=100, drain=False, carrier=DR_CARRIER.get, states={"worktree-wf_dr-3": "IN FLIGHT"})
+                  budget_points=100, drain=False, carrier=DR_CARRIER.get, owned={"worktree-wf_dr-3"})
     check("a SPLIT report's branch IN FLIGHT is the SPLIT arm's (PB2974), not this rule's",
           any("PB6" in g.notes for g in pf2["groups"]), True)
+# PB3311 review R1-1: the survey reads a FINDINGS branch IN FLIGHT ALSO when a carrier merely contains it
+# (prune_worktrees.contained: it lands through that branch), and that says nothing about who answers ITS findings. The
+# survey as plan_wave.main reads it, end to end: wf_dr-5 (PB79's FINDINGS branch, DECISION by lifecycle) is an ancestor
+# of wf_dr-2 (PB7's branch, the carrier). With the carrier locked by a live agent (IN FLIGHT, owned) PB7 waits and the
+# carried PB79 still gets its R1-2 finisher, its pred naming the carrier; with the carrier finished (WAITING TO LAND)
+# both are planned. Before the fix the bare state made PB79 wait on an answer nobody was writing.
+import prune_worktrees  # noqa: E402
+_dr_tips = {"worktree-wf_dr-2": "2020202bb", "worktree-wf_dr-5": "6060606ff"}
+_dr_rep = {r.lead: r for r in prune_worktrees.report_index(DR, lambda _i: False)}
+_git_saved = prune_worktrees.git
+prune_worktrees.git = lambda *a, **_k: _Shown(0 if a == ("merge-base", "--is-ancestor", "6060606ff", "2020202bb") else 1)
+try:
+    for carrier_state, pb7_planned in (("IN FLIGHT", False), ("WAITING TO LAND", True)):
+        rows = [prune_worktrees.Row(b, "UNLANDED", [], [], 1, None, None, 0, 999.0, "", report=_dr_rep[lead], state=st,
+                                    tip=_dr_tips[b])
+                for b, lead, st in (("worktree-wf_dr-2", "PB7", carrier_state), ("worktree-wf_dr-5", "PB79", "DECISION"))]
+        prune_worktrees.contained(rows)
+        survey_owned = prune_worktrees.owned(rows)
+        pr = pw.plan(dr_notes, CLUSTERS, HALF, dr_reports, lambda b: DR_CLASS.get(b, "ABSENT"), DR_UNLANDED, RULES,
+                     budget_points=100, carrier=DR_CARRIER.get, owned=survey_owned)
+        g79 = next((g for g in pr["groups"] if g.notes == ["PB79"]), None)
+        check(f"R1-1: a FINDINGS branch contained in a {carrier_state} carrier reads IN FLIGHT, is not owned, and gets "
+              f"its finisher naming the carrier; the carrier's own note {'is planned' if pb7_planned else 'waits'}",
+              (rows[1].state, rows[1].carrier, "worktree-wf_dr-5" in survey_owned, "PB79" in pr["waiting"],
+               bool(g79) and "contained in worktree-wf_dr-2" in g79.pred,
+               any("PB7" in g.notes for g in pr["groups"]), "being answered" in pr["waiting"].get("PB7", "")),
+              ("IN FLIGHT", "worktree-wf_dr-2", False, False, True, pb7_planned, not pb7_planned))
+finally:
+    prune_worktrees.git = _git_saved
 pn = dr_plan(False)
 check("every mode: an unseen lead's FINDINGS gets its finisher", any(g.notes == ["PB77"] for g in pn["groups"]), True)
 # R1-2: PB79's branch is contained in worktree-wf_dr-2, PB7's DONE branch, whose report never answers PB79's findings:
@@ -425,7 +453,6 @@ check("a branch naming no lead is a judgment row, its non-lead ids never planned
       ("worktree-wf_dr-8" in pj["unlanded_without_note"], any("PB4242" in g.notes for g in pj["groups"])), (True, False))
 # ...and unlanded_branch_notes itself keeps every id the subjects name: it once kept only the open notes, so a
 # superseded FINDINGS branch naming only its unseen lead (owner-task: PB77) reached plan() empty, a judgment row.
-import prune_worktrees  # noqa: E402
 _saved = (prune_worktrees.main_names, prune_worktrees.classify, prune_worktrees.git)
 _subjects = {"owner-task": "PB77: an owner task\nPB77: answer review R1-1", "worktree-wf_x": "PB2, PB11: fix"}
 prune_worktrees.main_names = lambda: set()

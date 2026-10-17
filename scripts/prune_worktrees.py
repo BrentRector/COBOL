@@ -20,9 +20,10 @@ who acts next:
                    ledger, read through plan_wave.inflight_file_sets; the branch name starts with the group's slug
                    `w<wave><letter>`), or it was touched in the last --min-age minutes (its HEAD reflog or STATUS.md).
                    Nobody touches it.
-                   A branch with no report whose tip is contained in a fix-lane branch that is IN FLIGHT, waiting or
-                   STOPPED (a same-file predecessor, a branch a review finisher merged) is IN FLIGHT too: it lands
-                   through that branch, and reads LANDED once it has.
+                   A branch whose tip is contained in a fix-lane branch that is IN FLIGHT, waiting or STOPPED (a
+                   same-file predecessor, a branch a review finisher merged; contained()) is IN FLIGHT too: it lands
+                   through that branch (its row names it, `carrier`), and reads LANDED once it has. Only the first
+                   kind has a live owner of its own (owned(): what the planner's FINDINGS arm waits on).
   A FINISHED BRANCH is decided by ONE rule of three coverages, never by a report's age (kb/Work PB3181, PB3125):
     1. its newest fix-lane report (`w<wave><letter>-PB<lead>-report.md`, plan_wave.py REPORT_NAME, under
        coord.reports_dir()) is FINISHED (plan_wave.Report.finished: `Status: DONE`, or DISCHARGED with a HEAD past its
@@ -352,6 +353,8 @@ class Row:
                                     # (unreviewed_since: main's, a clean merge of main, DEVLOG-only)
     report_since: list[str] | None = None   # unreviewed_since(the report's HEAD, tip): [] = the report covers the tip,
                                             # None = it names no head of this branch (kb/Work PB3181)
+    carrier: str = ''               # contained(): the branch it lands THROUGH; its IN FLIGHT is that branch's, and
+                                    # nobody works on THIS one (owned() excludes it; kb/Work PB3311 review R1-1)
 
 
 def mechanical(commit: str, repo=REPO) -> bool:
@@ -688,7 +691,18 @@ def contained(rows: list[Row], repo=REPO) -> None:
         c = next((c for c in carriers if c.tip != r.tip
                   and git('merge-base', '--is-ancestor', r.tip, c.tip, cwd=repo).returncode == 0), None)
         if c:
-            r.state, r.why = 'IN FLIGHT', f'contained in {c.name} ({c.state}): its work lands through that branch; ' + evidence(r)
+            r.state, r.carrier = 'IN FLIGHT', c.name
+            r.why = f'contained in {c.name} ({c.state}): its work lands through that branch; ' + evidence(r)
+
+
+def owned(rows: list[Row]) -> set[str]:
+    """The branches with a live owner of their OWN: IN FLIGHT by lifecycle() (a live agent's lock, its dispatch still
+    out, a touch inside --min-age, which is how a resumed branch whose tip moved past its report reads), never by
+    contained(). A contained branch reads IN FLIGHT because its work lands through its carrier, and the carrier may be
+    any finished branch that merged it (a same-file successor of ANOTHER note, MANDATORY-PRACTICES O2): that says
+    nothing about who works on THIS branch. The planner's FINDINGS arm reads this set (plan_wave.plan `owned`, kb/Work
+    PB3311): the bare state made a carried FINDINGS branch wait for an answer nobody was writing (review R1-1)."""
+    return {r.name for r in rows if r.state == 'IN FLIGHT' and not r.carrier}
 
 
 def verdict(rows: list[Row]) -> str:
@@ -1148,6 +1162,13 @@ def self_test() -> int:
         check('contained in succ' in rows['pred'].why, f'a predecessor lands through its successor: {rows["pred"].why}')
         check('contained in fnd-fix' in rows['fnd-pred'].why,
               f'a FINDINGS branch its finisher merged lands through the finisher: {rows["fnd-pred"].why}')
+        # owned(): IN FLIGHT by the branch's OWN lifecycle only; a contained branch names its carrier and is not owned
+        # (kb/Work PB3311 review R1-1: the planner's FINDINGS arm waits only on an owned branch)
+        live_set = owned(list(rows.values()))
+        check((rows['fnd-pred'].carrier, rows['pred'].carrier, rows['lane-pred'].carrier, rows['fresh'].carrier)
+              == ('fnd-fix', 'succ', 'lane-stopped', ''), 'contained() names the carrier; a fresh branch has none')
+        check(live_set == {n for n, s in want.items() if s == 'IN FLIGHT'} - {'fnd-pred', 'pred', 'lane-pred'},
+              f'owned = IN FLIGHT by its own lifecycle (lock, ledger, touch), never by containment: {sorted(live_set)}')
         check(set(rows) == set(want), f'every branch and detached worktree has a row: {sorted(set(rows) ^ set(want))}')
         check(rows['modified-only'].content == 'CHECK', 'a branch that only modifies an existing file is not LANDED')
         check(rows['unreadable'].dirty > 0, 'a worktree whose status git cannot produce counts as dirty')
