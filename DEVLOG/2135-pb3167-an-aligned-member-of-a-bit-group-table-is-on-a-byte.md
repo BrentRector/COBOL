@@ -1,4 +1,4 @@
-## PB3167: an ALIGNED member of a bit-group table is on a byte in every occurrence (whole-byte stride); a bit group begins where its first item does
+## Entry 2135 — 2026-10-16 20:20 PDT — PB3167: an ALIGNED member of a bit-group table is on a byte in every occurrence (whole-byte stride); a bit group begins where its first item does
 
 **Re-probe.** On a fresh build, `05 BA PIC 1(2) USAGE BIT. 05 SUB GROUP-USAGE BIT OCCURS 3. 10 SA PIC 1 USAGE BIT.
 10 TA PIC 1(5) USAGE BIT ALIGNED.` laid every occurrence 11 bits apart: FUNCTION LENGTH of the record 35, TA(2) at
@@ -78,3 +78,4 @@ Performance: `HoldsByteStart` returns at the first byte-starting member, and it 
 Duplication: one fewer copy of the placement dispatch.
 
 **Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run `20261017T014548Z-ba6d09` at b2ac0ff92; Conformance 5,950 · Unit 33,015 · Characterization 5 cases ran). After the review fix and the merge of main: GREEN again (run `20261017T022004Z-882502` at fea15f9f9; Conformance 6,035 · Unit 33,154 · Characterization 5 cases ran; the new golden, the new `OdoTail` fact and the re-pinned `RuntimeAbiPinDriftTests` Passed; the 14 `EmittedCSharp_MatchesSnapshot` cases run directly, 14/14 Passed). The 14 characterization snapshots that carry the runtime version are not in leg 1 (the kb/Work PB3144 trap), so they were run directly: 14/14 Passed. LINUX GATE: the landing's (batched gating).
+
