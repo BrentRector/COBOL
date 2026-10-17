@@ -119,7 +119,7 @@ semantics).
     assert. `ConstructRegistry` is the edition-gating registry; putting a decline in it would be the same
     two-answers-to-two-questions mistake as folding the pass into `VersionConformancePass`. The declined band's
     per-edition obligation is discharged instead by the negative corpus's `*> reject-at:` header plus the
-    below-edition POSITIVE controls (`conformance:85/declined_validate_words_are_user_words` — the clause words
+    below-edition POSITIVE controls (`conformance:cases/_unassigned/declined_validate_words_are_user_words` — the clause words
     are legal user-defined words at COBOL-85 — and `DeclinedFacilityTests.CommitAt2014_IsAUserWord…`).
   - **Adding one.** Put the rule in `CobolDeclined.g4` behind an `{isXXXX()}?` LEFT-EDGE predicate (the clause
     words are user-defined words below the edition that introduced them) and, if it is an ENTRY POINT there — a
@@ -131,7 +131,7 @@ semantics).
     documentation, matched on a `-` boundary so a family's level-2 name, its level-3 names and the open
     `EC-IMP` suffixes resolve to one row. It is keyed to the three names Annex A.4.3 item 3 LISTS, never to the
     live `EC-FLOW` level-2 family — `EC-FLOW-RELEASE` and its siblings belong to implemented facilities, and
-    `conformance:2023/declined_ec_flow_sibling_still_legal` is that complement's witness. EC-SCREEN-\* and
+    `conformance:cases/_unassigned/declined_ec_flow_sibling_still_legal` is that complement's witness. EC-SCREEN-\* and
     EC-MCS-\* have the same zero-setting-site shape and are ONE ROW EACH when their modules' witnesses land.
 - **Corpus runners** (`CorpusRunnerTests`, Phase-1 shells): per-edition `tests/conformance/<ed>/manifest.json`
   discovery (enabled compile-asserted strict; pending catalogued; integrity facts forbid silent

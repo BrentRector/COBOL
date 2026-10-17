@@ -40,7 +40,7 @@ namespace CobolNet.Tests.Unit;
 /// <item>BEHAVIORAL: over every elementary pair the comparator's own drift test enumerates, plus reference-modified and
 /// ANY LENGTH sides, the binder's verdict is the relation's; and PB3098's rows compile to the verdicts the table
 /// derives from the standard (the universal lane's twin is the golden
-/// <c>conformance:2002/pb2077_refmod_argument_both_lanes</c>).</item>
+/// <c>conformance:cases/_unassigned/pb2077_refmod_argument_both_lanes</c>).</item>
 /// </list>
 /// </summary>
 public sealed class TypedAndUniversalInvokeVerdictsAgreeDriftTests

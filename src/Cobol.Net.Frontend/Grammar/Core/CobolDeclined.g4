@@ -15,7 +15,7 @@
 // ⚠ THE NEIGHBOURING HAZARD IS A DIFFERENT POSITION, and these rules must not disturb it: `01 DESTINATION PIC
 // X.` — the word in a NAME slot — draws COBOLNET0901 "'DESTINATION' is a reserved word", which is CORRECT
 // there and has to keep firing. That is why every new token is admitted to `cobolWord` and why
-// `conformance:negative/declined-validate-entry-name-still-0901` exists. (A pre-landing analysis attributed
+// `conformance:cases/_unassigned/declined-validate-entry-name-still-0901` exists. (A pre-landing analysis attributed
 // that 0901 to the CLAUSE position; the measurement says otherwise, and the truth was worse — a wholly
 // generic error.) That is the same gap kb/Work PB100 closed for the locale module and kb/Work PB137 / Wave H
 // closed for the VALIDATE, COMMIT and ROLLBACK *statements*; this file closes it for the DATA DIVISION and

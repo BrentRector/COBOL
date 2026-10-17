@@ -12,7 +12,7 @@ namespace CobolNet.Tests.Unit;
 /// (§7.3.7.2 SR1 "formed in accordance with 8.8.2"; §7.3.7.3 GR1 "the order of precedence … shown in 8.8.2") —
 /// the directive fragment parse, the shared <see cref="BooleanExpressionResolver"/> and the shared
 /// <see cref="ArithmeticFormationRules"/> the runtime lane also uses (kb/Work PB1370, PB1413). The runtime twins
-/// are pinned by <c>tests/conformance/2023/boolean_expression_formation</c> and the PB1413 negatives. Every
+/// are pinned by <c>conformance-suite/cases/7.3.7-Compile-time-boolean-expressions/boolean_expression_formation</c> and the PB1413 negatives. Every
 /// expected value is derived from §8.8.2 in the test's own comment.
 /// </summary>
 public sealed class BooleanExpressionFormationTests

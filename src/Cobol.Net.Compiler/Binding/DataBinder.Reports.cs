@@ -2442,7 +2442,7 @@ public sealed partial class DataBinder
             // by LevelNumberPass, COBOLNET1746. The conjunction is exact: a format-3 or format-5 VALUE clause in
             // the report section requires a level-number this section does not admit, so SR30 is a consequence
             // of two rules each screened at the one place it belongs, not a third rule to write down here.
-            // Pinned by tests/conformance/negative/pb558-condition-name-in-report-section, all four editions.
+            // Pinned by conformance-suite/cases/13.18.63-VALUE/pb558-condition-name-in-report-section, all four editions.
             //
             // The finding this replaced WAS real when it was measured: the walk dropped an 88 entry in silence,
             // and a later `IF condition-name` compiled and then aborted at RUN time. PB485 (f37da577b,

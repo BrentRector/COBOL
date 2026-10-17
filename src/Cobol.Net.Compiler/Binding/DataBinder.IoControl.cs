@@ -138,7 +138,7 @@ public sealed partial class DataBinder
     /// file-names in that SAME RECORD AREA clause are open." The area emitted here is a live typed field
     /// of the program class, so a CLOSE of one member cannot take it away from a still-open sibling —
     /// GR7's availability branch holds STRUCTURALLY, not by omission (pinned by
-    /// conformance:85/pb235_same_record_area_close). GR7's other branch — a successful CLOSE with no open
+    /// conformance:cases/12.4.6.4-SAME/pb235_same_record_area_close). GR7's other branch — a successful CLOSE with no open
     /// member left makes the area UNAVAILABLE — carries no obligation a conforming program can observe:
     /// the standard defines nothing about referencing an unavailable record area (and Annex A.2 item 5
     /// makes the unsuccessful case outright undefined), so WiseOwl COBOL's determination is that the storage

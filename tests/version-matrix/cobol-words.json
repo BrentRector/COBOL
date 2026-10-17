@@ -251,7 +251,7 @@
    "token": "COMMIT",
    "nameSlot": true,
    "subscriptTrigger": true,
-   "note": "commit/rollback facility. USER WORD at 85/2002/2014; reserved 2023 only. The nameSlot alternative is RESERVATION-GATED (kb/Work PB137): the generator emits `{!reservedHere(...)}?` so at 2023 no operand list can absorb the bare facility verb (the statement arms parse everywhere), while below 2023 the word stays an ordinary user word. Declarations at 2023 re-admit through dataName's predicated alternatives so the 8.9 funnel (COBOLNET0901) still NAMES the word; the negative fixture tests/conformance/negative/user-word-commit.cob pins the declaration screen."
+   "note": "commit/rollback facility. USER WORD at 85/2002/2014; reserved 2023 only. The nameSlot alternative is RESERVATION-GATED (kb/Work PB137): the generator emits `{!reservedHere(...)}?` so at 2023 no operand list can absorb the bare facility verb (the statement arms parse everywhere), while below 2023 the word stays an ordinary user word. Declarations at 2023 re-admit through dataName's predicated alternatives so the 8.9 funnel (COBOLNET0901) still NAMES the word; the negative fixture conformance-suite/cases/_unassigned/user-word-commit.cob pins the declaration screen."
   },
   {
    "token": "CONDITION",
@@ -1019,7 +1019,7 @@
    "token": "ROLLBACK",
    "nameSlot": true,
    "subscriptTrigger": true,
-   "note": "commit/rollback facility. USER WORD at 85/2002/2014; reserved 2023 only. The nameSlot alternative is RESERVATION-GATED (kb/Work PB137): the generator emits `{!reservedHere(...)}?` so at 2023 no operand list can absorb the bare facility verb (the statement arms parse everywhere), while below 2023 the word stays an ordinary user word. Declarations at 2023 re-admit through dataName's predicated alternatives so the 8.9 funnel (COBOLNET0901) still NAMES the word; the negative fixture tests/conformance/negative/user-word-commit.cob pins the declaration screen."
+   "note": "commit/rollback facility. USER WORD at 85/2002/2014; reserved 2023 only. The nameSlot alternative is RESERVATION-GATED (kb/Work PB137): the generator emits `{!reservedHere(...)}?` so at 2023 no operand list can absorb the bare facility verb (the statement arms parse everywhere), while below 2023 the word stays an ordinary user word. Declarations at 2023 re-admit through dataName's predicated alternatives so the 8.9 funnel (COBOLNET0901) still NAMES the word; the negative fixture conformance-suite/cases/_unassigned/user-word-commit.cob pins the declaration screen."
   },
   {
    "token": "ROUNDING",

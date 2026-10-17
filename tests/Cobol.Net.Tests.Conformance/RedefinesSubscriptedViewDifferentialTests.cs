@@ -9,7 +9,7 @@ namespace CobolNet.Tests.Conformance;
 /// its occurrences end-to-end in the ONE backing; an inner REDEFINES starts at its target's first position and
 /// adds no width; a sibling table contributes width × OCCURS), plus NEXT SENTENCE in an IF's THEN phrase
 /// (§14.9.19.4 GR4 — the ELSE-phrase rule GR6 is exercised by the spec-derived golden
-/// tests/conformance/85/pb414_next_sentence_last_sentence_inline.cob, not here). Pinned to the
+/// conformance-suite/cases/14.9.19-IF/pb414_next_sentence_last_sentence_inline.cob, not here). Pinned to the
 /// former legacy engine (NIST-85 green over the REDEFINES table series) — a regression net, never a rule's witness.
 /// </summary>
 public sealed class RedefinesSubscriptedViewDifferentialTests
@@ -93,7 +93,7 @@ public sealed class RedefinesSubscriptedViewDifferentialTests
     /// DESIGN-frontend-grammar §3.11 determination), and in the second the condition is FALSE, so GR5 ignores the THEN phrase and the ELSE arm
     /// runs. The IF branches are both exercised; the NEXT SENTENCE PLACEMENT is one arm, and the other —
     /// NEXT SENTENCE in an ELSE phrase, §14.9.19.4 GR6 — is measured by the spec-derived golden
-    /// tests/conformance/85/pb414_next_sentence_last_sentence_inline.cob (kb/Work PB414).</summary>
+    /// conformance-suite/cases/14.9.19-IF/pb414_next_sentence_last_sentence_inline.cob (kb/Work PB414).</summary>
     [Fact]
     public void NextSentence_SkipsTrailOfOwnSentence()
         => AssertMatchesGolden("""

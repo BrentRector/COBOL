@@ -12,7 +12,7 @@ namespace CobolNet.Tests.Conformance;
 /// ISO §8.8.4.2.1 — "A relation condition shall contain at least one reference to an operand that is not a literal"
 /// (kb/Work PB1470). The sentence is neither a general format nor a syntax rule, so §4.2.2's warning mechanism
 /// indicates it: COBOLNET3146, a WARNING at every edition (docs/CONFORMANCE.md D-RELLITERAL), the relation compiling and
-/// evaluating as written (<c>conformance:85/pb1470_relation_of_two_literals_runs</c> pins the values).
+/// evaluating as written (<c>conformance:cases/8.8.4.2-Simple-relation-conditions/pb1470_relation_of_two_literals_runs</c> pins the values).
 /// <para>The EXPECTED verdict is computed here from the rule over each operand kind's one property — is it a literal as
 /// the source wrote it? A figurative constant is one (§8.3.3.6 is a clause of §8.3.3 Literals), a symbolic-character is
 /// "a user-defined figurative constant" (§8.3.2.2.29), and a constant-name's effect "is as if literal-1 … were written

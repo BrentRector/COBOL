@@ -95,7 +95,7 @@ internal sealed class CorrespondingBinder(BinderContext ctx, StatementBinder hos
         // ⛔ AND SR12's SECOND HALF IS NOW CHECKED INSTEAD OF ASSUMED (kb/Work PB390). What stood here claimed
         // SR12's "not reference-modified" half "DOES hold structurally: reference modification resolves only over
         // elementary character items, never a group" — false. A group item IS reference-modifiable and has its own
-        // golden (tests/conformance/2023/pb70_group_reference_modification.cob). Nothing checked the prohibition;
+        // golden (conformance-suite/cases/8.4.3.3-Reference-modification/pb70_group_reference_modification.cob). Nothing checked the prohibition;
         // the shape was refused only by an accident of CorrAccess.Create's default arm, under a storage-shape
         // message naming neither the rule nor reference modification — and once that factory switched on
         // Place.Undecorated (kb/Work PB393) the accident stopped refusing it at all, so `MOVE CORRESPONDING

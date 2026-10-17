@@ -649,10 +649,10 @@ ACOS, ASIN) are still screened by the ONE §15.3 rule 14 screen (PB952): their o
 `null` for a rejected argument, which the body turns into the NaN every rejected argument becomes — so no body
 carries a domain test. A float operand IS its binary64 and keeps the double body, as a scaled operand of a `Sdidi`
 member does. `WholeRangeBodiesDriftTests` pins each member's runtime overload and every arm's value against an
-independent 140-digit oracle. Pinned by `tests/conformance/2002/pb999_log_trig_decimal_range`,
-`tests/conformance/85/pb1041_trig_log_arc_exact_argument` and `tests/conformance/2002/pb1041_exp_and_wide_exact_argument`,
+independent 140-digit oracle. Pinned by `conformance-suite/cases/15.20.4-Returned-value-rule/pb999_log_trig_decimal_range`,
+`conformance-suite/cases/15.8.4-Returned-value-rule/pb1041_trig_log_arc_exact_argument` and `conformance-suite/cases/15.20.4-Returned-value-rule/pb1041_exp_and_wide_exact_argument`,
 and the rate-side twin (PRESENT-VALUE's exact discount base, above) by
-`tests/conformance/85/pb1000_present_value_rate_near_minus_one`. ANNUITY's twin is a BODY fix, not an intake one
+`conformance-suite/cases/15.74.3-Argument-rules/pb1000_present_value_rate_near_minus_one`. ANNUITY's twin is a BODY fix, not an intake one
 (PB1310): its §15.9.4 1) b) denominator 1 − (1 + rate)^−n is evaluated as −expm1(−n·log1p(rate))
 (`CobolIntrinsics.ExpMinusOne` / `LogOnePlus`, Kahan's formulations), because forming 1 + rate in binary64 is exactly
 1.0 for any rate below 2^−53 — a COMP-2 rate included — and ANNUITY(1E-17 12) stored 0 for 1/12.
@@ -671,7 +671,7 @@ result. PRESENT-VALUE's §15.74.3 r2 is then decided where every SDIDI evaluatio
 leading table(ALL) rate stay one `CobolDec[]` enumeration. A list with a floating argument keeps the binary64
 body (its EAE is evaluated in binary64, CONFORMANCE.md DOC-A.1-92); an SDIDI argument was already routed to the
 Dec bodies by `RenderNum`'s native Dec arm (PB69). `WholeRangeBodiesDriftTests` requires every variadic Float
-catalog row to be a member and pins each overload. Pinned by `tests/conformance/85/pb1565_variadic_exact_argument_list`.
+catalog row to be a member and pins each overload. Pinned by `conformance-suite/cases/15.74.4-Returned-value-rule/pb1565_variadic_exact_argument_list`.
 
 **The RANGE of the returned value: past binary64 is the size error condition (PB1566).** Under native arithmetic the
 family's returned value IS a binary64 (CONFORMANCE.md DOC-A.1-92), so binary64's range is the range of the native
@@ -683,7 +683,7 @@ check, raising `CobolSizeError` exactly as FACTORIAL does past the Int128 interm
 ARGUMENT keeps its DOC-A.1-70 disposition), and every `ExactListBodies` result through `NarrowResult`, which knows
 the exact value. EXP(1000) used to print `Infinity` and `COMPUTE F = FUNCTION EXP(-1000) ON SIZE ERROR` took NOT ON
 SIZE ERROR. Under a standard mode the SDIDI's own range answers the same way (§8.8.1.5.2 r2). Pinned by
-`tests/conformance/2002/pb1566_exp_result_range`.
+`conformance-suite/cases/15.34.4-Returned-value-rules/pb1566_exp_result_range`.
 
 ### An intrinsic-function-name the REPOSITORY identifies is not a user-defined word (PB65, §8.3.2.1 rule 5).
 

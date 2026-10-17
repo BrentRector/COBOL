@@ -537,7 +537,7 @@ parameter: a predicate that reads `$w` is context-dependent and ANTLR cannot eva
 enclosing rule. The NAME arm of each brace stays `cobolWord`, and that split exposed two slots the ladder had
 exempted WRONGLY: `entry-convention-name-1` and `external-locale-name-1` are SYSTEM-NAMES (§8.3.2.3.1), and §8.3.2.1
 rule 1 forbids a reserved word there exactly as in a user-defined word, so `LOCALE L1 IS USER-DEFAULT` is now
-COBOLNET0901 (`conformance:negative/pb764-reserved-word-as-system-name`). What the funnel still lets pass is
+COBOLNET0901 (`conformance:cases/8.3.2-COBOL-words/pb764-reserved-word-as-system-name`). What the funnel still lets pass is
 NON-positional only: a bare §15 function-argument phrase word, a construct declined whole
 (`DeclinedFacilityPass.EnclosingDeclinedConstruct`, its set drift-tested against `CobolDeclined.g4`'s entry points),
 and the EXCEPTION-OBJECT / DEBUG- registers. `FormatWordDriftTests` derives the tokenless §8.9-reserved words from
@@ -1400,7 +1400,7 @@ joined the table the same way, which is the table doing its job: a tenth format 
 grammar is missing, and only THEN close the list. Doing (3) before (1) and (2) rejects legal source that is
 silently accepted today, which is strictly worse than the defect — the ALIGNED trap of PB487 in reverse. Each
 site's rendered clause list, with its PDF page and printed folio, is recorded in a comment above its alternative
-list in the `.g4`, and `tests/conformance/2023/pb829_closed_formats_legal.cob` writes a LEGAL clause in every
+list in the `.g4`, and `conformance-suite/cases/11.2-Identification-division-structure/pb829_closed_formats_legal.cob` writes a LEGAL clause in every
 newly-closed format as the standing witness that the rendering was right.
 
 **What is NOT this mechanism, and is deliberately still open.**

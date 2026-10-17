@@ -10,7 +10,7 @@ namespace CobolNet.Tests.Unit;
 /// an identifier of the FORMAL's class (ISO §8.4.3.1.2 Format 8; §8.4.3.10.3 SR1 a) "depending upon the associated
 /// data item's class"), so it crosses as the storage-free <see cref="PredefinedNullArgument"/> carrier and the
 /// formal's slot adapter supplies the null of its own carrier (§8.4.3.10.4 GR1–GR3, §8.4.3.7.4 GR1). These pin what
-/// the end-to-end witness (conformance:2002/pb1630_null_argument_crossing) cannot reach: the §12.3.8.4 GR10 c)
+/// the end-to-end witness (conformance:cases/8.4.3.1-Identifier/pb1630_null_argument_crossing) cannot reach: the §12.3.8.4 GR10 c)
 /// crossing, where the activating element knows no formal and a non-slot formal must refuse the carrier at
 /// activation as EC-PROGRAM-ARG-MISMATCH (§14.9.4.4 GR3 d)) rather than read it as characters.
 /// </summary>

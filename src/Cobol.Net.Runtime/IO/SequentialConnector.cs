@@ -733,7 +733,7 @@ public sealed class SequentialConnector : FileConnector
     ///   hold N−1 written lines forever, FOOTING phrase or not. The strict boundary below is
     ///   docs/CONFORMANCE.md §4 "DETERMINATION — the §14.9.51.4 GR26 a)/b) boundary at LINAGE-COUNTER = page
     ///   size" (kb/Work PB686), which carries the survey and the NIST SQ201M evidence; it is pinned at the
-    ///   boundary by tests/conformance/2023/pb686_linage_gr26_boundary.cob (+ the 85 twin) on BOTH arms of the
+    ///   boundary by conformance-suite/cases/13.18.34-LINAGE/pb686_linage_gr26_boundary.cob (+ the 85 twin) on BOTH arms of the
     ///   FOOTING dispatch, and by LinageConformanceTests.Gr26ab_CounterEqualsBody_IsFootingEopNotOverflow.</item>
     /// <item>GR6b2/3: at the two page transitions — AFTER the overflow decision was made against the OLD page
     ///   body AND after all positioning on the current page (GR6 b) 2's own words: <i>"This occurs before the

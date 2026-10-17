@@ -155,7 +155,7 @@
    "row": {"rule-id": "GR-14.9.5.4-11", "section": "14.9.5.4", "kind": "GR", "ordinal": 11,
            "subject": "CANCEL statement", "verdict": "CONFORMS",
            "code-location": "src/Cobol.Net.Runtime/Control/ProgramTable.cs#CallPointer",
-           "test-ref": "conformance:2023/pb154_cancel_scope",
+           "test-ref": "conformance:cases/14.9.5-CANCEL/pb154_cancel_scope",
            "derivation": "docs/CONFORMANCE.md#DRV-GR-14.9.5.4-11"},
    "state": "OK", "refusals": ["has-spec-derived-test"]},
 

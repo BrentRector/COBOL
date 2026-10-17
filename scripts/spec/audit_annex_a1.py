@@ -279,7 +279,7 @@ def self_test() -> int:
         # item has NO §7 row — demanding one reported three correctly-closed rows as findings. The control above
         # proves the check still fires for a claiming row.
         ('a DECLINED item closing on its witness needs no §7 row',
-         {}, [doc_row('conformance:negative/a48-format-clause-declined', 'DOCUMENTED-NON-SUPPORT')], None),
+         {}, [doc_row('conformance:wiseowl/cases/13.4.5-File-description/a48-format-clause-declined', 'DOCUMENTED-NON-SUPPORT')], None),
         # ⛔ AND ITS TWIN, WHICH IS WHY THE SKIP IS KEYED ON THE REGISTER AND NOT ON THE VERDICT (PB280 Q1). An
         # OPTIONAL element §7 records as "Not provided." carries the SAME verdict and a REAL determination, so
         # its witness is held to that row's `Pinned by` like any other. Keyed on the verdict, this case passes
@@ -309,7 +309,7 @@ def self_test() -> int:
         ('a gloss outside the backticks after an xUnit class pin is not part of the ref',
          {70: pins_of('`unit:CarrierLandingFormTests` (the family)')}, None),
         ('a gloss outside the backticks after a golden pin is not part of the ref',
-         {70: pins_of('`conformance:2023/pb3017_sdidi_divide_remainder_beyond_the_int128_carrier` (the half)')},
+         {70: pins_of('`conformance:cases/_unassigned/pb3017_sdidi_divide_remainder_beyond_the_int128_carrier` (the half)')},
          None),
         ('a pin naming a missing class is caught', {70: ['unit:NoSuchTestClass.Whatever']}, 'no NoSuchTestClass.cs'),
         ('a pin naming a missing golden is caught', {70: ['conformance:2023/no_such_case_at_all']}, 'does not exist'),

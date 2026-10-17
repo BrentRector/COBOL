@@ -112,7 +112,7 @@
       "src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs:538-546 — VisitWriteBeforeAfter (C6-A gate, LANDED)",
       "src/Cobol.Net.Frontend/Grammar/Core/CobolIO.g4:357-366 — writeBeforeAfter/writeAdvancePhrase (C6-A grammar, LANDED)",
       "src/Cobol.Net.Editions/Constructs.g.cs:35 + ConstructRegistry.g.cs:37 — write-before-and-after-advancing-2023 (C6-A registry, LANDED)",
-      "tests/conformance/2023/write_before_and_after.cob — C6-A golden (LANDED)",
+      "conformance-suite/cases/14.9.51-WRITE/write_before_and_after.cob — C6-A golden (LANDED)",
       "tests/version-matrix/constructs.json:283-292 — the write-before-and-after row; grep -i suppress over constructs.json returns NOTHING (no C6-B row)"
      ]
     },
@@ -1202,7 +1202,7 @@
       "src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs:548-557 — `VisitPerformUntil` fires `Constructs.PerformUntilExit2023` on `ctx.EXIT()`",
       "tests/version-matrix/constructs.json:175-185 — the `perform-until-exit-2023` row (introducedIn 2023, expectDiagnostic COBOLNET0900)",
       "src/Cobol.Net.Editions/Constructs.g.cs:26 and ConstructRegistry.g.cs:28 — the generated const + registry row for perform-until-exit-2023",
-      "tests/conformance/2023/perform_until_exit.cob + .out — the passing golden (01/02/03/DONE)",
+      "conformance-suite/cases/14.9.28-PERFORM/perform_until_exit.cob + .out — the passing golden (01/02/03/DONE)",
       "src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4 — grep for FINALLY and LOCATION returns exit code 1 (855 lines, neither token present)",
       "src/Cobol.Net.Frontend/Preprocessor/TurnDirectiveProcessor.cs:103-107 — LOCATION is matched as a raw string in the directive processor, never lexed as a parser token",
       "tests/version-matrix/reserved-words.json:1616-1623 (FINALLY r2023:true) and :2300-2307 (LOCATION r2023:true)",

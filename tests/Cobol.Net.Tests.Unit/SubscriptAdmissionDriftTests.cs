@@ -27,7 +27,7 @@ namespace CobolNet.Tests.Unit;
 /// re-spells it or an edit puts <c>IsTable</c> back in the admission position.</para>
 ///
 /// <para>The behavioural half lives in the conformance corpus, where it belongs:
-/// <c>tests/conformance/85/pb877_subscripted_subscript.cob</c> (the positive, one line per receiver family plus
+/// <c>conformance-suite/cases/8.4.2.3-Subscripts/pb877_subscripted_subscript.cob</c> (the positive, one line per receiver family plus
 /// the sending, ref-mod, function-argument and SEARCH ALL arms) and the two negatives
 /// <c>pb877-subscript-on-non-table-item</c> / <c>pb877-subscript-count-mismatch</c>.</para>
 /// </summary>

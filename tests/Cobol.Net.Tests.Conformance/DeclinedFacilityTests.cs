@@ -58,7 +58,7 @@ public sealed class DeclinedFacilityTests
 
     /// <summary>THE ARM THAT PROVES THE PROBE CAN FAIL. At <c>--std 85</c> VALIDATE is a USER-DEFINED WORD
     /// (§8.9 reserves it "added 2002"), so the statement arm must NOT fire and no COBOLNET1580 may appear — the
-    /// same fact <c>conformance:negative/user-word-validate</c> pins from the other side. Without this leg the
+    /// same fact <c>conformance:cases/_unassigned/user-word-validate</c> pins from the other side. Without this leg the
     /// theory above would pass just as well against a compiler that warned unconditionally.</summary>
     [Fact]
     public void ValidateAt85_IsAUserWord_AndDrawsNoFacilityWarning()
@@ -86,7 +86,7 @@ public sealed class DeclinedFacilityTests
     /// <para>Covering witness for GR-14.9.7.4-3/-4/-5, GR-14.9.36.4-3/-4/-5/-6 and GR-14.6.11-1 (the implicit
     /// COMMIT at normal run-unit termination, which quantifies over the necessarily-empty set of active APPLY
     /// COMMIT clauses). The runtime half — a bare COMMIT and ROLLBACK actually running as CONTINUE — is
-    /// <c>conformance:2023/pb137_commit_inert</c>.</para>
+    /// <c>conformance:cases/14.9.7-COMMIT/pb137_commit_inert</c>.</para>
     /// <para>⚠ The count is asserted per SITE, not per program: an emit that moved to a once-per-program guard
     /// would still satisfy "contains COBOLNET1579" and would stop naming the second statement.</para></summary>
     [Fact]
@@ -202,7 +202,7 @@ public sealed class DeclinedFacilityTests
     }
 
     /// <summary>⛔ THE NEIGHBOURING HAZARD, which is a SUPPORTED construct sharing the same word — the shape
-    /// <c>conformance:negative/declined-validate-entry-name-still-0901</c> exists for on the DESTINATION side.
+    /// <c>conformance:cases/_unassigned/declined-validate-entry-name-still-0901</c> exists for on the DESTINATION side.
     /// §12.3.7's SPECIAL-NAMES CLASS clause (<c>CLASS class-name IS literal THRU literal</c>) is claimed,
     /// implemented and reachable through the class condition; adding a data-description arm on the same leading
     /// token must not disturb it. Asserted by RUNNING it, not merely compiling it, because a decline that fired

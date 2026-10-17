@@ -29,7 +29,7 @@ namespace CobolNet.Tests.Conformance;
 /// explicit or implicit INITIALIZE statement"): LA shows the host's value, never VVVV.</para>
 /// <para>A program activated by the operating system (the <c>Main</c> of a <c>cobol</c> executable) is the other
 /// §13.7.4 3) case, whose effect is undefined; WiseOwl COBOL gives each formal its category default there, which the
-/// golden <c>conformance:2002/pb2671_omitted_formal_category_default</c> pins.</para>
+/// golden <c>conformance:cases/A.1-Implementor-defined-language-element-list/pb2671_omitted_formal_category_default</c> pins.</para>
 /// </summary>
 public sealed class NonCobolActivatorLinkageTests
 {

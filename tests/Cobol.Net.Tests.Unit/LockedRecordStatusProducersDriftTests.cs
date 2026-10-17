@@ -24,7 +24,7 @@ namespace CobolNet.Tests.Unit;
 /// lock owner is a different connector) and <c>FileRegistry.ConflictOnLockedRecord</c>
 /// (<c>PhysicalFileTable.IsLockedByOther</c>). A third producer turns this RED, and the answer is to re-adjudicate
 /// item 152 (write the new circumstance into §7) — never to widen the expected set silently. The behavioural half,
-/// '51' for a genuinely locked record, is pinned by <c>conformance:2002/pb669_lock_visibility_plain_connector</c>.</para>
+/// '51' for a genuinely locked record, is pinned by <c>conformance:cases/A.1-Implementor-defined-language-element-list/pb669_lock_visibility_plain_connector</c>.</para>
 /// </summary>
 [Trait("Sweep", "tree")]
 public sealed class LockedRecordStatusProducersDriftTests

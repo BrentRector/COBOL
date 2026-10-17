@@ -835,7 +835,7 @@ public static class CobolArgAdapt
     /// routed here either: §14.8.2.2 2) makes that pairing a MOVE, which a pointer cannot send. Nor is a formal of
     /// any length but the pointer's 8 (<paramref name="formalWidth"/>; negative = ANY LENGTH, whose length rule
     /// 2c "considered to match"): rule 1's same-length requirement is the pairing's whole conformance, and its
-    /// violation is §14.9.4.4 GR3 d)'s EC-PROGRAM-ARG-MISMATCH (conformance:2002/pb615_unreadable_argument_carrier).
+    /// violation is §14.9.4.4 GR3 d)'s EC-PROGRAM-ARG-MISMATCH (conformance:cases/_unassigned/pb615_unreadable_argument_carrier).
     /// Returns <paramref name="args"/> itself (no allocation) whenever the argument is anything else.</para></summary>
     /// <summary>The cheap pre-test for <see cref="WithPointerContent"/>: a BY CONTENT argument on a class-pointer
     /// slot. Asked first so the common (non-pointer) crossing never computes the formal's image width.</summary>

@@ -59,7 +59,7 @@ public sealed class TierCRejectionTests
     /// undergo ... a move operation, in either direction ... unless the other operand is a compatible group".
     /// <c>WS-SRC</c> and <c>WS-DEST</c> are ELEMENTARY, so neither leg can ever be that other operand, and
     /// §4.2.2 ¶2 requires a compile-time mechanism for a violated syntax rule. A COMPATIBLE pair now moves
-    /// rather than aborting (<c>conformance:2014/pb393_move_varlen_group</c>), so the Tier-C island no longer
+    /// rather than aborting (<c>conformance:cases/14.9.25-MOVE/pb393_move_varlen_group</c>), so the Tier-C island no longer
     /// owns MOVE at all — its remaining MOVE-adjacent lock is the pointer/object-class arm below.
     /// ⛔ Do NOT "restore" these to a runtime loud; the loud was the defect.</summary>
     [Fact] public void MoveIntoGroup_BindRejected() => AssertBindRejected("    MOVE WS-SRC TO WS-G.");

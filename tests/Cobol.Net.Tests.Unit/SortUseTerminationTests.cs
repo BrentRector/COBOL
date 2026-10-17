@@ -12,7 +12,7 @@ namespace CobolNet.Tests.Unit;
 /// (<see cref="CobolSort.RegisterFormat1Sort"/>) and the generated <c>__RunUse</c> of every EC-model element hands each
 /// declarative's action to <see cref="CobolSort.AfterUseProcedure"/>; these pin its answer per action, per scope and per
 /// statement, independent of any compiled program (the end-to-end witnesses are
-/// <c>conformance:2002/pb1177_sort_procedure_use_not_normal</c> and <c>conformance:2002/pb1177_sort_called_use_not_normal</c>).</summary>
+/// <c>conformance:cases/14.9.40-SORT/pb1177_sort_procedure_use_not_normal</c> and <c>conformance:cases/14.9.40-SORT/pb1177_sort_called_use_not_normal</c>).</summary>
 public sealed class SortUseTerminationTests
 {
     private const string Sd = "PB1177-SD";

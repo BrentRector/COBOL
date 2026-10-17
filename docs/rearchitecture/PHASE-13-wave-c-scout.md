@@ -94,7 +94,7 @@ SL1=1000
 
 (exact bytes: five lines, each terminated by the platform newline the DISPLAY writer emits; the conformance harness's boolean_ops.out shows a trailing newline after the last line.)
 
-Byte-by-byte derivation (A = 1100, category boolean; R is PIC 1(4) so it renders as a 4-char '0'/'1' string per D-B1; DISPLAY concatenates the literal and R with NO separator — confirmed against tests/conformance/2002/boolean_ops.out where `DISPLAY "AND=" R` -> `AND=0100`):
+Byte-by-byte derivation (A = 1100, category boolean; R is PIC 1(4) so it renders as a 4-char '0'/'1' string per D-B1; DISPLAY concatenates the literal and R with NO separator — confirmed against conformance-suite/cases/8.8.4.2-Simple-relation-conditions/boolean_ops.out where `DISPLAY "AND=" R` -> `AND=0100`):
 - SL3: 1100 B-SHIFT-L 3 -> 0000. §8.8.2 rule 8 (logical left, MSB discarded/LSB<-0): 1100->1000->0000->0000; == Annex A Table A.2 row "Shift left | 1100 | B-SHIFT-L | 3 | 0000". Result length 4 = first-operand length (rule 9). => "SL3=0000"
 - SR3: 1100 B-SHIFT-R 3 -> 0001. rule 8 (logical right): 1100->0110->0011->0001; == Table A.2 "Shift right ... 0001". => "SR3=0001"
 - SLC: 1100 B-SHIFT-LC 3 -> 0110. rule 8 (circular left rotate): 1100->1001->0011->0110; == Table A.2 "Shift left circular ... 0110". => "SLC=0110"

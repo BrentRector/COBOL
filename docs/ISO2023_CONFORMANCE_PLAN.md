@@ -197,7 +197,7 @@ was the **#1 work item of the pre-PIVOT byte-engine era. Do NOT do it now:** the
     424); ☑ PERFORM VARYING over a typed table works, SEARCH safely stays byte (426); ☑ **nested groups → nested
     `record struct`s** via a member-path walk (427). **BYTE-ENGINE CONFORMANCE FIX (424):** a VALUE on an OCCURS item
     now initializes EVERY occurrence (ISO §13.18.63.4 GR 9 — was only the last); zero baseline shifts; conformance
-    test `tests/conformance/2002/table_value_occurs`.
+    test `conformance-suite/cases/13.18.63-VALUE/table_value_occurs`.
   - **PROGRESS — Stage-3 "definition of done" (DEVLOG 428), guard 1196/507/364:** ☑ a representative ordinary
     business program flips its **WHOLE data division** (nested group + numeric OCCURS table + standalone longs;
     DISPLAY/decimal-ADD/MOVE/PERFORM-VARYING/COMPUTE/IF) and is byte-identical (`RepresentativeBusinessProgram_…`).
@@ -217,7 +217,7 @@ was the **#1 work item of the pre-PIVOT byte-engine era. Do NOT do it now:** the
     BASED-deref via a new `IrBasedDerefLocation` (`CilLocationEmitter.EmitBasedDerefArgs` pushes (Buffer,Offset,Length)
     from `_PTR_b` → legacy engine reads+writes the pointed-to storage). `DataStatementBinder.BindSetAddress` (both
     grammar alts, token-order discriminated); `LocationResolver` intercepts a whole BASED reference. Conformance
-    `tests/conformance/2002/based_pointer.cob`. **Pointer slice 1b COMPLETE — one `ManagedPointer` representation,
+    `conformance-suite/cases/13.18.5-BASED/based_pointer.cob`. **Pointer slice 1b COMPLETE — one `ManagedPointer` representation,
     always-typed, no 8-byte handle.**
   - **PROGRESS — Stage-4 pointer slices 2 + 3 LANDED → POINTER SUBSYSTEM COMPLETE (DEVLOG 436–437), guard
     1196/510/364:** ☑ **slice 2** pointer arithmetic `SET p UP/DOWN BY n` (`IrPointerAdjust`, Offset ± n bytes; conf
@@ -375,14 +375,14 @@ Each item: **ID** · feature · spec ref · severity · tractability · current 
   the inline emit only builds the args array; a Compilation pre-pass builds the signature registry
   (`SemanticModel.UserFunctionSignatures` = name → RETURNING length+PIC); `IrUserFunctionCall` +
   `ExpressionLowerer` routing. Verified `COMPUTE R = FUNCTION DOUBLER(X) + 1` → 43. Conformance:
-  `tests/conformance/2002/udf_inline_expression`. **NOTE:** applies when every argument is a storage location;
+  `conformance-suite/cases/_unassigned/udf_inline_expression`. **NOTE:** applies when every argument is a storage location;
   literal/arith args are M2-UDF-2 below.
 - ☑ 🐛 **M2-UDF-2 — Literal / arithmetic-expression arguments (DONE — DEVLOG 374).** `FUNCTION FOO(5)` /
   `FOO(A + 1)` now evaluate correctly (were silently 0). The Compilation pre-pass also records each function's
   USING-parameter signatures (`SemanticModel.UserFunctionParameterSignatures`); `IrUserFunctionArg` carries either
   a location (BY CONTENT) or a value + the target parameter's length/PIC; the emit encodes a value argument via
   `CobolProgramRegistry.EncodeFunctionArg` (`PicRuntime.EncodeNumeric`). Verified `DOUBLER(5)` = 10,
-  `DOUBLER(4+1)` = 10. Conformance `tests/conformance/2002/udf_value_args`. **The UDF correctness chapter
+  `DOUBLER(4+1)` = 10. Conformance `conformance-suite/cases/_unassigned/udf_value_args`. **The UDF correctness chapter
   (M2-UDF-1 + M2-UDF-2) is closed for numeric functions** — and, in the GREENFIELD (P10 Step 9, DEVLOG 859),
   the **category-carrying RETURNING channel** extends it to alphanumeric / numeric-edited / national /
   image-form-group results (every leaf `DataItem.ElementImageCapable` — character-stored or a pinned numeric
@@ -405,12 +405,12 @@ Each item: **ID** · feature · spec ref · severity · tractability · current 
   + TotalDigits 3/5/10/19-or-20 + sign); `DataSymbol.IsUnsignedBinary`/`IsFixedWidthBinary`; PicUsageResolver/
   RecordLayoutBuilder/SemanticBuilder threaded. Runtime COMP-5 codec extended to 1-byte (sbyte/byte) — no PIC'd
   COMP-5 is ever 1 byte. Verified BC=127/-128, BCU=255, full-width SHORT/LONG/DOUBLE, COMPUTE. Conformance
-  `tests/conformance/2002/binary_usage`.
+  `conformance-suite/cases/13.18.60-USAGE/binary_usage`.
 - ☑ **M2-DATA-2 — `USAGE FLOAT-SHORT / FLOAT-LONG / FLOAT-EXTENDED` (DONE — DEVLOG 376, 377).** Aliased onto
   COMP-1/COMP-2 (3 edits each: lexer tokens + usageKeyword/bare-form alts + `UsageMapper.FromUsageKeyword`
   FLOAT-SHORT→Comp1 / FLOAT-LONG→Comp2 / FLOAT-EXTENDED→Comp2). FLOAT-EXTENDED maps to double (.NET has no
   native 128-bit float — documented approximation; a true soft-float quad path is out of scope). Verified
-  10.5*2=21, 100.25*4=401, 250.5*2=501. Conformance `tests/conformance/2002/float_usage` (all three usages).
+  10.5*2=21, 100.25*4=401, 250.5*2=501. Conformance `conformance-suite/cases/13.18.60-USAGE/float_usage` (all three usages).
 - ☑ **M2-DATA-3 — National data (CORE DONE — DEVLOG 383).** `USAGE NATIONAL` + `PIC N(n)` (UTF-16, **2
   bytes/char**), `N"…"`/`n'…'` literals, and the full data-movement surface: MOVE national←national
   (left-justify, U+0020 pad, right truncate, JUSTIFIED RIGHT), national↔alphanumeric and numeric→national
@@ -423,7 +423,7 @@ Each item: **ID** · feature · spec ref · severity · tractability · current 
   `MoveFigurativeToField`; emit-time category dispatch in `CilDataEmitter`/`CilComparisonEmitter`/`CilEmitter`
   (VALUE). **An adversarial review (3 agents) caught that the first slice silently corrupted national↔alpha
   MOVE, figurative/VALUE/INITIALIZE fill, and comparison — all fixed before commit.** Conformance
-  `tests/conformance/2002/national_data` (13 assertions); NATIONAL-EDITED landed 2026-09-12 (kb/Work PB492, `tests/conformance/{2002,2014,2023}/pb492_national_edited`). **Deferred:** `NX"…"`, full
+  `conformance-suite/cases/13.18.40-PICTURE/national_data` (13 assertions); NATIONAL-EDITED landed 2026-09-12 (kb/Work PB492, `tests/conformance/{2002,2014,2023}/pb492_national_edited`). **Deferred:** `NX"…"`, full
   implementor correspondence + `EC-DATA-CONVERSION` (Latin-1 only), collating-sequence national compare,
   ref-mod ×2 byte adjustment, INSPECT-national.
 - ☑ **M2-DATA-4 — Boolean & bit data (CORE DONE — DEVLOG 386).** `PIC 1(n)` / `USAGE BIT` (one byte/position,
@@ -432,7 +432,7 @@ Each item: **ID** · feature · spec ref · severity · tractability · current 
   **comparison** (field=field, field=literal), and **JUSTIFIED RIGHT** (§13.18.32 — the fix also un-deadened
   national JUSTIFIED). A 2-agent adversarial review caught + fixed three defects before commit: non-boolean VALUE
   corruption (§13.18.63 GR10 → CBL1002), a boolean nested in a COMPUTE tree read as numeric (→ CBL2601, recursed),
-  and JUSTIFIED wrongly rejected on boolean/national (CBL0803). Conformance `tests/conformance/2002/boolean_data`.
+  and JUSTIFIED wrongly rejected on boolean/national (CBL0803). Conformance `conformance-suite/cases/13.18.32-JUSTIFIED/boolean_data`.
   **Deferred:** bit operators B-AND/B-OR/B-XOR/B-NOT (reserved-word collision; needs the XOR wiring pattern),
   `BX"…"`, true bit-packing, GROUP-USAGE BIT, boolean↔non-boolean compare strictness, boolean ref-mod, the broader
   alphanumeric/national-in-COMPUTE latent hole, uninitialized-boolean=0x20 (matches the National precedent).
@@ -456,7 +456,7 @@ Each item: **ID** · feature · spec ref · severity · tractability · current 
     `MoveFigurativeToField` (ZERO/`'0'`), `GetDisplayString` boolean branch (show raw `'0'`/`'1'`, **no TrimEnd**),
     `MoveBooleanLiteralToOccursField` (VALUE); emit dispatch in `CilDataEmitter.EmitMoveFieldToField` +
     `EmitMoveStringToField`, `CilComparisonEmitter`, `CilEmitter` VALUE-init, and INITIALIZE-default in
-    `DataMovementLowerer`. **Conformance** `tests/conformance/2002/boolean_data` covering literal/MOVE/VALUE/
+    `DataMovementLowerer`. **Conformance** `conformance-suite/cases/13.18.32-JUSTIFIED/boolean_data` covering literal/MOVE/VALUE/
     INITIALIZE/DISPLAY/compare. **Defer:** `BX"…"` hex, **bit operators B-AND/B-OR/B-XOR/B-NOT** (corpus-collision
     risk — `B-NOT` seen as an identifier in a unit test; needs careful reserved-word handling + the XOR-operator
     wiring pattern, DEVLOG 375), true bit-packing, GROUP-USAGE BIT, SET cond-name interplay.
@@ -468,7 +468,7 @@ Each item: **ID** · feature · spec ref · severity · tractability · current 
   class is folded pairwise per §8.8.3.3 GR1 (kb/Work PB1406) — with the §8.8.3.2 SRs as `COBOLNET1540/1541/1545`
   (a word standing for no literal `COBOLNET2473`; §12.3.7.3 SR11's symbolic-character operand `COBOLNET2474`), the
   `concat-operator-2002` VersionConformancePass parse-arm gate (0900 at `--std 85`), the enabled
-  `tests/conformance/2002/literal_concat` golden (+ `concat_below_2002` / `concat_class_mismatch` negatives)
+  `conformance-suite/cases/8.8.3-Concatenation-expressions/literal_concat` golden (+ `concat_below_2002` / `concat_class_mismatch` negatives)
   and the active version-matrix row. Never existed in the legacy engine (GreenfieldOnly).
 - ◑ **M2-DATA-5 — Pointers & based addressing. PHASE-1 DONE (DEVLOG 389); Phase-2 = managed .NET refs, done in the data-model Stage 4 (NOT gated).** **[A] HIGH.**
   **Phase-1 COMPLETE:** `USAGE POINTER` (8-byte opaque handle, no PIC), `NULL`, `SET p TO NULL` / `SET p TO q`,
@@ -518,7 +518,7 @@ Each item: **ID** · feature · spec ref · severity · tractability · current 
     fills 0x00×8. (7) `CategoryCompatibility` add `(Pointer,Pointer)` move + comparison + `IsPointerFamily`.
     (8) `ConditionLowerer` route pointer Location/Location → `IrStringCompare`; handle pointer vs NULL figurative.
     (9) `DataItemClassifier.ValidateValueClause` REJECT a VALUE on a pointer item. (10) restrict pointer comparison
-    to = / NOT = (reject ordering). Conformance `tests/conformance/2002/pointer_data` (declare, SET TO NULL, = NULL
+    to = / NOT = (reject ordering). Conformance `conformance-suite/cases/13.18.60-USAGE/pointer_data` (declare, SET TO NULL, = NULL
     YES, two NULLs equal). **Note:** Phase-1 is thin standalone (every pointer can only be NULL until ADDRESS OF/
     ALLOCATE exist) — its value is the foundation; the useful Phase-2 (dereference) is the owner-gated design decision.
 
@@ -550,7 +550,7 @@ Each item: **ID** · feature · spec ref · severity · tractability · current 
   the lowerer applies per-item precedence TO VALUE → REPLACING → default, includes FILLER under WITH FILLER, and
   suppresses the default for non-VALUE items under TO VALUE unless TO DEFAULT. `EmitValueClauseInit` emits each
   item's declared VALUE (figurative / ALL-literal / numeric / string). Conformance
-  `tests/conformance/2002/initialize_phrases`.
+  `conformance-suite/cases/14.9.11-DISPLAY/initialize_phrases`.
 - ☑ **M2-PROC-2 — `INSPECT … BACKWARD` (DONE — DEVLOG 378).** §14.9.21. New `BACKWARD` reserved word +
   grammar `INSPECT BACKWARD? …` + a `bool Backward` threaded Bound→IR→emit→runtime. Implemented as a
   reverse-wrapper: reverse the target + every multi-char operand/delimiter, run the existing forward
@@ -571,7 +571,7 @@ Each item: **ID** · feature · spec ref · severity · tractability · current 
 - ◑ **M2-PROC-6 — `GOBACK RETURNING` (DONE — DEVLOG 387); EXIT variants verified; `CONTINUE AFTER` deferred.**
   §14.9.16. `GOBACK RETURNING|GIVING identifier` (dialect-gated 2002+) lowers to a synthetic MOVE into the
   PROCEDURE DIVISION RETURNING item + `IrGoBack` (reuses the CALL…RETURNING wiring); conformance
-  `tests/conformance/2002/goback_returning`. EXIT PROGRAM/PERFORM[ CYCLE]/SECTION/PARAGRAPH/METHOD/FUNCTION
+  `conformance-suite/cases/14.9.4-CALL/goback_returning`. EXIT PROGRAM/PERFORM[ CYCLE]/SECTION/PARAGRAPH/METHOD/FUNCTION
   grammar present and EXIT PROGRAM/PERFORM green across NIST — no gap. **Remaining:** `CONTINUE AFTER expr SECONDS`
   (2002 timed delay) — deferred (non-deterministic, poor conformance fit, low value).
 
@@ -622,7 +622,7 @@ Each item: **ID** · feature · spec ref · severity · tractability · current 
   `ProgramState` (`EmissionContext.StateIsInstance` chokepoint), `INVOKE class "NEW" RETURNING o` (`newobj`+`.ctor`),
   `INVOKE o "method"` (`callvirt`, static cross-type resolution, classes emitted before programs), `USAGE OBJECT
   REFERENCE class` → a `_OBJ_` managed reference, and PERFORM inside an OBJECT method. Conformance
-  `tests/conformance/2002/oo_hello` + `oo_method_perform`. Adversarial-reviewed (non-OO corpus byte-identical; 2
+  `conformance-suite/cases/11.7-METHOD-ID/oo_hello` + `oo_method_perform`. Adversarial-reviewed (non-OO corpus byte-identical; 2
   latent landmines fixed: instance-State LOCAL-STORAGE load + receiver-less PERFORM). Turnkey map +
   per-slice scope in `docs/COBOLNET_OO_DESIGN.md`. **Slice 2 (DEVLOG 448): `INVOKE …
   USING/RETURNING`** — OO methods take USING args + a RETURNING value via the CALL ManagedPointer[] ABI (an OO method
@@ -666,7 +666,7 @@ Each item: **ID** · feature · spec ref · severity · tractability · current 
 
 - ☑ **M4-1 — `DELETE FILE` execution (DONE — DEVLOG 373).** Full statement pipeline (BoundDeleteFileStatement →
   IrDeleteFile → FileRuntime.DeleteFile = ResolveHostPath + File.Delete + I-O status 00/35/30). Verified status
-  35 after delete + the physical file removed. Conformance `tests/conformance/2023/delete_file`. **Follow-up:**
+  35 after delete + the physical file removed. Conformance `conformance-suite/cases/A.1-Implementor-defined-language-element-list/delete_file`. **Follow-up:**
   the `ON EXCEPTION`/`NOT ON EXCEPTION` phrases + multiple file-names are not yet honored.
 - ☑ **M4-2a — logical `XOR` / `EXCLUSIVE-OR` operator (DONE — DEVLOG 375; RE-EDITIONED to 2023 — DEVLOG 596).**
   New `logicalXorExpression` grammar level (precedence NOT>AND>XOR>OR), `BoundBinaryOperatorKind.Xor` →
@@ -674,7 +674,7 @@ Each item: **ID** · feature · spec ref · severity · tractability · current 
   here claimed XOR is "2002-era, not a 2023 delta" — that parenthetical was UNSOURCED and is WRONG: Annex E.2
   item 25 / E.3.2 item 4 (the spec's own change annex) list XOR and EXCLUSIVE-OR among the words newly reserved
   by 2023 (they were user-defined words before), and presence in the 2023 body (§8.8.4.9) proves nothing about
-  2002. The operator is `{is2023()}?`-gated; conformance re-editioned to `tests/conformance/2023/logical_xor`
+  2002. The operator is `{is2023()}?`-gated; conformance re-editioned to `conformance-suite/cases/8.8.4.11-Complex-Combined-conditions/logical_xor`
   (VCR rows 32/41; constructs.json rows `logical-xor-operator-2023` + the two user-word interval rows).
 - ☑ **M4-2b — `SMALLEST-ALGEBRAIC` + `EXCEPTION-FILE-N` intrinsics — BOTH LANDED.** SMALLEST-ALGEBRAIC (§15.83)
   is a compile-time PICTURE fold (`IntrinsicBind.Fold`, the HIGHEST/LOWEST `BindAlgebraicFold` family;
@@ -797,7 +797,7 @@ A commercial compiler needs more than spec checkboxes. Track these in parallel:
   National (§3.2). Process note: keep THIS document the singular live plan — tick items + log here as work lands;
   no separate resume/handoff docs.
 - **2026-06-05 (session DEVLOG 383)** — **M2-DATA-3 National (UTF-16) data CORE COMPLETE** (conformance
-  `tests/conformance/2002/national_data`, 13 assertions). `PIC N`/`USAGE NATIONAL` (2 bytes/char), `N"…"`
+  `conformance-suite/cases/13.18.40-PICTURE/national_data`, 13 assertions). `PIC N`/`USAGE NATIONAL` (2 bytes/char), `N"…"`
   literals, MOVE national←national, national↔alphanumeric + numeric→national conversion, literal/figurative
   VALUE, MOVE SPACE / INITIALIZE, DISPLAY, and national comparison — all char-aware. A 3-agent adversarial
   review caught that the initial slice silently corrupted national↔alpha MOVE, figurative/VALUE/INITIALIZE

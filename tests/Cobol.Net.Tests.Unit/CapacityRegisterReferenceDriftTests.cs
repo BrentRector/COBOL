@@ -21,9 +21,9 @@ namespace CobolNet.Tests.Unit;
 /// <c>CapacityRegisters</c> lookup added beside the one in <c>SymbolTable.CapacityCandidates</c>, or a fault member
 /// added without a diagnostic, both look exactly like the working compiler until the one program that hits them.
 /// The behavioural half lives in the conformance corpus —
-/// <c>tests/conformance/2014/pb457_capacity_register_qualified.cob</c> and the three negatives
+/// <c>conformance-suite/cases/14.9.39-SET/pb457_capacity_register_qualified.cob</c> and the three negatives
 /// <c>pb457-capacity-register-subscripted</c> / <c>-under-table</c> / <c>-bad-qualifier</c>, and for the method
-/// scope <c>tests/conformance/2014/pb3165_method_capacity_register_scope.cob</c> (kb/Work PB3165).</para>
+/// scope <c>conformance-suite/cases/_unassigned/pb3165_method_capacity_register_scope.cob</c> (kb/Work PB3165).</para>
 /// <para><b>A tree-wide sweep</b> (tier 0c, at every gate): the one-lookup scan reads all of <c>src</c>, so a second
 /// lookup added in ANY file breaks it, and the impact map of the file that adds one never names this class.</para>
 /// </summary>
