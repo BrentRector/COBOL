@@ -163,7 +163,7 @@ STAMP_PATHS = (
     "tests/version-matrix/traceability-inventory.json",
     "tests/version-matrix/inventory-schema.json",
     "tests/version-matrix/constructs.json",
-    "tests/conformance",
+    "conformance-suite",
     "kb/Work",
     "docs/CONFORMANCE.md",
     "docs/COBOLNET_REARCHITECTURE_PLAN.md",

@@ -419,7 +419,7 @@ jobs:
           # match `VersionMatrixTests_P0.Cobol85Program_…`, and vstest answers a filter that matches nothing
           # with a SILENT GREEN. Cobol85Program_StillCompilesAtLaterEdition is unique in the tree, so keying on
           # it is both correct today and immune to the next re-partition. Every `~VersionMatrixTests`,
-          # `~CorpusRunnerTests` and `~NistDifferentialTests` filter below still matches, partitions included,
+          # `~ConformanceSuiteTests` and `~NistDifferentialTests` filter below still matches, partitions included,
           # because each partition class keeps its family name as a prefix.
           - shard: matrix-cont-2002
             filter: "FullyQualifiedName~Cobol85Program_StillCompilesAtLaterEdition&DisplayName~2002"
@@ -430,9 +430,9 @@ jobs:
           - shard: matrix-constructs
             filter: "FullyQualifiedName~VersionMatrixTests&FullyQualifiedName!~Cobol85Program_StillCompilesAtLaterEdition"
           - shard: corpus-nist
-            filter: "FullyQualifiedName~CorpusRunnerTests|FullyQualifiedName~NistDifferentialTests"
+            filter: "FullyQualifiedName~ConformanceSuiteTests|FullyQualifiedName~NistDifferentialTests"
           - shard: rest
-            filter: "FullyQualifiedName!~VersionMatrixTests&FullyQualifiedName!~CorpusRunnerTests&FullyQualifiedName!~NistDifferentialTests"
+            filter: "FullyQualifiedName!~VersionMatrixTests&FullyQualifiedName!~ConformanceSuiteTests&FullyQualifiedName!~NistDifferentialTests"
     steps:
       - uses: actions/checkout@v7
         with:
@@ -556,7 +556,7 @@ jobs:
           # match `VersionMatrixTests_P0.Cobol85Program_…`, and vstest answers a filter that matches nothing
           # with a SILENT GREEN. Cobol85Program_StillCompilesAtLaterEdition is unique in the tree, so keying on
           # it is both correct today and immune to the next re-partition. Every `~VersionMatrixTests`,
-          # `~CorpusRunnerTests` and `~NistDifferentialTests` filter below still matches, partitions included,
+          # `~ConformanceSuiteTests` and `~NistDifferentialTests` filter below still matches, partitions included,
           # because each partition class keeps its family name as a prefix.
           - shard: matrix-cont-2002
             filter: "FullyQualifiedName~Cobol85Program_StillCompilesAtLaterEdition&DisplayName~2002"
@@ -567,9 +567,9 @@ jobs:
           - shard: matrix-constructs
             filter: "FullyQualifiedName~VersionMatrixTests&FullyQualifiedName!~Cobol85Program_StillCompilesAtLaterEdition"
           - shard: corpus-nist
-            filter: "FullyQualifiedName~CorpusRunnerTests|FullyQualifiedName~NistDifferentialTests"
+            filter: "FullyQualifiedName~ConformanceSuiteTests|FullyQualifiedName~NistDifferentialTests"
           - shard: rest
-            filter: "FullyQualifiedName!~VersionMatrixTests&FullyQualifiedName!~CorpusRunnerTests&FullyQualifiedName!~NistDifferentialTests"
+            filter: "FullyQualifiedName!~VersionMatrixTests&FullyQualifiedName!~ConformanceSuiteTests&FullyQualifiedName!~NistDifferentialTests"
     steps:
       - uses: actions/checkout@v7
         with:

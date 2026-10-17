@@ -17,11 +17,11 @@ Inputs, each optional except the listings:
 
 THE NAME KEY. Every lookup keys on `name_key(display name)`: the display name with the partition suffix `_P<k>`
 removed from its CLASS segment. A partitioned family (`TestPartitioning.Slice`) puts row i in class
-`_P{i % Partitions}`, so appending one golden to a manifest renames every later row of the family; keyed without the
+`_P{i % Partitions}`, so adding one suite test renames every later row of the family; keyed without the
 suffix, the append leaves ONE unknown case (evidence `impact-map-pb1708/b7`).
 
 THE TIERS (per case; a key shared by several cases takes the lowest):
-  0a  a case of a test method the diff ADDS · a corpus row whose manifest entry or golden files the diff changes ·
+  0a  a case of a test method the diff ADDS · a suite row whose test, its files or its keyed entry the diff changes ·
       red at the previous gate — always leg 1 (an EDITED test or harness is tier 1 through the map: a whole changed
       test file would put every row of its theories here — 5,774 cases for 68b X, evidence b4);
   0h  a HOST-ONLY WITNESS (kb/Work PB3022; DESIGN-test-build-ci.md §3.17.3): its class carries the xUnit trait
@@ -321,7 +321,7 @@ class Context:
     map_known: set[str]                     # every name key the map recorded, in any assembly
     every_tier1: bool                       # the change cannot be attributed (no map, stale map, ...)
     added_tests: set[str]                   # test methods the change adds
-    goldens: set[str]                       # corpus goldens the change touches
+    goldens: set[str]                       # suite test ids the change touches (impacted_tests.suite_tests)
     reds: set[str]
     previous: Timings
     recorded: Timings                       # the map's durations
@@ -343,9 +343,14 @@ class KeyGroup:
         return (self.per_case if self.per_case is not None else median) * len(self.cases)
 
 
+#: The suite runner's theory argument naming a test (ConformanceSuiteTests: `SuiteTest_…(edition, id)` and
+#: `WiseOwlRefusal_…(id, edition)`): a case of a test the change touches (`impacted_tests.suite_tests`) is tier 0a.
+SUITE_ID = 'id: '
+
+
 def tier_of(display: str, key: str, ctx: Context, per_case: float | None, has_timings: bool) -> str:
     if (method_of(display) in ctx.added_tests or key in ctx.reds
-            or any(f'name: "{g}"' in display for g in ctx.goldens)):
+            or any(f'({SUITE_ID}"{g}"' in display or f', {SUITE_ID}"{g}"' in display for g in ctx.goldens)):
         return "0a"
     cls = class_of(key)  # the class without its partition suffix: a trait is declared on the family
     if cls in ctx.host_classes or cls == TRAIT_GUARD:
@@ -539,8 +544,8 @@ def self_test() -> int:
 
     ns = "CobolNet.Tests.Conformance."
     check("NameKey strips the partition suffix from the class segment",
-          name_key(ns + 'CorpusRunnerTests_P2.Run(edition: "85", name: "x")')
-          == ns + 'CorpusRunnerTests.Run(edition: "85", name: "x")')
+          name_key(ns + 'ConformanceSuiteTests_P2.SuiteTest_IsNoWorseThanItsVerdictAllows(edition: "85", id: "x")')
+          == ns + 'ConformanceSuiteTests.SuiteTest_IsNoWorseThanItsVerdictAllows(edition: "85", id: "x")')
     check("NameKey never touches a theory's arguments",
           name_key(ns + 'T.M(path: "a.B_P1.c")') == ns + 'T.M(path: "a.B_P1.c")')
     check("NameKey leaves a class without a numeric partition suffix alone",
@@ -574,7 +579,7 @@ def self_test() -> int:
     check("the collection cap holds one collection's budgeted leg-1 time to LEG_ONE_COLLECTION_CAP",
           p["stats"]["leg1_cases"] == 15 and p["stats"]["leg1_floor_seconds"] == 15.0, p["stats"])
     # tier 0a: a changed test file's class, a touched golden, a previous red — in leg 1 whatever their cost.
-    row = f'{ns}CorpusRunnerTests_P1.EnabledProgram(edition: "85", name: "g1")'
+    row = f'{ns}ConformanceSuiteTests_P1.SuiteTest_IsNoWorseThanItsVerdictAllows(edition: "85", id: "g1")'
     red = f"{ns}C3.M3"
     t3 = timed([(d, 1.0) for d in cheap] + [(pole, 1000.0), (row, 500.0), (f"{ns}Changed.M", 400.0)])
     all3 = cheap + [pole, row, f"{ns}Changed.M"]
@@ -591,8 +596,8 @@ def self_test() -> int:
     check("tier 0u: unknown cases are charged the median within LEG_ONE_UNKNOWN_BUDGET; the overflow leads leg 2",
           p["stats"]["unknown_admitted"] == 22 and p["stats"]["unknown_overflow"] == 8
           and p["leg2"][:8] == [name_key(d) for d in new[22:]], p["stats"])
-    # a partition rename after a manifest append: keyed by NameKey the renamed row is KNOWN, not 0u.
-    renamed = f'{ns}CorpusRunnerTests_P2.EnabledProgram(edition: "85", name: "g1")'
+    # a partition rename after a suite test is added: keyed by NameKey the renamed row is KNOWN, not 0u.
+    renamed = f'{ns}ConformanceSuiteTests_P2.SuiteTest_IsNoWorseThanItsVerdictAllows(edition: "85", id: "g1")'
     p = plan_assembly(cheap + [pole, renamed], ctx(previous=t3, map_known=k3))
     check("a partition-renamed row keeps its timing through NameKey (not tier 0u)",
           p["stats"]["tiers"]["0u"] == 0, p["stats"]["tiers"])

@@ -88,7 +88,7 @@ def declaration_files() -> list[pathlib.Path]:
     C# doc-comments are still covered — by `audit_doc_citations.py`, whose quoted-fragment rule works there, and
     by this file's PHANTOM check, which needs no convention at all."""
     out = sorted(REPO.joinpath("src").rglob("*.g4"))
-    out += sorted(REPO.joinpath("tests").joinpath("conformance").rglob("*.cob"))
+    out += sorted(REPO.joinpath("conformance-suite").rglob("*.cob"))   # the suite's tests: cases/, wiseowl/cases/
     return [p for p in out if _keep(p)]
 
 

@@ -11,7 +11,7 @@ namespace CobolNet.Tests.Conformance;
 /// 2002+ (no stray 0901 about the format's own keywords, no undefined-name noise — the §8.9 funnel exempts the
 /// statement's subtree), the illegal shapes draw exactly ONE named syntax-rule diagnostic, the two formats gate at the
 /// 2002 edition, and the one shape that has a COBOL-85 reading keeps it. The runtime semantics are the goldens
-/// tests/conformance/2002/pb64t1_* and the unit LocaleStateTests.
+/// pb64t1_* of conformance-suite/cases/ and the unit LocaleStateTests.
 /// </summary>
 public sealed class SetLocaleDispositionTests
 {

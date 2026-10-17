@@ -1348,7 +1348,7 @@ public sealed class SpecTraceabilityInventoryDriftTests
 
         // Test refs: an unknown form, a golden that does not exist, and an xUnit method that does not exist.
         Assert.Single(UnresolvedTestRefs([Base("X-8") with { TestRef = "vibes:it-looked-right" }], s, root));
-        Assert.Single(UnresolvedTestRefs([Base("X-9") with { TestRef = "conformance:2023/no_such_case" }], s, root));
+        Assert.Single(UnresolvedTestRefs([Base("X-9") with { TestRef = "conformance:cases/14.9.8-COMPUTE/no_such_case" }], s, root));
         Assert.Single(UnresolvedTestRefs(
             [Base("X-10") with { TestRef = "unit:SpecTraceabilityInventoryDriftTests.NoSuchMethod" }], s, root));
 

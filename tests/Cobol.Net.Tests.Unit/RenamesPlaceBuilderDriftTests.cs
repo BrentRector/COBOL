@@ -20,8 +20,8 @@ namespace CobolNet.Tests.Unit;
 /// second arm that can return before the shared tail again.</para>
 /// <para><b>Why a source scan.</b> A second arm looks exactly like the working compiler until a program writes the
 /// one operand shape it forgets. The behavioural half lives in the conformance corpus:
-/// <c>conformance-suite/cases/8.4.3.3-Reference-modification/pb1380_renames_ref_mod.cob</c>, <c>tests/conformance/2023/
-/// pb1380_renames_ref_mod_zero_length.cob</c> and the negative <c>pb1380-renames-alias-binary-ref-mod</c>.</para>
+/// <c>conformance-suite/cases/8.4.3.3-Reference-modification/pb1380_renames_ref_mod.cob</c>, <c>conformance-suite/cases/
+/// 7.3.23-REF-MOD-ZERO-LENGTH/pb1380_renames_ref_mod_zero_length.cob</c> and the negative <c>pb1380-renames-alias-binary-ref-mod</c>.</para>
 /// </summary>
 public sealed class RenamesPlaceBuilderDriftTests
 {

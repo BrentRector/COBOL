@@ -30,8 +30,8 @@ namespace CobolNet.Tests.Conformance;
 /// prohibition on ACCEPTING, so an unclaimed A.4 module is REFUSED, not warned. The whole module is now an
 /// ERROR by name (COBOLNET1560 data/environment surface, COBOLNET1707 procedure surface) through the one funnel
 /// <see cref="CobolNet.Binding.ScreenFacility"/>, which puts its witnesses where a refusal belongs: the NEGATIVE
-/// corpus, 41 programs under <c>tests/conformance/negative/a42-*</c>, each <c>.err</c> naming the construct as
-/// well as the code. <c>ScreenFacilityConstructDriftTests</c> holds that coverage complete against
+/// refusals, 41 programs <c>a42-*</c> under <c>conformance-suite/wiseowl/cases/</c>, each refusal's expected text
+/// naming the construct as well as the code. <c>ScreenFacilityConstructDriftTests</c> holds that coverage complete against
 /// <c>CobolScreen.g4</c>. Adding a screen test back here would need it to COMPILE, which is exactly what the
 /// module may no longer do.</para>
 ///

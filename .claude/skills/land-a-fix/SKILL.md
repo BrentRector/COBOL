@@ -47,15 +47,18 @@ never write "swept" without one.
 
 The exact section AND rule number (`§14.9.24 GR4d`), not "per the spec".
 
-## 5. Write the golden AND register it in the same commit
+## 5. Write the test in the conformance suite
 
 - Expected value **computed from the spec**, never copied from another compiler or from observed output.
-- Positive golden in `tests/conformance/<edition>/` → add its name to that directory's `manifest.json` `enabled`.
-- Negative golden in `tests/conformance/negative/` (`.cob` + `.err`) → add it to
-  `tests/conformance/negative/manifest.json`, which is a SEPARATE manifest.
+- A test is `conformance-suite/cases/<ISO clause>-<Name>/<id>.cob` opening with its metadata header (`id`, `rules`,
+  `accept`, `source-format`, `files`; `conformance-suite/README.md`, 'Adding a test') and its `<id>.out`. There is
+  no manifest: the generator reads the header, and the suite runner (`ConformanceSuiteTests`) runs every test.
+- A program WiseOwl must refuse names no `accept` edition and gets its entry in
+  `conformance-suite/wiseowl/diagnostics.json` (`refuse-at`, `expect`: the code or a message substring).
+- A test of WiseOwl's own behaviour (documented non-support, a WiseOwl option) goes in `wiseowl/cases/`.
 
-An unregistered golden never runs AND fails the manifest-integrity test — but only at the comprehensive gate, never
-at the wave-local run. Register it before running even the wave-local gate.
+`python conformance-suite/harness/generate.py --check` refuses a malformed header, an undeclared file and any file
+under the removed `tests/conformance/`; it is a gate audit that runs before the build.
 
 If the fix gates a construct's `introducedIn`, run the edition-gate sweep — see the `new-construct` skill.
 

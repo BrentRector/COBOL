@@ -10,7 +10,7 @@ namespace CobolNet.Tests.Unit;
 /// group O notes measured wrong: the §14.6.9.2 recreation (kb/Work PB1144), the §8.5.1.9.5 INITIALIZED seed of a
 /// created element (PB1267) and the §8.5.1.9.6 2) resource-bounded maximum capacity (PB1410). Checking is off in
 /// these tests, so the nonfatal and fatal conditions take their "no exception" outcomes; the goldens under
-/// <c>tests/conformance/2014/pb1*_dyn_*</c> cover them with checking on.</summary>
+/// <c>pb1*_dyn_*</c> of <c>conformance-suite/cases/</c> cover them with checking on.</summary>
 public sealed class CobolDynTableTests
 {
     /// <summary>16 KiB per element, so MaxOccurrences elements are ~16 TiB — more than any host's memory plus swap,

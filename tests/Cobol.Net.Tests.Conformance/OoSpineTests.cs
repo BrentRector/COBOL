@@ -12,7 +12,7 @@ namespace CobolNet.Tests.Conformance;
 /// TRAPS reproduced as day-one tests (each was a REAL caught legacy bug — traps #1/#4/#10 run here or in the
 /// enabled 2002 corpus), the D8 control-flow contract (method GOBACK vs STOP RUN vs EXIT METHOD), and the OO
 /// diagnostic band (COBOLNET0813/0820–0827). Two-object independence (trap #1) runs as the ENABLED corpus
-/// programs oo_instance_data / oo_object_group (CorpusRunnerTests byte-compares them).
+/// programs oo_instance_data / oo_object_group (ConformanceSuiteTests byte-compares them).
 /// </summary>
 public sealed class OoSpineTests
 {

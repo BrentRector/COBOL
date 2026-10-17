@@ -14,7 +14,7 @@ namespace CobolNet.Tests.Unit.Collation;
 /// per-category snapshot, the two runtime conditions the statements own — EC-LOCALE-MISSING (GR24) and
 /// EC-LOCALE-INVALID-PTR (GR21) — through their checking flags (a raise only while checking is on; the state is
 /// unchanged either way), DETERMINATION L1's normalization of external identifications, and the SORT snapshot
-/// (§14.6.6 r5 — <c>CobolCollation.Snapshot</c>). The goldens under tests/conformance/2002/pb64t1_* prove the same
+/// (§14.6.6 r5 — <c>CobolCollation.Snapshot</c>). The suite tests pb64t1_* (conformance-suite/cases/) prove the same
 /// through compiled COBOL; this pins the runtime's contract directly.
 /// </summary>
 [Collection("process-globals")]   // reads the process-global locale configuration (the site tailoring directory variable a

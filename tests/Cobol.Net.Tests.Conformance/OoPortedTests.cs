@@ -21,7 +21,7 @@ public sealed class OoPortedTests
     //
     // SKIPPED as already asserted by an ENABLED greenfield artifact (10):
     //   Invoke_ByReferenceArg_Works                -> corpus golden oo_method_args (the same ACC/ADDTO
-    //       USING…RETURNING BY REFERENCE pattern, per-instance BAL, byte-compared by CorpusRunnerTests)
+    //       USING…RETURNING BY REFERENCE pattern, per-instance BAL, byte-compared by ConformanceSuiteTests)
     //   TypedObjectData_IsPerInstance              -> corpus goldens oo_instance_data (the SAME OOINST/BOX
     //       ---/---/XYZ program, verbatim) + oo_object_group (trap #1 — see the OoSpineTests header)
     //   Inherits_PolymorphicOverride_DispatchesToSubclass -> corpus golden oo_inherit (ANIMAL/DOG virtual

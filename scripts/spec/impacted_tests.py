@@ -22,7 +22,7 @@ How a changed C# file reaches tests:
   * without `--base` (files named on the command line) every file is taken at that file level.
 A changed TEST file reaches tests the same way (the test assemblies are recorded too): an edited test body or a
 theory's harness is tier 1 for the rows that executed it. It also names the tier-0a facts only the diff knows: the
-test METHODS the change adds (no map or timing knows them yet), and the corpus goldens whose manifest entry or files
+test METHODS the change adds (no map or timing knows them yet), and the suite tests whose files or keyed entries
 the change touches (`gate_plan.py` puts their cases in leg 1). A whole changed test FILE is not tier 0a: a harness
 edit reaches every row of its theory, and 68b X's (b4) put 5,774 cases and 62.8 % of the work ahead of its first red.
 
@@ -77,6 +77,10 @@ STRUCTURAL_RE = re.compile(r"(\.g4|\.csproj|\.props|\.targets|\.sln|global\.json
                            r"|^src/Cobol\.Net\.Compiler\.SourceGen/|(^|/)Directory\.[^/]+$", re.IGNORECASE)
 TRIVIAL_RE = re.compile(r"^\s*(//.*|/\*.*|\*.*|)$")
 HUNK_RE = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+\d+(?:,\d+)? @@")
+#: The conformance suite's test trees (conformance-suite/harness/generate.py's TREES): a file of one of their clause
+#: folders belongs to suite tests by id (`suite_tests`), and the two keyed files beside them name tests by id.
+SUITE_TREES = ("conformance-suite/cases/", "conformance-suite/wiseowl/cases/")
+SUITE_KEYED = ("conformance-suite/wiseowl/diagnostics.json", "conformance-suite/wiseowl/options.json")
 HEAD: str | None = None  # --head: diff base..HEAD instead of the worktree (a replay, or a landed branch)
 TIER_DIRECT, TIER_WIDENED, TIER_UNREACHED = 1, 2, 3
 
@@ -89,7 +93,7 @@ class Reach:
     widened: int = 0
     direct_names: set[str] = field(default_factory=set)            # display-name substrings reached outside the map
     added_tests: dict[str, set[str]] = field(default_factory=dict)  # assembly -> test methods the change ADDS
-    goldens: set[str] = field(default_factory=set)                 # corpus goldens the change touches
+    goldens: set[str] = field(default_factory=set)                 # suite test ids the change touches
     every_tier1: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
 
@@ -288,7 +292,6 @@ def inserted_members(ix: MapIndex, path: str, added: list[str]) -> int | None:
 
 
 _TEXT: dict[Path, str] = {}
-_PROGRAMS: dict[Path, list[Path]] = {}
 
 
 def text_of(path: Path) -> str:
@@ -300,12 +303,6 @@ def text_of(path: Path) -> str:
         except OSError:
             _TEXT[path] = ""
     return _TEXT[path]
-
-
-def corpus_programs(root: Path) -> list[Path]:
-    if root not in _PROGRAMS:
-        _PROGRAMS[root] = [p for p in root.rglob("*") if p.suffix.lower() in (".cob", ".cbl")]
-    return _PROGRAMS[root]
 
 
 def test_sources() -> list[Path]:
@@ -369,40 +366,43 @@ def consumers(ix: MapIndex, path: str, base: str | None) -> list[str] | None:
             if f != path and f.endswith(".cs") and pattern.search(text_of(REPO / f))]
 
 
-def corpus_goldens(path: str) -> set[str] | None:
-    """The corpus goldens a file under tests/conformance/ belongs to: itself when it is a program at an edition
-    root, else every program that names its stem (a copybook, a library member, a data file), transitively through
-    support programs. None when no golden names it."""
-    root = REPO / "tests" / "conformance"
-    programs = corpus_programs(root)
-    goldens: set[str] = set()
-    seen: set[str] = set()
-    todo = [Path(path)]
-    while todo:
-        p = todo.pop()
-        stem = p.stem
-        if stem.lower() in seen:
-            continue
-        seen.add(stem.lower())
-        if len(p.parts) == 4 and (root / p.parts[2] / (stem + ".cob")).exists():
-            goldens.add(stem)  # tests/conformance/<edition>/<name>.<ext>: the golden itself or its output/input
-            continue
-        word = re.compile(r"(?<![A-Za-z0-9-])" + re.escape(stem) + r"(?![A-Za-z0-9-])", re.IGNORECASE)
-        for prog in programs:
-            if prog.stem.lower() != stem.lower() and word.search(text_of(prog)):
-                todo.append(prog.relative_to(REPO))
-    return goldens or None
+def suite_tests(path: str) -> set[str] | None:
+    """The conformance-suite tests (by id: the suite runner's rows carry `id: "<id>"`) a file of a clause folder
+    belongs to: the test itself (`<id>.cob`), the test an expected output names (`<id>[.<edition>][.<item>=<value>]
+    .out`, conformance-suite/README.md), or every test of the folder whose header declares the file (`files`, a
+    WiseOwl library folder's `<library>/<file>` included), read by the generator's one header reader. None when no
+    test of the folder claims it."""
+    tree = next(t for t in SUITE_TREES if path.startswith(t))
+    p = Path(path)
+    rel = Path(path[len(tree):]).parts   # (<clause folder>, <file>) or (<clause folder>, <library>, <file>)
+    if len(rel) < 2:
+        return None
+    if len(rel) == 2 and p.suffix.lower() == ".cob":
+        return {p.stem}
+    if len(rel) == 2 and p.suffix == ".out":
+        return {p.name.split(".")[0]}
+    sys.path.insert(0, str(REPO / "conformance-suite" / "harness"))
+    import generate  # noqa: PLC0415  (the suite's one header reader; only a change to a declared file pays for it)
+    declared = "/".join(rel[1:])
+    owners = set()
+    for cob in sorted((REPO / tree / rel[0]).glob("*.cob")):
+        header, _ = generate.read_header(text_of(cob))
+        if header is not None and declared in (header.fields.get("files") or []):
+            owners.add(cob.stem)
+    return owners or None
 
 
-def manifest_entries(path: str, base: str) -> set[str]:
-    """The entries of a corpus manifest the change ADDS (present now, absent at the base)."""
-    def enabled(rev: str | None) -> set[str]:
+def changed_entries(path: str, base: str) -> set[str]:
+    """The entries of a keyed JSON file (`wiseowl/diagnostics.json`, `wiseowl/options.json`: test id -> its entry)
+    that the change ADDS or CHANGES (present now with a value other than the base's); `$`-keys are documentation."""
+    def entries(rev: str | None) -> dict:
         try:
             text = git("show", f"{rev}:{path}") if rev else text_of(REPO / path)
-            return set(json.loads(text).get("enabled", []))
+            return {k: v for k, v in json.loads(text).items() if not k.startswith("$")}
         except (subprocess.CalledProcessError, ValueError, AttributeError):
-            return set()  # absent on that side (an added or deleted manifest)
-    return enabled(HEAD) - enabled(base)
+            return {}  # absent on that side (an added or deleted file)
+    now, then = entries(HEAD), entries(base)
+    return {k for k, v in now.items() if then.get(k) != v}
 
 
 def ancestor_distance(sha: str, base: str) -> int | None:
@@ -520,7 +520,7 @@ def declaration_change(ix: MapIndex, path: str, base: str | None, reach: Reach, 
 
 
 def reach_of(ix: MapIndex | None, changes: list[tuple[str, str]], base: str | None, reach: Reach) -> None:
-    """Fill `reach` for the changed files. The tier-0a facts (added test methods, corpus goldens) come from the diff
+    """Fill `reach` for the changed files. The tier-0a facts (added test methods, suite tests) come from the diff
     alone and are gathered with or without a map; the tiers need the map."""
     sources = None
     for status, path in changes:
@@ -543,22 +543,22 @@ def reach_of(ix: MapIndex | None, changes: list[tuple[str, str]], base: str | No
         if path.startswith("src/"):
             reach.every_tier1.append(f"{path}: a non-C# input under src/ (embedded data or resources)")
             continue
-        if path.startswith("tests/conformance/"):
-            if path.endswith("manifest.json"):
-                if base is None:
-                    reach.notes.append(f"{path}: named without a diff — which entries changed is unknown")
-                else:
-                    added = manifest_entries(path, base)
-                    reach.goldens |= added
-                    reach.notes.append(f"{path}: manifest entries added: {', '.join(sorted(added)) or 'none'}")
+        if path in SUITE_KEYED:
+            if base is None:
+                reach.notes.append(f"{path}: named without a diff — which entries changed is unknown")
             else:
-                goldens = corpus_goldens(path)
-                if goldens is None:
-                    reach.every_tier1.append(f"{path}: corpus data no golden program names — cannot attribute it")
-                else:
-                    reach.goldens |= goldens
-                    reach.notes.append(f"{path}: the golden(s) {', '.join(sorted(goldens))}")
-                continue
+                changed = changed_entries(path, base)
+                reach.goldens |= changed
+                reach.notes.append(f"{path}: entries added or changed: {', '.join(sorted(changed)) or 'none'}")
+            continue
+        if path.startswith(SUITE_TREES):
+            tests = suite_tests(path)
+            if tests is None:
+                reach.every_tier1.append(f"{path}: a suite file no test of its folder declares — cannot attribute it")
+            else:
+                reach.goldens |= tests
+                reach.notes.append(f"{path}: the suite test(s) {', '.join(sorted(tests))}")
+            continue
         if ix is None:
             continue
         if path.startswith("tests/nist/"):
@@ -703,6 +703,15 @@ def self_test() -> int:
     t, reach = tiers_for(["tests/_shared/TestPartitioning.cs"])
     check("a shared test file is compiled into every assembly", set(reach.added_tests) == set(TEST_ASSEMBLIES.values()),
           sorted(reach.added_tests))
+    copy = "conformance-suite/cases/7.2.3-COPY/"
+    got = [suite_tests(copy + f) for f in ("copy-library-text.cob", "copy-library-text.2002.out", "CSCOPY01.cpy",
+                                           "NO-SUCH-TEXT.cpy")]
+    check("a suite file belongs to its test by id: the program, an expected output, a declared file (the header's "
+          "`files`); an undeclared file to none", got == [{"copy-library-text"}, {"copy-library-text"},
+                                                          {"copy-library-text"}, None], got)
+    _, reach = tiers_for([copy + "CSCOPY01.cpy"])
+    check("a declared suite file's test is tier 0a, every other row keeps its tier",
+          reach.goldens == {"copy-library-text"} and not reach.every_tier1, (reach.goldens, reach.every_tier1))
 
     # The method level: the entries a hunk changes (0 = One(), which M1 reached; 1 = Two(), which no test reached),
     # or None for a declaration change, which falls back to the file level.
@@ -797,7 +806,7 @@ def main() -> int:
     counts = {asm: dict(sorted(Counter(t.values()).items())) for asm, t in sorted(a.tiers.items())}
     print(f"impacted_tests: map {a.map_state}; tiers per assembly {counts or '(no map: every test tier 1)'}; "
           f"tier 0a: {len(set().union(*a.reach.added_tests.values()))} added test method(s), {len(a.reach.goldens)} "
-          f"golden(s). The gate runs the WHOLE population in this order (scripts/run_gate_legs.py)")
+          f"suite test(s). The gate runs the WHOLE population in this order (scripts/run_gate_legs.py)")
     return 0
 
 

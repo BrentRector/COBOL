@@ -165,7 +165,7 @@ def pins_of(cell: str) -> list[str]:
     """The test-refs a `Pinned by` cell names — backticks are legibility, not content."""
     if cell.strip() in ('', '—', '-'):
         return []
-    # A ref may carry a trailing gloss OUTSIDE its backticks (`conformance:2023/x` (out-of-range half)); the gloss
+    # A ref may carry a trailing gloss OUTSIDE its backticks (`conformance:cases/14.9.8-COMPUTE/x` (out-of-range half)); the gloss
     # is prose for the reader, not part of the ref, so it is dropped before the ref is compared or resolved.
     refs = [GLOSS_RX.sub('`', p.strip()).strip('`').strip() for p in cell.split(';') if p.strip()]
     return [r for r in refs if r]
@@ -270,7 +270,7 @@ def self_test() -> int:
          [doc_row('unit:CobolDateWindowingTests.SecondsPastMidnight_PinnedClock_ExactTicks')],
          'does not name in'),
         ('an inventory row closing with no §7 row at all is caught',
-         {}, [doc_row('conformance:2023/whatever')], 'no row for item 87'),
+         {}, [doc_row('conformance:cases/14.9.8-COMPUTE/whatever')], 'no row for item 87'),
         ('a NON-spec-derived ref is not required to be named (it can never close a row)',
          {87: []}, [doc_row('nist:IF128A')], None),
         ('a row with no verdict evidence at all is silent',
@@ -312,7 +312,7 @@ def self_test() -> int:
          {70: pins_of('`conformance:cases/_unassigned/pb3017_sdidi_divide_remainder_beyond_the_int128_carrier` (the half)')},
          None),
         ('a pin naming a missing class is caught', {70: ['unit:NoSuchTestClass.Whatever']}, 'no NoSuchTestClass.cs'),
-        ('a pin naming a missing golden is caught', {70: ['conformance:2023/no_such_case_at_all']}, 'does not exist'),
+        ('a pin naming a missing golden is caught', {70: ['conformance:cases/14.9.8-COMPUTE/no_such_case_at_all']}, 'does not exist'),
         ('a pin of an unknown form is caught', {70: ['vibes:it-looked-right']}, 'not a test-ref form'),
     ]
     for name, pins, want in pin_resolution_cases:

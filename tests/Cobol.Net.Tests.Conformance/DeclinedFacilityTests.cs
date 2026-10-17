@@ -9,8 +9,8 @@ namespace CobolNet.Tests.Conformance;
 /// repository that the §4.2.6 recognize-and-warn band fires at all.
 ///
 /// <para>⛔ WHY THESE HAD TO BE WRITTEN AS xUnit FACTS. The negative corpus can only assert a FAILING compile
-/// (<c>CorpusRunnerTests.EnabledNegativeCase_RejectsWithItsDiagnostic</c> asserts <c>ok == false</c> and matches
-/// the <c>.err</c> code), and the positive corpus compares STDOUT only — the fixture header of
+/// (<c>ConformanceSuiteTestsBase{TSlot}.WiseOwlRefusal_RefusesTheSourceWithItsDiagnostic</c> asserts the refusal
+/// and matches its <c>wiseowl/diagnostics.json</c> code), and the positive corpus compares STDOUT only — the fixture header of
 /// <c>2023/wave_h_facilities_inert.cob</c> says in so many words that the warnings "go to the non-failing
 /// compile channel (not stdout)". So COBOLNET1560 / 1578 / 1579 / 1580 had **no assertion mechanism of any
 /// kind**: a repository-wide search found the four codes only inside SOURCE COMMENTS. Every one of them could
@@ -20,7 +20,7 @@ namespace CobolNet.Tests.Conformance;
 ///
 /// <para>The A.4 DATA-DIVISION halves need none of this: COBOLNET1708/1709/1710 are ERRORS (Annex A.4.1 — an
 /// optional element's syntax is accepted only when support is claimed), so they are witnessed by the ordinary
-/// <c>tests/conformance/negative/declined-*</c> corpus.</para>
+/// <c>declined-*</c> refusals of <c>conformance-suite/</c>.</para>
 /// </summary>
 public sealed class DeclinedFacilityTests
 {

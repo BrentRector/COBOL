@@ -18,7 +18,7 @@ A batch file is a JSON list of records, or an object with a "records" list (and 
        {"rule-id": "AR-15.7-1",
         "verdict": "CONFORMS",
         "code-location": "src/Cobol.Net.Compiler/Binder/Intrinsics/IntrinsicSignatures.cs#Abs",
-        "test-ref": "conformance:2023/intrinsic_abs; unit:IntrinsicArgumentRuleTests.Abs_RejectsAlphanumeric",
+        "test-ref": "conformance:cases/15.7-ABS/intrinsic_abs; unit:IntrinsicArgumentRuleTests.Abs_RejectsAlphanumeric",
         "editions": "85,2002,2014,2023",
         "notes": ""}]}
 

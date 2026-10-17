@@ -1,76 +1,45 @@
 #!/usr/bin/env python3
-"""PostToolUse hook — a conformance golden that is not in its manifest is flagged immediately.
+"""PostToolUse hook — a test written under the removed `tests/conformance/` is flagged the moment it is written.
 
-A positive golden must be listed in its edition directory's manifest.json ("enabled" or "pending"); a negative
-golden must be listed in tests/conformance/negative/manifest.json. An unregistered golden never runs AND fails the
-manifest-integrity test — but only at the COMPREHENSIVE gate, never at the per-commit wave-local run. That delay is
-why it has bitten twice in one session.
+The corpus moved into the conformance suite (kb/Work PB3177, docs/rearchitecture/DESIGN-conformance-suite.md §13
+S2): a test is a program in a clause folder of `conformance-suite/cases/` (or `wiseowl/cases/`) whose header the
+generator reads, and there is no manifest to register it in. A file under `tests/conformance/` would never run, so the
+generator refuses it (`conformance-suite/harness/generate.py --check`, a gate audit that runs before the build); this
+hook says so at the write instead of at the gate, naming where the test belongs. The refusal is the generator's; this
+is only its early echo.
 
-Read-only. Silent when the golden is registered or the file is unrelated.
+Read-only. Silent for every other file.
 """
 import json
 import pathlib
 import sys
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
-CORPUS = REPO / "tests" / "conformance"
-GOLDEN_SUFFIXES = {".cob", ".out", ".err"}
+REMOVED = REPO / "tests" / "conformance"
 
 
-def bail() -> None:
-    sys.exit(0)
+def main() -> int:
+    try:
+        data = json.load(sys.stdin)
+    except Exception:  # noqa: BLE001 - not a hook payload: nothing to say
+        return 0
+    ti = data.get("tool_input") or {}
+    tr = data.get("tool_response") or {}
+    raw = tr.get("filePath") or ti.get("file_path") or ""
+    if not raw:
+        return 0
+    try:
+        rel = pathlib.Path(raw).resolve().relative_to(REMOVED.resolve())
+    except ValueError:
+        return 0
+    json.dump({"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": (
+        f"tests/conformance/{rel.as_posix()} is under the REMOVED corpus tree (kb/Work PB3177): it never runs, and "
+        f"`python conformance-suite/harness/generate.py --check` (a gate audit) refuses it. Move the test into "
+        f"conformance-suite/cases/<ISO clause>-<Name>/ with its metadata header (conformance-suite/README.md, "
+        f"'Adding a test'); a negative is a refusal entry in conformance-suite/wiseowl/diagnostics.json.")}},
+        sys.stdout)
+    return 0
 
 
-try:
-    data = json.load(sys.stdin)
-except Exception:  # noqa: BLE001
-    bail()
-
-ti = data.get("tool_input") or {}
-tr = data.get("tool_response") or {}
-raw = tr.get("filePath") or ti.get("file_path") or ""
-if not raw:
-    bail()
-
-path = pathlib.Path(raw)
-if path.suffix not in GOLDEN_SUFFIXES:
-    bail()
-
-try:
-    rel = path.resolve().relative_to(CORPUS.resolve())
-except Exception:  # noqa: BLE001 - not under tests/conformance
-    bail()
-
-if len(rel.parts) < 2:
-    bail()
-
-subdir = rel.parts[0]
-manifest = CORPUS / subdir / "manifest.json"
-if not manifest.exists():
-    bail()
-
-try:
-    doc = json.loads(manifest.read_text(encoding="utf-8"))
-except Exception:  # noqa: BLE001
-    bail()
-
-listed = set(doc.get("enabled") or []) | set(doc.get("pending") or [])
-name = path.stem
-if name in listed:
-    bail()
-
-where = "tests/conformance/negative/manifest.json" if subdir == "negative" else f"tests/conformance/{subdir}/manifest.json"
-json.dump(
-    {
-        "hookSpecificOutput": {
-            "hookEventName": "PostToolUse",
-            "additionalContext": (
-                f"Golden '{name}' is NOT listed in {where}. Register it in the SAME commit (add to \"enabled\", or "
-                f"\"pending\" if its feature has not landed) — an unregistered golden never runs AND fails the "
-                f"manifest-integrity test at the comprehensive gate, long after the wave-local gate said green. "
-                f"Note: negative goldens use their own manifest, separate from the per-edition ones."
-            ),
-        }
-    },
-    sys.stdout,
-)
+if __name__ == "__main__":
+    sys.exit(main())
