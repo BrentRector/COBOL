@@ -252,7 +252,7 @@ public sealed class TypedAndUniversalInvokeVerdictsAgreeDriftTests
         "the argument is described with PICTURE 9(6) where the formal parameter is described with PICTURE 9(4)")]
     public void ARefusal_SpellsItsClauses_NeverAnIdentityKey(string negative, string argument, string difference)
     {
-        var r = CompilerDriver.Compile(new CompilerDriver.Options(TestRepo.Tests("conformance", "negative", negative),
+        var r = CompilerDriver.Compile(new CompilerDriver.Options(TestRepo.SuiteCase(Path.GetFileNameWithoutExtension(negative)),
             Path.Combine(Path.GetTempPath(), "CobolNet_PB2077_" + Guid.NewGuid().ToString("N")[..8] + ".dll"),
             DialectLevel: 2023, CheckOnly: true, SourceFormat: InitialReferenceFormat.Auto));
         var refusals = r.Errors.Where(e => e.Contains("COBOLNET0828", StringComparison.Ordinal)

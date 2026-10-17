@@ -128,13 +128,13 @@ internal static class ConformanceSuiteRunner
                 : throw new SuiteHarnessException($"the profile states no value of Annex A.1 item {item}")));
         if (!test.ExpectedOutput.TryGetValue(key, out string? expectedPath))
             throw new SuiteHarnessException($"the manifest has no expected output for {(key.Length == 0 ? "no A.1 value" : key)}");
-        string expected = CutRunner.Normalize(File.ReadAllText(Path.Combine(ConformanceSuite.Root, expectedPath)));
+        string expected = CutRunner.Normalize(File.ReadAllText(Path.Combine(SuiteManifest.Root, expectedPath)));
         return stdout == expected ? new(Pass, "") : new(Fail, Difference(expected, stdout, expectedPath));
     }
 
     private static SuiteResult Flagged(string edition, SuiteTest test, string work)
     {
-        if (test.Control is null || !ConformanceSuite.Manifest.Editions[edition].TryGetValue(test.Control, out SuiteTest? control))
+        if (test.Control is null || !SuiteManifest.Manifest.Editions[edition].TryGetValue(test.Control, out SuiteTest? control))
             throw new SuiteHarnessException($"its control {test.Control} is not a test of the {edition} manifest");
         CompilerDriver.Options flagOptions = FlagOptions(test, edition, work);
         var (compiled, crash) = Compile(AcceptOptions(control, edition, Path.Combine(work, "control")));
@@ -168,7 +168,7 @@ internal static class ConformanceSuiteRunner
             string name = Path.GetRelativePath(folder, declared).Replace('\\', '/');
             if (name == sourceName)
                 throw new SuiteHarnessException($"its declared file {declared} has the name the harness gives its source");
-            byte[] bytes = File.ReadAllBytes(Path.Combine(ConformanceSuite.Root, declared));
+            byte[] bytes = File.ReadAllBytes(Path.Combine(SuiteManifest.Root, declared));
             string to = Path.Combine(work, name);
             Directory.CreateDirectory(Path.GetDirectoryName(to)!);
             File.WriteAllBytes(to, bytes);
@@ -177,7 +177,7 @@ internal static class ConformanceSuiteRunner
         string compileDir = Path.Combine(work, "compile");
         Directory.CreateDirectory(compileDir);
         return CompiledProgramCache.StageSource(Path.Combine(compileDir, sourceName),
-            File.ReadAllText(Path.Combine(ConformanceSuite.Root, source)), companions);
+            File.ReadAllText(Path.Combine(SuiteManifest.Root, source)), companions);
     }
 
     /// <summary>The compile of <paramref name="source"/> the adapter's <c>compile</c> (or, with <paramref name="flag"/>,

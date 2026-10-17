@@ -335,11 +335,11 @@ public sealed class CompiledProgramCacheDriftTests : IDisposable
     public void TheOutputDirectory_DoesNotReachTheOutput()
     {
         var sources = new List<CompilerDriver.Options>();
-        foreach (object[] row in ConformanceSuite.Tests())
+        foreach (object[] row in SuiteManifest.Tests())
         {
-            SuiteTest test = ConformanceSuite.Manifest.Editions[(string)row[0]][(string)row[1]];
+            SuiteTest test = SuiteManifest.Manifest.Editions[(string)row[0]][(string)row[1]];
             if (test.Expect != "accept") continue;
-            string text = File.ReadAllText(Path.Combine(ConformanceSuite.Root, test.Source));
+            string text = File.ReadAllText(Path.Combine(SuiteManifest.Root, test.Source));
             if (!Regex.IsMatch(text, "EXCEPTION-LOCATION|DEBUG-ITEM|DEBUG-LINE", RegexOptions.IgnoreCase)) continue;
             CompilerDriver.Options staged = ConformanceSuiteRunner.AcceptOptions(test, (string)row[0], Path.Combine(_dir, "suite", test.Id));
             sources.Add(staged with { OutputPath = "x.dll" });

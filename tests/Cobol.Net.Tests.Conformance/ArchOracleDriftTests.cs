@@ -85,10 +85,10 @@ public sealed class ArchOracleDriftTests
     {
         var population = ArchOracle.Population().ToDictionary(c => c.Id, StringComparer.Ordinal);
         string Positive(string text) => population.Keys.First(id => id.Split('/') is ["suite", var edition, var test]
-            && File.ReadAllText(Path.Combine(ConformanceSuite.Root, ConformanceSuite.Manifest.Editions[edition][test].Source))
+            && File.ReadAllText(Path.Combine(SuiteManifest.Root, SuiteManifest.Manifest.Editions[edition][test].Source))
                 .Contains(text));
         string missingLibrary = population.Keys.First(id => id.StartsWith("refusal/", StringComparison.Ordinal)
-            && ConformanceSuite.Manifest.Refusals[id["refusal/".Length..].Split('@')[0]].Expect.Contains("CBL3620"));
+            && SuiteManifest.Manifest.Refusals[id["refusal/".Length..].Split('@')[0]].Expect.Contains("CBL3620"));
 
         string[] machineSpecific = [TestRepo.Root, Path.GetTempPath()];
         foreach (string id in new[] { Positive("EXCEPTION-LOCATION"), Positive("WHEN-COMPILED"), missingLibrary })

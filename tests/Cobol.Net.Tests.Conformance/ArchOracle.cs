@@ -109,7 +109,7 @@ public static class ArchOracle
     private static IEnumerable<OracleCase> SuiteTestCase(object[] row)
     {
         var (edition, id) = ((string)row[0], (string)row[1]);
-        SuiteTest test = ConformanceSuite.Manifest.Editions[edition][id];
+        SuiteTest test = SuiteManifest.Manifest.Editions[edition][id];
         yield return new($"suite/{edition}/{id}", $"suite/{edition}", () => InScratch(dir => CompiledProgramCache.Compile(
             test.Expect == "accept" ? ConformanceSuiteRunner.AcceptOptions(test, edition, dir)
                 : ConformanceSuiteRunner.FlagOptions(test, edition, dir))));
@@ -119,7 +119,7 @@ public static class ArchOracle
     private static IEnumerable<OracleCase> SuiteRefusalCase(object[] row)
     {
         var (id, edition) = ((string)row[0], (string)row[1]);
-        SuiteRefusal refusal = ConformanceSuite.Manifest.Refusals[id];
+        SuiteRefusal refusal = SuiteManifest.Manifest.Refusals[id];
         yield return new($"refusal/{id}@{edition}", "refusal", () => InScratch(dir =>
             CompiledProgramCache.Compile(ConformanceSuiteRunner.RefusalOptions(refusal, edition, dir))));
     }

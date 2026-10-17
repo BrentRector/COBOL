@@ -141,8 +141,7 @@ public sealed class IntrinsicArgumentClassDriftTests
     [Fact]
     public void ThePb1NegativeFixtures_ExistAndAreRegistered()
     {
-        string manifest = File.ReadAllText(
-            TestRepo.Tests("conformance", "negative", "manifest.json"));
+        var refusals = SuiteManifest.Manifest.Refusals;
         foreach (string name in new[]
                  {
                      "pb1-numeric-arg-alphanumeric",       // 's'-shaped rule violated by a numeric operand
@@ -150,10 +149,9 @@ public sealed class IntrinsicArgumentClassDriftTests
                      "pb1-numeric-arg-numeric-edited",     // the §8.5.2.1 Table-2 row that reads the other way
                  })
         {
-            Assert.True(File.Exists(TestRepo.Tests("conformance", "negative", name + ".cob")), $"{name}.cob missing");
-            Assert.True(File.Exists(TestRepo.Tests("conformance", "negative", name + ".err")), $"{name}.err missing");
-            Assert.True(manifest.Contains(name, StringComparison.Ordinal),
-                $"{name} is not in tests/conformance/negative/manifest.json — it would never run");
+            Assert.True(File.Exists(TestRepo.SuiteCase(name)), $"{name}.cob missing");
+            Assert.True(refusals.ContainsKey(name),
+                $"{name} has no entry in conformance-suite/wiseowl/diagnostics.json — it would never be refused");
         }
     }
 

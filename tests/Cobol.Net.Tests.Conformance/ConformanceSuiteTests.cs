@@ -34,13 +34,13 @@ public abstract class ConformanceSuiteTestsBase<TSlot>
     public const int Partitions = 24;
 
     [PartitionedRowSource(nameof(Tests))]
-    public static IEnumerable<object[]> AllTests() => ConformanceSuite.Tests();
+    public static IEnumerable<object[]> AllTests() => SuiteManifest.Tests();
 
     /// <summary>This partition's share of the suite's tests.</summary>
     public static IEnumerable<object[]> Tests() => TestPartitioning.SliceRows<TSlot>(AllTests(), Partitions);
 
     [PartitionedRowSource(nameof(Refusals))]
-    public static IEnumerable<object[]> AllRefusals() => ConformanceSuite.Refusals();
+    public static IEnumerable<object[]> AllRefusals() => SuiteManifest.Refusals();
 
     /// <summary>This partition's share of the refusals.</summary>
     public static IEnumerable<object[]> Refusals() => TestPartitioning.SliceRows<TSlot>(AllRefusals(), Partitions);
@@ -49,7 +49,7 @@ public abstract class ConformanceSuiteTestsBase<TSlot>
     [MemberData(nameof(Tests))]
     public void SuiteTest_IsNoWorseThanItsVerdictAllows(string edition, string id)
     {
-        SuiteTest test = ConformanceSuite.Manifest.Editions[edition][id];
+        SuiteTest test = SuiteManifest.Manifest.Editions[edition][id];
         SuiteResult result = ConformanceSuiteRunner.Judge(edition, test);
         Assert.True(result.Verdict is ConformanceSuiteRunner.Pass or ConformanceSuiteRunner.NotApplicable,
             $"[{edition}/{test.Clause}/{id}] {result.Verdict}: {result.Reason}");
@@ -59,7 +59,7 @@ public abstract class ConformanceSuiteTestsBase<TSlot>
     [MemberData(nameof(Refusals))]
     public void WiseOwlRefusal_RefusesTheSourceWithItsDiagnostic(string id, string edition)
     {
-        SuiteRefusal refusal = ConformanceSuite.Manifest.Refusals[id];
+        SuiteRefusal refusal = SuiteManifest.Manifest.Refusals[id];
         CompilerDriver.Result result = ConformanceSuiteRunner.CompileRefusal(refusal, edition);
         Assert.True(result.Status is CompilerDriver.Outcome.FrontendError or CompilerDriver.Outcome.BindError,
             $"[{edition}/{id}] must be REFUSED by the front end or the binder at --std {edition}; the compile ended "
@@ -152,7 +152,7 @@ public sealed class ConformanceSuiteTests
     [Fact]
     public void TheAlternativeSignConventionTest_CarriesItsWiseOwlOption()
     {
-        SuiteTest test = ConformanceSuite.Manifest.Editions["2023"]["pb803_sign_encoding_ascii"];
+        SuiteTest test = SuiteManifest.Manifest.Editions["2023"]["pb803_sign_encoding_ascii"];
         Assert.Equal("ascii", test.Options["sign-encoding"]);
         Assert.Equal(ConformanceSuiteRunner.Pass, ConformanceSuiteRunner.Judge("2023", test).Verdict);
     }
