@@ -265,8 +265,8 @@ public sealed record BoundReportVaryingRef(string CsName) : BoundExpr;
 /// with <paramref name="PositionsPerCharacter"/> positions to a character (8) so the extent rounds up to whole
 /// characters (<c>CobolTable.OdoExtentChars</c>, the image channel's rounding), or 1 when the positions ARE the
 /// answer (a bit group's LENGTH in boolean positions, §15.50.4 r1). <paramref name="TrailingWidth"/> is the padding of
-/// the table's LAST occurrence that its <paramref name="ElemWidth"/> stride counts and its extent does not (an ALIGNED
-/// bit table's, §13.18.1.4 GR2; <c>BitLayout.TrailingFillerBits</c>): given back once an occurrence exists, so the
+/// the table's LAST occurrence that its <paramref name="ElemWidth"/> stride counts and its extent does not (a bit table's
+/// with an ALIGNED subject or member, §13.18.1.4 GR2; <c>BitLayout.TrailingFillerBits</c>): given back once an occurrence exists, so the
 /// answer is the one the same table fixed at that many occurrences has (kb/Work PB3156).</summary>
 public sealed record BoundOdoExtent(Place Depending, int MinOccurs, int MaxOccurs, int FixedWidth, int ElemWidth,
     int TrailingWidth, int PositionsPerCharacter = 1) : BoundExpr

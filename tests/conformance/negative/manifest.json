@@ -1004,6 +1004,7 @@
   "pb132-call-vlg-argument",
   "pb132-call-bit-unaligned",
   "pb3158-call-bit-unaligned-after-aligned",
+  "pb3167-redefines-group-first-item-aligned",
   "pb132-call-bit-variable-subscript",
   "pb132-call-byvalue-index-name",
   "pb132-call-byvalue-implied-class",
@@ -2746,7 +2747,10 @@
   "pb3233-inspect-symbolic-literal1-size",
   "pb3254-sort-in-inverted-section-sort-procedure-first",
   "pb3254-sort-in-inverted-section-sort-procedure-last",
-  "pb3254-merge-in-inverted-section-sort-procedure"
+  "pb3254-merge-in-inverted-section-sort-procedure",
+  "pb3191-numeric-constant-name-as-condition",
+  "pb3191-numeric-constant-name-boolean-operand",
+  "pb3191-boolean-constant-name-length-two-condition"
  ],
  "pending": []
 }

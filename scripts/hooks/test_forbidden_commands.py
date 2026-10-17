@@ -4,6 +4,7 @@
 A guard hook is a gate, and a gate is only trusted once its failure branch has fired (feedback: prove the watchdog
 fails). Run: python scripts/hooks/test_forbidden_commands.py   (every gate and CI run it through scripts/self_tests.py.)
 """
+import base64
 import json
 import os
 import pathlib
@@ -12,6 +13,12 @@ import sys
 
 HOOK = pathlib.Path(__file__).with_name("forbidden_commands.py")
 BS = chr(92)  # a backslash, spelled without one
+NL = chr(10)
+# kb/Work PB3198: every rule reads the ONE model of the command line (shell_location.steps), so each rule is checked
+# AFTER a heredoc (the rules that scanned only the text before the first `<<` passed these) and after a QUOTED `<<`
+# (which made the rest of the line a "heredoc body" for the rules that did not).
+HD = "cat > m.txt <<'EOF'" + NL + "hello" + NL + "EOF" + NL
+QS = 'python -c "print(1<<2)"; '
 
 CASES = [
     # (command, expect_block)
@@ -64,6 +71,13 @@ CASES = [
     ("sed -n 17,20p scripts/orchestrator/enqueue.py && head -3 x.txt", False),
     ("git add -- .github/workflows/build-and-test.yml && git commit -q -m x", False),
     ("pwsh -NoProfile -File scripts/build-local.ps1 > b.log 2>&1; git status", True),
+    # the repros of kb/Work PB1725 and PB1736: a read-only command whose ARGUMENTS name a verdict command or script
+    ('grep -n "dotnet test" scripts/x.sh; echo ---', False),
+    ('sed -i "s/x/overlaps battery.sh/" STATUS.md; git add -A', False),
+    ("cat scripts/build-local.ps1; echo", False),
+    ("git ls-tree HEAD scripts/linux-gate.sh scripts/build-local.sh; git ls-tree HEAD x", False),
+    ("grep -rlE 'x|build-local.ps1' kb/Work | head; echo", False),
+    ("pwsh scripts/build-local.ps1 -Priority BelowNormal; git commit -m x", True),
     ("python scripts/orchestrator/enqueue.py land b > l.log 2>&1 && git log -1", True),
     # 5b'. the chain is read by the SHARED parser (review R1-1's sibling): a comment's apostrophe, an escaped quote or a
     # heredoc before the chain no longer hides it
@@ -111,6 +125,98 @@ CASES = [
     ("bash -c 'cd /e/x && a & b'", True),                                # a -c payload is a command line
     ("(cd /e/x && a) & b", False),                                       # the subshell already scopes the cd
     ("{ cd /e/x; a; } & b", True),                                       # a { } group is in the backgrounded list
+    # PB3198: every rule after a heredoc, after a quoted `<<`, and silent on its words inside a body or a quote
+    (HD + "git stash", True),
+    (QS + "git stash", True),
+    ("cat > m.txt <<'EOF'" + NL + "git stash" + NL + "EOF" + NL + "git status", False),   # the body is text
+    ('git commit -m "never git stash"', False),                          # so is a quoted message
+    (HD + "git pull --autostash", True),
+    ("git -c rebase.autoStash=true rebase origin/main", True),           # autostash switched on through -c
+    ("git -c rebase.autostash=false rebase origin/main", False),
+    (HD + "git push origin main", True),
+    (QS + "git push origin HEAD:main", True),
+    ("git push origin +HEAD:main", True),                                # a forced refspec is still main
+    ("git push origin +main", True),
+    ("cd /e/claude-skills && git push origin x; git -C /e/COBOL push origin main", True),   # each push in its own dir
+    ("cat > m.txt <<'EOF'" + NL + "git push origin main" + NL + "EOF" + NL + "git status", False),
+    (QS + 'printf "a' + BS + 'n"', False),                               # a quoted `<<` is no heredoc: no body
+    (HD + 'printf "a' + BS + 'n"', False),                               # the command after a body is no body
+    ("bash -c 'cat' <<'EOF'" + NL + "a" + BS + "nb" + NL + "EOF", True),  # a body feeding a -c payload is a body
+    (HD + 'dotnet test x.csproj --filter "~Foo" > log.txt', True),
+    (QS + 'dotnet test x.csproj --filter "~Foo" > log.txt', True),
+    (HD + 'dotnet test x.csproj --filter "FullyQualifiedName~Foo"', True),   # unredirected, after a heredoc
+    ('dotnet test x.csproj --filter=~Foo > log.txt', True),
+    ('dotnet test x.csproj --filter "FullyQualifiedName~Foo" & echo x > y.txt', True),  # another command's redirect
+    ('git commit -m "dotnet test --filter ~X"', False),                  # quoted text is no test run
+    (QS + "dotnet build x.sln > b.log && git commit -m x", True),
+    (HD + "wsl --shutdown", True),
+    (QS + "wsl --shutdown", True),
+    ("cat > m.txt <<'EOF'" + NL + "wsl --shutdown" + NL + "EOF", False),
+    (HD + "cd /e/x && a & b", True),
+    (QS + "cd /e/x && a & b", True),
+    # a heredoc a shell reads as its script is a command line, so every rule reads it (the w1098c lead)
+    ("bash <<'EOF'" + NL + "git stash" + NL + "EOF", True),
+    ("bash -s <<'EOF'" + NL + "git push origin main" + NL + "EOF", True),
+    ("sh <<'EOF'" + NL + 'dotnet test x.csproj --filter "~Foo" > log.txt' + NL + "EOF", True),
+    ("pwsh -NoProfile -Command - <<'EOF'" + NL + "git stash" + NL + "EOF", True),
+    ("bash run.sh <<'EOF'" + NL + "git stash" + NL + "EOF", False),   # stdin of a script is that script's data
+    # the branch review of PB3198, R1-1: a command substitution is a command line, in a word or inside double quotes
+    ("x=$(git stash)", True),
+    ("echo `git stash`", True),
+    ('echo "$(git stash)"', True),
+    ("cat <(git stash)", True),
+    ("x=$(git stash list)", False),
+    ("r=$(git push origin HEAD:main 2>&1)", True),
+    ('r=$(dotnet test x.csproj --filter "~Foo")', True),
+    ("git commit -m \"$(cat <<'EOF'" + NL + "fix a" + BS + "nb" + NL + "EOF" + NL + ')"', True),   # the commit shape
+    ("git commit -m \"$(cat <<'EOF'" + NL + "fix a" + NL + "EOF" + NL + ')"', False),
+    # a quote or a bracket in the body never ends the substitution, so the command after it is still read
+    ("git commit -m \"$(cat <<'EOF'" + NL + 'say "hi" (and \') too' + NL + "EOF" + NL + ')" && git stash', True),
+    ("git commit -m \"$(cat <<'EOF'" + NL + 'say "hi" (and \') too' + NL + "EOF" + NL + ')" && git status', False),
+    ("dotnet test x.csproj > t.log 2>&1; echo \"EXIT=$? $(date)\"", False),   # a substitution is its echo's own
+    ('dotnet test x.csproj --filter "FullyQualifiedName~X" | tail $(echo -5)', False),   # the reader is still tail
+    # R2-1: a `dotnet test` inside a substitution pipes to the next stage OF THAT SUBSTITUTION, and the reader's own
+    # substitution (one level deeper) is never the reader
+    ('r=$(dotnet test x.csproj --filter "FullyQualifiedName~Foo" | tail -5)', False),
+    ("bash -c 'r=$(dotnet test x.csproj --filter FullyQualifiedName~Foo | tail -5)'", False),
+    ('r=$(dotnet test x.csproj --filter "FullyQualifiedName~Foo" | grep $(echo Passed))', False),
+    ('r=$(dotnet test x.csproj --filter "FullyQualifiedName~Foo" | sort)', True),       # piped, but not to a reader
+    ('r=$(dotnet test x.csproj --filter "FullyQualifiedName~Foo" | sort $(echo x | tail -1))', True),  # tail is sort's
+    ('dotnet test x.csproj --filter "FullyQualifiedName~Foo" | ( tail -5 )', False),    # a grouped reader is a reader
+    # a group is a pipeline stage: it reads the stage before it, and the stage after it reads the group
+    ("( echo 'git stash' ) | bash", True),
+    ("echo 'git stash' | ( bash )", True),
+    ("echo 'git stash list' | ( bash )", False),
+    # R3-1: reading a pipe never makes a group's FIRST command a pipeline side, so its cd moves the group's later steps
+    # (at ff8f1c01b the first two passed, a push to this repository's main, and the third was a false block)
+    ("cd /e/claude-skills; echo y | ( cd /e/COBOL && git push origin HEAD:main )", True),
+    ("cd /e/claude-skills; true | { cd /e/COBOL; git push origin main; }", True),
+    ("echo y | ( cd /e/claude-skills && git push -q origin main )", False),
+    # and the group's stdin reaches each of its commands, a -c payload's and a substitution's
+    ("echo 'git stash' | ( cd /e/W; bash )", True),
+    ("echo 'git stash list' | ( cd /e/W; bash )", False),
+    ("echo 'git stash' | bash -c 'cd /e/W; bash'", True),
+    ("echo 'git stash' | x=$(bash)", True),
+    # R1-2: every other way a shell is handed a command line as a string or through stdin
+    ('eval "git stash"', True),
+    ('eval "git stash list"', False),
+    ('cmd /c "git stash"', True),
+    ('cmd //c "git push origin main"', True),
+    ('cmd /c "cd /d E:/COBOL & git push origin main"', True),
+    ('cmd /c "cd /d E:/claude-skills & git push origin main"', False),      # another repository, read as cmd.exe does
+    ("echo 'git stash' | bash", True),
+    ("printf 'git stash" + BS + "n' | sh", True),
+    ("cat <<EOF | bash" + NL + "git stash" + NL + "EOF", True),
+    ("echo 'git stash' | grep stash", False),                              # piped into a reader, not a shell
+    ("cat run.sh | bash", False),                                          # what a file holds is not this line's
+    ('bash <<< "git stash"', True),
+    ('grep x <<< "git stash"', False),
+    ("timeout 5 bash -c 'git stash'", True),                               # behind a command that runs another
+    ("env A=1 sh -c 'git stash'", True),
+    ("xargs -n1 sh -c 'git stash' < x.txt", True),
+    ("wsl -d Ubuntu -e bash -lc 'git stash'", True),
+    ("bash -euc 'git stash'", True),                                       # `-c` among single-letter options
+    ("bash -C run.sh", False),                                             # `-C` is noclobber, not a payload
 ]
 
 
@@ -124,6 +230,33 @@ PS_CASES = [
     ("git stash", True),
     ("Set-Location E:/x && a & b", True),                                # the same backgrounded list in PowerShell 7
     ("Set-Location E:/x; & pwsh -File y.ps1", False),                    # `&` that starts a command is the call operator
+    ("& git stash pop", True),                                           # the call operator before git (PB3198)
+    ("git commit -m 'never git stash'", False),
+    # the branch review of PB3198: PowerShell's subexpressions, expressions and script blocks are command lines
+    ("echo $(git stash)", True),
+    ('Write-Output "x $(git stash)"', True),
+    ("Write-Output (git stash)", True),
+    ("Get-ChildItem | ForEach-Object { git stash }", True),
+    ("if ($x) { git stash }", True),
+    # R3-1's PowerShell forms: a script block reading the pipeline runs in this runspace, so its Set-Location moves it
+    ("Set-Location E:/claude-skills; 'y' | & { Set-Location E:/COBOL; git push origin main }", True),
+    ("Set-Location E:/claude-skills; 'y' | ForEach-Object { Set-Location E:/COBOL; git push origin main }", True),
+    ("'y' | & { Set-Location E:/claude-skills; git push origin main }", False),
+    ("$m = (git log -1 --format=%s)", False),
+    ("Write-Output 'git stash'", False),
+    # R2-1: a filtered run inside an expression or subexpression pipes to the reader beside it
+    ('$r = (dotnet test x.csproj --filter "FullyQualifiedName~Foo" | Select-String Passed)', False),
+    ('$r = $(dotnet test x.csproj --filter "FullyQualifiedName~Foo" | Select-String Passed)', False),
+    ('$r = (dotnet test x.csproj --filter "FullyQualifiedName~Foo" | Sort-Object)', True),
+    # and every interpreter handed a string
+    ('Invoke-Expression "git stash"', True),
+    ("iex 'git stash'", True),
+    ("'git stash' | Invoke-Expression", True),
+    ("'git stash' | Write-Output", False),
+    ("& pwsh -NoProfile -c 'git stash'", True),
+    ('cmd /c "git stash"', True),
+    ("pwsh -EncodedCommand " + base64.b64encode("git stash".encode("utf-16-le")).decode(), True),
+    ("pwsh -EncodedCommand " + base64.b64encode("git status".encode("utf-16-le")).decode(), False),
 ]
 
 
@@ -164,6 +297,12 @@ UNIT_CASES = [
      + "git commit -q -F ../m.txt; git push -q origin HEAD:main", True),
     ("cat > ../m.txt <<'EOF'" + chr(10) + "the unit ran git push -q origin HEAD:main" + chr(10) + "EOF" + chr(10)
      + "git commit -q -F ../m.txt", False),                                    # the word inside the heredoc BODY is text
+    (QS + "git push", True),                                                   # a quoted `<<` hides nothing (PB3198)
+    ("git commit -q -m 'x' && xargs -n1 git push origin < refs.txt", True),    # git wherever it stands in the step
+    # the branch review of PB3198, R1-1: a push inside a command substitution is a push
+    ("out=$(git -C /e/claude-skills push origin main 2>&1)", True),
+    ("out=$(git push -q origin HEAD:main 2>&1)", True),
+    ("echo `git push`", True),
 ]
 
 fails =[(c, e) for c, e in CASES if blocked(c) != e]

@@ -131,7 +131,7 @@ CONVENTIONS = {
                 "is live).",
     "citation-check": "python scripts/spec/cite.py --check <clause> \"<quoted text>\"  — every § you cite, no exceptions.",
     "record-shape": "{'rule-id','verdict','code-location','test-ref','editions','notes'} — strings only; editions as "
-                    "\"85,2002,2014,2023\".",
+                    "\"85,2002,2014,2023\" (ascending, no spaces: the one spelling record_verdicts.py accepts).",
 }
 
 index = []

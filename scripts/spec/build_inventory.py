@@ -23,7 +23,8 @@ Row schema (one per rule):
     state                                    derived — never written by hand; the GAP count is what session-probe
                                              reports and what v1.0 is defined against
     verdict / code-location / test-ref /     the adjudicated fields, preserved across every rebuild;
-      editions / notes                       their vocabulary and requirements live in inventory-schema.json
+      derivation / editions / notes          their vocabulary and requirements live in inventory-schema.json
+                                             (`editions` is carried in its one spelling, `Schema.spell_editions`)
 """
 from __future__ import annotations
 
@@ -79,6 +80,8 @@ def main() -> int:
             prior[row["rule-id"]] = row
 
     out: list[dict] = []
+    respelled: list[str] = []
+    unspellable: list[str] = []
     for r in rules:
         row = {
             "rule-id": r["id"], "section": r["section"], "kind": r["kind"], "ordinal": r["ordinal"],
@@ -90,6 +93,18 @@ def main() -> int:
             for k in CARRIED:
                 if old.get(k):
                     row[k] = old[k]
+        # ⚖ A carried `editions` is WRITTEN in its one spelling (`Schema.spell_editions`, kb/Work PB3172), so a
+        # rebuild on any tree — a merge that brought in a row recorded before PB3172 — leaves the field in the form
+        # the validator accepts. Only the spelling moves; an edition the schema lacks or names twice is a claim
+        # to correct through a record_verdicts batch, so it stops the rebuild instead.
+        if carried_editions := row["editions"]:
+            try:
+                row["editions"] = schema.spell_editions(schema.split(carried_editions, schema.editions_sep))
+            except ValueError as e:
+                unspellable.append(f"{r['id']}: {e}")
+            else:
+                if row["editions"] != carried_editions:
+                    respelled.append(r["id"])
         row["state"] = schema.state_for(row)
         out.append(row)
 
@@ -125,6 +140,16 @@ def main() -> int:
         print("   record_verdicts batch, or move it to the id that now carries its text (kb/Work PB698):")
         for rid in drifted:
             print(f"       {rid}")
+
+    if respelled:
+        print(f"\n  editions respelled: {len(respelled)} carried row(s) written in the one spelling "
+              f"(kb/Work PB3172), e.g. {', '.join(respelled[:5])}")
+    if unspellable:
+        print(f"\n⛔ {len(unspellable)} CARRIED `editions` FIELD(S) NAME AN EDITION THE SCHEMA LACKS, OR ONE TWICE —"
+              f" nothing is written; correct each through a record_verdicts batch:")
+        for u in unspellable:
+            print(f"       {u}")
+        return 1
 
     if args.check:
         return 1 if drifted else 0
