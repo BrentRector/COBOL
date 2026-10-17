@@ -1,4 +1,4 @@
-## PB3293: a CLDR reset, extension or prefix string is read by the one S2.1 walk over the rules built so far
+## Entry 2127 — 2026-10-16 18:12 PDT — PB3293: a CLDR reset, extension or prefix string is read by the one S2.1 walk over the rules built so far
 
 **Mechanism.** `CldrTailoringBuilder.Builder.Lookup` read the current elements of a reset string (`&X`), an extension
 (`x/y`) and a prefix (`p|x`) by whole key: an exact tailored entry, else the root's `GetElements(ReadOnlySpan<int>)`,
@@ -38,3 +38,4 @@ edition-gated construct.
 
 **Rows.** None: PB3293 claimed no inventory row (the ISO rows, §12.3.7.4 GR7 e and §8.8.4.2.11, defer the order to
 the locale); `closes_rows: []` with its reason.
+
