@@ -225,6 +225,17 @@ public sealed partial class ReferenceResolver(DataBinder data)
                 + "that uniquely identifies that resource\").");
             return;
         }
+        // A DECLARED CONSTANT-NAME IS NOT UNDEFINED EITHER (kb/Work PB3287). A constant-name is in no name table the
+        // lookup above reads (§13.10.4 GR1 substitutes its literal), so a position that needs a data item and was
+        // handed one — `ADDRESS OF C` — used to be told "not defined", about a name the CONSTANT entry declares.
+        if (qualifiers.Count == 0 && data.IsConstantName(name) && !data.Symbols.TryResolve(name, data.ActiveScope, out _))
+        {
+            data.Edition.Error(DiagnosticCatalog.UndefinedReference,
+                $"'{text}' is declared as a constant-name (a CONSTANT entry, ISO §13.10), not as a data item, so this "
+                + "reference identifies no data item (ISO §8.4.2.1: \"a statement shall contain a reference that "
+                + "uniquely identifies that resource\").");
+            return;
+        }
         // ⛔ A DECLARED INDEX-NAME IS NOT UNDEFINED (kb/Work PB1266 — the resolver-level twin of SetBinder's
         // PB388 screen). The data symbol table holds no index-name, so `ADD 1 TO IX` and `CALL "P" USING IX` — an
         // identifier position an index-name cannot fill — landed in the "not defined" arm below and told the user that
@@ -403,21 +414,85 @@ public sealed partial class ReferenceResolver(DataBinder data)
             + (why is null ? "" : $" ({why})") + "; see the error at the declaration. The reference cannot be bound.");
     }
 
+    /// <summary>What <see cref="Identify"/> concluded about a written data reference: EITHER a final
+    /// <paramref name="Answer"/> (the name is no storage data item — a register, a sum counter, a refused reference —
+    /// or the reference was refused) OR the data <paramref name="Item"/> the name identifies, with the reference
+    /// <paramref name="Written"/> and its subscripts rendered to <paramref name="IndexExprs"/> (every OCCURS level
+    /// bound, §8.4.2.3.3 SR3; empty for a property temp, whose subscripts were identifier-3's). Never both.</summary>
+    private readonly record struct Identified(
+        RefResolution? Answer, DataItem? Item, WrittenReference Written, List<Position>? IndexExprs);
+
     private RefResolution ResolveImplCore(Core.DataReferenceContext dref, bool report)
+    {
+        var id = Identify(dref, report, forAddressOf: false);
+        if (id.Answer is { } answer) return answer;
+        // What follows the identification is the PLACE half: the item's place, then the reference-modification tail.
+        var item = id.Item!;
+        var written = id.Written;
+        var cleanRef = written.RefModPart;   // the reference modifier (refModSpec : leftmost : length)
+
+        // ⛔ EVERY NAMED ITEM TAKES THE SAME TAIL — a level-66 RENAMES alias included (kb/Work PB1380). The alias's
+        // place is built by PlaceForItem, the ONE item→place builder, and then meets the reference-modification
+        // tail below like any other identifier. It used to be composed in an arm of its own HERE that returned
+        // before that tail, so `RN(2:3)` bound the WHOLE alias — ISO §8.4.3.3.4 GR5's "unique data item that is a
+        // subset of the data item referenced by identifier-1" was never created, `MOVE RN(2:3) TO X` moved every
+        // character of the span, and `RN(2:N)` with N = 0 overwrote the span instead of raising EC-BOUND-REF-MOD
+        // (§7.3.23.3 GR1, directive omitted). Both forms were dropped: the THROUGH form's RenamesPlace AND the
+        // no-THROUGH form's forward to data-name-2's place.
+        if (PlaceForItem(item, id.IndexExprs!, out var gap) is not { } inner) return ItemFailure(dref, gap);
+
+        if (cleanRef is null) return RefResolution.Resolved(inner, "");
+        // identifier-1's DESCRIPTION is the item its place stands for, not the name as written: for a no-THROUGH
+        // RENAMES alias that is data-name-2, whose attributes §13.18.45.4 GR1 makes data-name-1's own; for a
+        // THROUGH alias it is the alias itself (an alphanumeric group item, GR2); for every other item the two
+        // are the same item. The syntactic path, the data-division path (ResolveItemRefMod) and the resolved-place
+        // path (RefModOf) all read it this way, so SR1 and the view are asked of one description.
+        DataItem described = inner.Item;
+        int preOpMark = data.PendingPreOps.Count;   // the reference modifier's own pre-ops (function activations) start here
+        if (ReadScreenedRefMod(dref, written, described, out var refusal) is not { } spec) return refusal!;
+        // §14.6.4 steps 6 → 7: an occurs-depending group's length is evaluated BEFORE the reference modifier, so when
+        // the modifier registered pre-ops (a function whose side effect may change the DEPENDING ON object) the length
+        // is pinned ahead of them (kb/Work PB1123).
+        if (inner is OdoGroupPlace odo && data.PendingPreOps.Count > preOpMark && FreezeOdoExtent is { } freeze)
+            inner = freeze(odo, preOpMark, dref.Start.Line);
+        return RefModView(described, inner, spec) is { } view
+            ? RefResolution.Resolved(view, "")
+            : RefResolution.Deferred(DeferredShape.NumericRefModSubstrate, DataBinder.WrittenText(dref));
+    }
+
+    /// <summary>⛔ THE ONE IDENTIFICATION STEP OF A WRITTEN DATA REFERENCE (kb/Work PB3287) — every entry that
+    /// resolves an <i>identifier</i> asks it, so a screen added here reaches them all: <see cref="ResolveImplCore"/>
+    /// (<see cref="Resolve"/> and <see cref="Probe"/>) takes the place half after it, and
+    /// <see cref="ResolveForAddressOf"/> the ADDRESS OF half. The steps, in the order the name classes are asked: the
+    /// special registers and the implicitly-defined names that are no storage item (CAPACITY register, EXCEPTION-OBJECT,
+    /// DEBUG-ITEM, a REPORT SECTION sum counter), the §8.4.3.3.3 SR3 reference-modification count, the §8.4.2.2
+    /// qualified or unqualified lookup with its one report (<see cref="ReportUnidentified"/>), the §13.7.3 SR4 LINKAGE
+    /// screen (<see cref="ScreenLinkageReference"/>) and the written subscripts (<see cref="ReadSubscripts"/>).
+    /// <para>⛔ THE SECOND COPY OF THIS SEQUENCE IS WHAT THIS REPLACED. ResolveForAddressOf re-sequenced the front half
+    /// by hand and dropped two of its screens: <c>SET P TO ADDRESS OF L-REC</c> over a LINKAGE record the procedure
+    /// division may not reference (§13.7.3 SR4) compiled clean, and an ambiguous or index-name operand was told it
+    /// "names none" where <c>MOVE</c> drew COBOLNET1639 / COBOLNET1637.</para>
+    /// <para><paramref name="forAddressOf"/> is the one place the operand differs: §8.4.3.11.3 SR1 admits only a data
+    /// item of the file, working-storage, local-storage or linkage section, so an object-property or object-view
+    /// chain (§8.4.3.9, §8.4.3.5) is not tried — it would synthesize a property temp, and register a pending
+    /// §8.4.3.9.4 operation, for an operand the caller must refuse — and a name that is one of those (the answer is a
+    /// place, or a chain) draws the caller's own operand-shape refusal, not "not defined".</para></summary>
+    private Identified Identify(Core.DataReferenceContext dref, bool report, bool forAddressOf)
     {
         DataReferenceCst r = dref;
         // The three answers (kb/Work PB1030). The written text is built only on a failure path.
         RefResolution Refused() => RefResolution.Refused(DataBinder.WrittenText(dref));
         RefResolution Deferred(DeferredShape shape) => RefResolution.Deferred(shape, DataBinder.WrittenText(dref));
         static RefResolution Resolved(Place place) => RefResolution.Resolved(place, "");
+        static Identified Ends(RefResolution answer) => new(answer, null, default, null);
         // A special register — LINAGE-COUNTER (I-O control system, ISO §8.4.3.14), LINE-/PAGE-COUNTER (Report
         // Writer control system, ISO §8.4.3.15) — is runtime-sourced, never a storage Place; the binder routes it
         // to BoundLinageCounterRef / BoundReportCounterRef (StatementBinder.ReportWriter.cs). The early return is
         // LOAD-BEARING for the QUALIFIED form (`LINAGE-COUNTER OF file`, `LINE-COUNTER OF report`): there
         // r.BaseName is the FILE-/REPORT-NAME qualifier and would otherwise mis-resolve here as a base data-name.
-        if (r.Register != SpecialRegister.None) return Deferred(DeferredShape.UnroutedSpecialRegister);
+        if (r.Register != SpecialRegister.None) return Ends(Deferred(DeferredShape.UnroutedSpecialRegister));
         // No base word outside a special register is a parse-error recovery node: the parser reported it.
-        if (r.BaseName is not { } name) return Refused();
+        if (r.BaseName is not { } name) return Ends(Refused());
 
         // The OCCURS DYNAMIC CAPACITY register (ISO §13.18.38 GR15 / §8.5.1.9.1; data-model D9): an implicitly-
         // defined VIEW over the owning dynamic table's current capacity — never a storage item, so it is not in
@@ -426,7 +501,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
         // shall not be defined elsewhere in the source element"), so every other question is a predicate over the
         // reference AS WRITTEN and belongs to this one screen, not to a fall-through (kb/Work PB457).
         if (CapacityRegisterFor(dref) is { } capReg)
-            return CapacityPlaceOf(dref, capReg) is { } capPlace ? Resolved(capPlace) : Refused();
+            return Ends(CapacityPlaceOf(dref, capReg) is { } capPlace ? Resolved(capPlace) : Refused());
 
         // The PREDEFINED OBJECT REFERENCE EXCEPTION-OBJECT (ISO §8.4.3.6; kb/Work PB922): §8.4.3.6.3 SR2 —
         // "EXCEPTION-OBJECT is implicitly described as class object and category object reference, as an external
@@ -441,7 +516,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
         // The RECEIVING half of SR1 is screened at the ONE receiving chokepoint (ExpressionBinder.ResolveReceiving);
         // this arm is what makes the SENDING half legal source rather than a typo.
         // The predicate is <see cref="IsExceptionObjectRegister"/> — the ONE answer every caller asks for.
-        if (IsExceptionObjectRegister(dref)) return Resolved(new ExceptionObjectPlace(data.ExceptionObjectRegister));
+        if (IsExceptionObjectRegister(dref)) return Ends(Resolved(new ExceptionObjectPlace(data.ExceptionObjectRegister)));
 
         // The X3.23-1985 DEBUG-ITEM special register / member (VCR Table 7 row 7.17): an IMPLICITLY-defined read-only
         // VIEW over the program-instance __dbgItem — not in ByName, so resolved HERE (before ordinary name lookup) to
@@ -449,7 +524,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
         // DEBUGGING MODE (DebugRegisters empty otherwise → this never fires for a non-debug program). Only the plain
         // unqualified/unsubscripted form is covered — a reference-modified/qualified DEBUG-* falls through to loud.
         if (data.DebugRegisters.TryGetValue(name, out var dbg) && dref.dataReferenceSuffix().Length == 0)
-            return Resolved(new DebugRegisterPlace(dbg.Item, dbg.Member));
+            return Ends(Resolved(new DebugRegisterPlace(dbg.Item, dbg.Member)));
 
         // A REPORT SECTION SUM COUNTER (ISO §13.18.54.4 GR5 — the data-name after the level number names the
         // COUNTER, not the printable item; GR12 permits procedure division statements to read and alter it): an
@@ -458,13 +533,11 @@ public sealed partial class ReferenceResolver(DataBinder data)
         // (kb/Work PB840). Its qualifiers are the report group entries above it and, outermost, its REPORT-NAME
         // (§8.4.2.2.3 SR4; §8.4.2.2.2 Format 1's file-report-qualifier — kb/Work PB1454). A REPEATING entry's
         // counter is a table and takes the ordinary subscripts (kb/Work PB1271).
-        if (SumCounterFor(dref, name, report) is { } sumCounter) return sumCounter;
+        if (SumCounterFor(dref, name, report) is { } sumCounter) return Ends(sumCounter);
 
         // The reference AS WRITTEN, read by the ONE decomposition (kb/Work PB443 — see WrittenReference).
         var written = ReadWritten(dref);
         var qualifiers = written.Qualifiers;
-        var subCtx = written.SubscriptGroup;    // the subscript list
-        var cleanRef = written.RefModPart;      // the reference modifier (refModSpec : leftmost : length)
 
         // ISO §8.4.3.3.3 SR3 — "Identifier-1 shall not be a reference-modification format identifier." The
         // grammar cannot express this (dataReferenceSuffix* and qualification's own (subscriptPart|refModPart)*
@@ -472,7 +545,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
         // `??=` kept the FIRST of each of the two carriers a ref-mod then had and one outranked the other, so
         // `MOVE A (3:4)(2:2)` COMPILED CLEAN and returned A(2:2) — a silent wrong value, not a composition and not
         // a rejection.
-        if (!ScreenRefModCount(dref, written, name)) return Refused();
+        if (!ScreenRefModCount(dref, written, name)) return Ends(Refused());
 
         // A reference whose chain ends in a non-word object (SELF, SUPER, a view, a function, NULL) is never a data name.
         DataItem? item = written.PropertyObject is not null ? null
@@ -484,11 +557,21 @@ public sealed partial class ReferenceResolver(DataBinder data)
         // §8.4.3.9.3 SR5/SR6 permit on the property value. A view of a qualified data item written `A OF G AS C` arrives
         // here too, and is that view.
         bool objectProperty = false;
+        if (item is null && forAddressOf)
+        {
+            // An ADDRESS OF operand is a data item of a section (§8.4.3.11.3 SR1): a property or a view of one is not,
+            // and trying it would register a pending §8.4.3.9.4 operation for an operand the caller refuses. The
+            // caller's own operand-shape refusal names the rule, so a chain stays silent here; any other name that
+            // resolves to nothing is reported like every other identifier's.
+            if (report && !IsObjectViewOfQualifiedItem(dref) && !IsObjectPropertyReference(dref))
+                ReportUnidentified(dref, name, qualifiers);
+            return Ends(Refused());
+        }
         if (item is null)
         {
-            if (ViewOfQualifiedItem(dref, report) is { } viewOfItem) return viewOfItem;
+            if (ViewOfQualifiedItem(dref, report) is { } viewOfItem) return Ends(viewOfItem);
             var (temp, final) = ResolveObjectProperty(dref, name, written);
-            if (final is not null) return final;
+            if (final is not null) return Ends(final);
             objectProperty = (item = temp) is not null;
         }
         if (item is null)
@@ -496,42 +579,18 @@ public sealed partial class ReferenceResolver(DataBinder data)
             // The NAME resolves to nothing — a typo or a mis-qualification, never a feature gap (kb/Work R30).
             // Every later null in this method is an unsupported-shape staging of a name that DID resolve.
             if (report) ReportUnidentified(dref, name, qualifiers);
-            return Refused();
+            return Ends(Refused());
         }
 
         List<Position> indexExprs = [];   // a property temp has no OCCURS: the written subscripts were identifier-3's
         if (!objectProperty)
         {
             if (report) ScreenLinkageReference(dref, item);
-            if (ReadSubscripts(dref, item, subCtx, out var subscripts) is { } subscriptFailure) return subscriptFailure;
+            if (ReadSubscripts(dref, item, written.SubscriptGroup, out var subscripts) is { } subscriptFailure)
+                return Ends(subscriptFailure);
             indexExprs = subscripts;
         }
-
-        // ⛔ EVERY NAMED ITEM TAKES THE SAME TAIL — a level-66 RENAMES alias included (kb/Work PB1380). The alias's
-        // place is built by PlaceForItem, the ONE item→place builder, and then meets the reference-modification
-        // tail below like any other identifier. It used to be composed in an arm of its own HERE that returned
-        // before that tail, so `RN(2:3)` bound the WHOLE alias — ISO §8.4.3.3.4 GR5's "unique data item that is a
-        // subset of the data item referenced by identifier-1" was never created, `MOVE RN(2:3) TO X` moved every
-        // character of the span, and `RN(2:N)` with N = 0 overwrote the span instead of raising EC-BOUND-REF-MOD
-        // (§7.3.23.3 GR1, directive omitted). Both forms were dropped: the THROUGH form's RenamesPlace AND the
-        // no-THROUGH form's forward to data-name-2's place.
-        if (PlaceForItem(item, indexExprs, out var gap) is not { } inner) return ItemFailure(dref, gap);
-
-        if (cleanRef is null) return Resolved(inner);
-        // identifier-1's DESCRIPTION is the item its place stands for, not the name as written: for a no-THROUGH
-        // RENAMES alias that is data-name-2, whose attributes §13.18.45.4 GR1 makes data-name-1's own; for a
-        // THROUGH alias it is the alias itself (an alphanumeric group item, GR2); for every other item the two
-        // are the same item. The syntactic path, the data-division path (ResolveItemRefMod) and the resolved-place
-        // path (RefModOf) all read it this way, so SR1 and the view are asked of one description.
-        DataItem described = inner.Item;
-        int preOpMark = data.PendingPreOps.Count;   // the reference modifier's own pre-ops (function activations) start here
-        if (ReadScreenedRefMod(dref, written, described, out var refusal) is not { } spec) return refusal!;
-        // §14.6.4 steps 6 → 7: an occurs-depending group's length is evaluated BEFORE the reference modifier, so when
-        // the modifier registered pre-ops (a function whose side effect may change the DEPENDING ON object) the length
-        // is pinned ahead of them (kb/Work PB1123).
-        if (inner is OdoGroupPlace odo && data.PendingPreOps.Count > preOpMark && FreezeOdoExtent is { } freeze)
-            inner = freeze(odo, preOpMark, dref.Start.Line);
-        return RefModView(described, inner, spec) is { } view ? Resolved(view) : Deferred(DeferredShape.NumericRefModSubstrate);
+        return new Identified(null, item, written, indexExprs);
     }
 
     /// <summary>⛔ §8.4.3.3.3 SR3 — "Identifier-1 shall not be a reference-modification format identifier." The
@@ -1466,6 +1525,24 @@ public sealed partial class ReferenceResolver(DataBinder data)
         qualifiers.Count == 0 ? ResolveUnqualified(name)
             : ResolveQualified(name, qualifiers as List<string> ?? [.. qualifiers]);
 
+    /// <summary>⛔ THE LOOKUP OF A WRITTEN NAME THAT NAMES A TABLE, REPORTED (kb/Work PB3287): <see cref="FindItem"/>, then
+    /// the one §8.4.2.2 report when no item is identified (<see cref="ReportUnidentified"/>) and the §13.7.3 SR4 screen
+    /// when one is (<see cref="ScreenLinkageReference"/>) — what <see cref="Identify"/> asks for every identifier, for the
+    /// two references that name a TABLE and not a place (the SEARCH / SORT table operand and the table(ALL) intrinsic
+    /// argument), which read their own subscripts. Both used to call <see cref="FindItem"/> and stop, so `SEARCH L-TABLE`
+    /// and `FUNCTION SUM (L-TABLE (ALL))` over a LINKAGE table the procedure division may not reference compiled clean
+    /// while `MOVE L-TABLE (1) TO X` drew COBOLNET2746. Null having reported.</summary>
+    internal DataItem? FindReportedItem(Core.DataReferenceContext dref, string name, List<string> qualifiers)
+    {
+        if (FindItem(name, qualifiers) is not { } item)
+        {
+            ReportUnidentified(dref, name, qualifiers);
+            return null;
+        }
+        ScreenLinkageReference(dref, item);
+        return item;
+    }
+
     /// <summary>A reference written where a general format prints a <b>table</b> operand, resolved and read: the
     /// <see cref="DataItem"/> the qualifiers single out, plus the two facts the statement's own syntax rules are
     /// about — how many subscripts were written, and whether a reference modification was.</summary>
@@ -1499,11 +1576,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
         DataReferenceCst r = dref;
         if (r.Register != SpecialRegister.None || r.BaseName is not { } name) return null;
         var written = ReadWritten(dref);
-        if (FindItem(name, written.Qualifiers) is not { } item)
-        {
-            ReportUnidentified(dref, name, written.Qualifiers);
-            return null;
-        }
+        if (FindReportedItem(dref, name, written.Qualifiers) is not { } item) return null;
         // The subscripts AS WRITTEN, split by the ONE declaration-informed splitter (kb/Work PB136) — the same
         // reading SR8/SR9 already demand of a Format-2 key subscript, for the same reason: the RENDERED index
         // expression has erased how many operands the programmer wrote.
@@ -1543,18 +1616,18 @@ public sealed partial class ReferenceResolver(DataBinder data)
     /// screens — the caller reports loud, never a wrong address.</summary>
     internal AddressOfOperand? ResolveForAddressOf(Core.DataReferenceContext dref)
     {
-        DataReferenceCst r = dref;
-        if (r.Register != SpecialRegister.None || r.BaseName is not { } name) return null;
-        var written = ReadWritten(dref);                  // the ONE decomposition (kb/Work PB443)
-        if (!ScreenRefModCount(dref, written, name)) return null;
-        var qualifiers = written.Qualifiers;
+        // ⛔ THE ONE IDENTIFICATION STEP (kb/Work PB3287): the special-register and implicit-name screens, the §8.4.2.2
+        // lookup and its report (an ambiguous or index-name operand is told so, as MOVE tells it), the §13.7.3 SR4
+        // LINKAGE screen (a record the procedure division may not reference is not addressable either) and the
+        // §8.4.2.3.3 SR2/SR3/SR5 subscript screen (kb/Work PB681: the omitted-list arm used to return the address of
+        // the table's FIRST occurrence for `ADDRESS OF E`). An answer is an operand that is no data item of a section
+        // (§8.4.3.11.3 SR1) or a reference already refused: null, and the caller names the operand-shape rule unless
+        // the resolver has (WasDiagnosed). What stays HERE is the address-specific tail.
+        var id = Identify(dref, report: true, forAddressOf: true);
+        if (id.Item is not { } item) return null;
+        var written = id.Written;
         var subCtx = written.SubscriptGroup;
-        if (FindItem(name, qualifiers) is not { } item) return null;
-        // §8.4.2.3.3 SR2/SR3/SR5 through the ONE screen the other two entries use (kb/Work PB681): an ADDRESS OF
-        // operand is an identifier like any other, and the omitted-list arm used to return the address of the
-        // table's FIRST occurrence for `ADDRESS OF E` — no subscript, no diagnostic, a pointer nobody asked for.
-        // The ONE written-subscript reading every identifier entry shares (kb/Work PB1030 extracted it).
-        if (ReadSubscripts(dref, item, subCtx, out var exprs) is not null) return null;
+        var exprs = id.IndexExprs!;
         RefModSpec? refMod = null;
         Place? bitPlace = null;
         OdoGroupPlace? extent = null;
@@ -1585,9 +1658,8 @@ public sealed partial class ReferenceResolver(DataBinder data)
         if (underDynamicTable) return new AddressOfOperand(item, null, refMod, bitPlace, extent);
         occursLevels.Reverse();
         if (occursLevels.Count != exprs.Count) return null;   // wrong subscript count → loud
-        // ByteWidth, for the same reason as the PlaceForItem twin above: the class backing is byte-addressed
-        // and a NATIONAL element strides two bytes per position (kb/Work PB231; §13.18.60.4 GR8 / D-N1).
-        var disp = occursLevels.Select((lv, k) => new OffsetTerm(exprs[k], lv.ByteWidth)).ToList();
+        // The ONE displacement term of a fixed level (FixedLevelTerm), the one the Tier-B view window takes.
+        var disp = occursLevels.Select((lv, k) => FixedLevelTerm(lv, exprs[k])).ToList();
         return new AddressOfOperand(item, disp, refMod, bitPlace, extent);
     }
 
@@ -1688,6 +1760,14 @@ public sealed partial class ReferenceResolver(DataBinder data)
         public PositionOffset OrdinalAt(int staticOrdinal) => new(OrdinalOrigin(staticOrdinal, OrdinalBase), OrdinalTerms);
     }
 
+    /// <summary>⛔ THE ONE DISPLACEMENT TERM OF A FIXED OCCURS LEVEL (kb/Work PB231, PB3287): <c>(index − 1) ×</c> the
+    /// level's per-occurrence STORAGE extent, <see cref="DataItem.ByteWidth"/> — never its character-position count,
+    /// because the class backing is byte-addressed and a NATIONAL element strides two bytes per position (§13.18.60.4
+    /// GR8 / D-N1). A Tier-B view window (<see cref="WindowScopeOf"/>) and the address of an occurrence
+    /// (<see cref="ResolveForAddressOf"/>) lay a table's occurrences end-to-end in the one cell image and take their
+    /// displacement from here, so a stride fix cannot be made in one of them only.</summary>
+    internal static OffsetTerm FixedLevelTerm(DataItem level, Position index) => new(index, level.ByteWidth);
+
     /// <summary>⛔ THE ONE WALK OF A TIER-B REFERENCE'S SUBSCRIPT LEVELS (kb/Work PB1042), outermost first. A fixed
     /// level displaces the window by <c>(index − 1) ×</c> its per-occurrence STORAGE extent — never its
     /// character-position count (kb/Work PB231: a NATIONAL element occupies two bytes per position, §13.18.60.4 GR8 /
@@ -1716,7 +1796,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
                 (terms, bitTerms, ordinalBase, ordinalTerms, nested) = ([], [], null, [], true);
                 continue;
             }
-            terms.Add(new OffsetTerm(indexExprs[k], level.ByteWidth));
+            terms.Add(FixedLevelTerm(level, indexExprs[k]));
             bitTerms.Add(new OffsetTerm(indexExprs[k], BitLayout.StrideBits(level)));
             if (cell is not null) ordinalTerms.Add(new OffsetTerm(indexExprs[k], CellComponents.PerOccurrence(level)));
         }
@@ -2093,7 +2173,8 @@ public sealed partial class ReferenceResolver(DataBinder data)
     /// the table(ALL) intrinsic argument so both ask it in the same order relative to ordinary lookup (a counter
     /// first, unless the qualifiers reach no counter and an ordinary item answers them). Null when the name is no
     /// counter's, when an ordinary item answers the qualifiers, or when the reference was diagnosed (no counter
-    /// is subordinate to the qualifiers; two counters are).</summary>
+    /// is subordinate to the qualifiers; two counters are; a counter and an ordinary data item of the same source
+    /// element are — kb/Work PB3232, the counters and the ordinary items being ONE §8.4.2.2.3 SR1 candidate set).</summary>
     internal (ReportModel Report, ReportSumFamily Family)? SumCounterFamilyFor(
         Core.DataReferenceContext dref, string name, List<string> qualifiers, bool report)
     {
@@ -2134,13 +2215,31 @@ public sealed partial class ReferenceResolver(DataBinder data)
                 ? data.DeclaredNearerThan(name, counterDepth)
                 : ResolveQualified(name, qualifiers) is { } nearer && data.DeclaringDepth(nearer) < counterDepth))
             return null;
-        if (matches.Count > 1)
+        // ⛔ THE COUNTER IS ONE CANDIDATE AMONG ALL THE DATA-NAMES OF ITS SPELLING (kb/Work PB3232). §13.18.54.4 GR5 makes a
+        // SUM entry's data-name the name of its sum counter, so the counter is a data-name like the ordinary data items
+        // of the same source element, and §8.4.2.2.3 SR1 — "For each non unique user-defined name that is explicitly
+        // referenced, uniqueness shall be established through a sequence of qualifiers that precludes any ambiguity of
+        // reference" — counts them TOGETHER. The ordinary items asked about are the ones the SAME written qualifiers
+        // reach in the SAME source element as the counters (§8.4.6.2.1 3): the one candidate set
+        // DataBinder.QualifiedCandidates, which the ordinary lookup (ResolveUnqualified / ResolveQualified) reads too.
+        // Asking only the counters, as this method did, let the counter win every collision with a WORKING-STORAGE item
+        // that had no qualifier to tell them apart: a MOVE to the name altered the report total, silently.
+        int sameSpelling = matches.Count + data.QualifiedCandidates(name, qualifiers, data.ActiveScope)
+            .Where(item => data.DeclaringDepth(item) == counterDepth).Count;
+        if (sameSpelling > 1)
         {
             if (report && _diagnosed.Add(dref))
+            {
+                int ordinary = sameSpelling - matches.Count;
                 data.Edition.Error(DiagnosticCatalog.ReportSumCounterReference, $"'{DataBinder.WrittenText(dref)}': the reference is ambiguous — "
-                    + $"{matches.Count} entries establish a sum counter named '{name}' (ISO §13.18.54.4 GR1 gives "
-                    + "each entry its own counter). A reference shall uniquely identify one resource (ISO "
-                    + "§8.4.2.2.1); qualify it by report group entry or report-name, or give the entries distinct data-names.");
+                    + (ordinary == 0
+                        ? $"{matches.Count} entries establish a sum counter named '{name}' (ISO §13.18.54.4 GR1 gives each entry its own counter)."
+                        : $"'{name}' is the name of {(matches.Count == 1 ? "a sum counter" : $"{matches.Count} sum counters")} "
+                          + $"(ISO §13.18.54.4 GR5) and of {(ordinary == 1 ? "a data item" : $"{ordinary} data items")} "
+                          + "the written qualifiers also reach.")
+                    + " A reference shall uniquely identify one resource (ISO §8.4.2.2.1, §8.4.2.2.3 SR1); qualify it by "
+                    + "report group entry, group or report-name, or give the entries distinct data-names.");
+            }
             return null;
         }
         return matches[0];
