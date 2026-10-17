@@ -907,10 +907,13 @@ another.
   leave the ledger (they are now committed pages, R1 applies).
 - **R5 — a SYNC POINT (promotion) is: sync the data file (`FileStream.Flush(true)` on the connector's own handle) → write the
   work meta's content to the committed slot with `committed generation` = its generation → sync again.** Two syncs make the meta
-  copy strictly after the pages it names. A promotion happens at COMMIT (for a file under commit control), at CLOSE, at the run
-  unit's implicit CLOSE of every open file (`FileRegistry.CloseAll`, §9.1.18.5 *"When a run unit terminates normally, all file
-  changes are permanently committed"*), and — for a file NOT under commit control — as a CHECKPOINT whenever the ledger holds
-  more than 1 024 pages or 4 096 statements have run since the last promotion. The checkpoint bounds R6's verification at
+  copy strictly after the pages it names. For a file NOT under commit control a promotion happens at CLOSE, at the run unit's
+  implicit CLOSE of every open file (`FileRegistry.CloseAll`) and as a CHECKPOINT whenever the ledger holds more than 1 024
+  pages or 4 096 statements have run since the last promotion. For a file UNDER commit control the only promotions are
+  COMMIT and the run unit's normal termination (§9.1.18.5 *"When a run unit terminates normally, all file changes are
+  permanently committed"*): a CLOSE of such a file writes the work meta and keeps the handle but does NOT promote, because a
+  ROLLBACK after that CLOSE must still restore the state at the last COMMIT (§14.9.36.4 GR3), which a promotion at CLOSE
+  would have advanced. The checkpoint bounds R6's verification at
   4 MiB of reads (about 20 ms at the measured 12-15 µs a page) and costs, at the measured 3 ms per sync pair, under 2 µs per
   statement amortized; it is never taken for a file under commit control, whose only promotions are the standard's.
 - **R6 — the ADOPTION RULE at OPEN decides which meta is the file.** Read page 0 and page 1 (two reads; the whole of what an
@@ -994,8 +997,9 @@ is reversed by its groups: the runtime half (PB3337) and the compiler half (PB33
 
 - **UNDER COMMIT CONTROL** is a bit in the meta (offset 96, bit 0), set by an OPEN through a connector covered by an active APPLY
   COMMIT clause (§12.4.6.3.4 GR1: *"This clause specifies that the files and data-items listed are to be subject to the commit
-  and rollback facility."*; GR5 defines active) and cleared by the promotion of a CLOSE or COMMIT that leaves no such connector
-  open. While it is set, the only promotions are COMMIT, CLOSE and normal termination (R5), and R6 adopts the committed slot at
+  and rollback facility."*; GR5 defines active) and cleared by the COMMIT (or the normal termination) after which no connector
+  under commit control holds the file. While it is set, the only promotions are COMMIT and normal termination (R5: a CLOSE
+  writes the work meta, keeps the handle and promotes nothing), and R6 adopts the committed slot at
   the next OPEN whatever the work slot says — which is §9.1.18.5's rollback of an abnormal termination, obtained by writing
   nothing at the termination (there is no process-exit handler to rely on) rather than by undoing anything.
 - **COMMIT** (§14.9.7.4 GR3: *"The execution of the COMMIT statement permanently applies any changes made to the files specified
@@ -1032,7 +1036,8 @@ formulas):
 | READ NEXT / PREVIOUS | ≤ 1 (+ d when the cursor crosses a leaf; + d for an alternate key's prime lookup) | 0 | 0 |
 | WRITE / REWRITE / DELETE (indexed, k alternate keys) | ≤ (k + 1) × d | ≤ (k + 1) × d + ledger + 1 meta; ≤ k + 3 in a sequential load (R3) | 0 |
 | WRITE / REWRITE / DELETE (relative) | ≤ d | ≤ d + ledger + 1 meta; ≤ 3 in a sequential load (R3) | 0 |
-| CLOSE / COMMIT / checkpoint | 0 | 1 (the committed slot) | 2 |
+| a promotion (CLOSE or checkpoint of a file not under commit control; COMMIT or normal termination of one under it) | 0 | 1 (the committed slot) | 2 |
+| CLOSE of a file under commit control | 0 | 1 (the work meta) | 0 |
 
 The witnesses: (a) **linearity** — a load of N and of 4N records through `NO OTHER` and through `ALL OTHER`, sequential and
 random keys, asserts that the pages written per statement differ by at most the depth growth (an integer ≤ 1 between those
