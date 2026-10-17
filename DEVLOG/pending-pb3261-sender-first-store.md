@@ -60,4 +60,5 @@ from EC-BOUND-SUBSCRIPT to EC-BOUND-REF-MOD against the reviewed build; D3 (a fu
 R1 (the receiver side) were already right. R1-2: the new predicate's doc comment had been inserted under `Snapshot`'s
 summary; each now carries its own. Sweeping the same shape found four more doubled summaries in files the branch
 touched (`EmitCompute`, `MoveEmitter.ElementaryStore`, `BoundIntrinsicCall.Anycase`, `BoundBoolAll`), fixed here; 47
-remain across the tree, left for a drift test of their own.
+remain across the tree, left for a drift test of their own. Re-gate (run `20261017T034046Z-13719e`): `=== BUILD-LOCAL
+GATE: LEG 1 ONLY (batched gating, PB2515): GREEN`, both goldens passed in leg 1.
