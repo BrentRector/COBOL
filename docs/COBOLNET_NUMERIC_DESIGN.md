@@ -1082,7 +1082,7 @@ clause text and fails if a new member is silently exempted.
    (GnuCOBOL's own divide is inexact, numeric.c:2259-2261) and an exponentiation take the SDIDI (`CobolDec.MulToOdd` /
    `DivToOdd`) as before; an unknown bound — `CobolNum.MulChecked` in EVERY statement (a native product never wraps). The old emitter
    multiplied unchecked and `PIC 9V9(30)` × `PIC 9V9(30)` — a legal statement, §14.7.7 r2 a) caps the COMPOSITE — stored a
-   wrapped product. The same bound drives `FunctionValueLane.AlignmentMayLeaveCarrier` (the one reader; the renderer and the bind-time lane prediction both ask it): SUM / RANGE / MEAN / MEDIAN /
+   wrapped product. The same bound drives `IntrinsicCarrierRules.AlignmentMayLeaveCarrier` (the one reader, in `compiler.bound`; the renderer and the bind-time lane prediction both ask it): SUM / RANGE / MEAN / MEDIAN /
    MIDRANGE align every argument to the list's maximum scale, and when the SUM of the magnitudes the function adds (each
    bounded by its aligned digits: every argument for SUM / MEAN, the two largest for RANGE, ×10 for MEDIAN / MIDRANGE)
    passes `Int128.MaxValue` the call goes to its SDIDI body (`SumDec` …) instead of raising for a value the receiver

@@ -1167,7 +1167,7 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
 
     /// <summary>⛔ THE ONE numeric-LITERAL argument carrier build, for every notation and every pass mode
     /// (kb/Work PB263 + PB264). A numeric literal argument crosses as the <c>(unscaled value, scale)</c> pair
-    /// that <see cref="EmitText.TryUnscaledParts"/> derives EXACTLY from the literal — its §8.3.3.3.2 rule-4
+    /// that <see cref="NumericLiteral.TryUnscaledParts"/> derives EXACTLY from the literal — its §8.3.3.3.2 rule-4
     /// value for the fixed-point form, its §8.3.3.3.3 rule-5 value ("the algebraic product of the value of its
     /// significand and the quantity derived by raising ten to the power of the exponent") for the
     /// floating-point form — so the two notations of one value cross identically, and the callee's own
@@ -1185,7 +1185,7 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
         // would decompose the literal a SECOND time and take only half of the result, leaving the rendered
         // expression and the cell type derived independently again — which is the precise shape of the defect
         // this method exists to remove.
-        if (!TryUnscaledParts(literalText, out string unscaled, out int scale))
+        if (!NumericLiteral.TryUnscaledParts(literalText, out string unscaled, out int scale))
             // Not a canonical numeric literal — the binder has already diagnosed it (COBOLNET1661 for an
             // out-of-range exponent, the §8.3.3.3.3 SR2/SR3 form checks otherwise). Stage loud rather than
             // emit a cell whose type cannot be derived; never a silent value.

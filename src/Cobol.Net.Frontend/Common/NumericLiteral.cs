@@ -162,6 +162,61 @@ public static class NumericLiteral
         return true;
     }
 
+    /// <summary>⛔ THE ONE exact unscaled decomposition of a numeric literal, in EITHER notation: the signed
+    /// unscaled digit string and the fraction-digit SCALE, so that the literal's value is exactly
+    /// <c>digits × 10^−scale</c>. A FIXED-POINT literal is its digits at its decimal-point position (ISO
+    /// §8.3.3.3.2 rule 4 — "The value of a fixed-point numeric literal is the algebraic quantity represented by
+    /// the characters in the fixed-point numeric literal"); a FLOATING-POINT literal decomposes to the SAME
+    /// KIND OF PAIR, because ISO §8.3.3.3.3 rule 5 makes its value "the algebraic product of the value of its
+    /// significand and the quantity derived by raising ten to the power of the exponent" — an EXACT scaled
+    /// integer, never an approximation.
+    /// <para>⛔ NEVER A TEXT EXPANSION. The pair comes from <see cref="TryParseExact"/>'s (significand,
+    /// power of ten). Expanding the value to digit text would build a string as long as the literal's decade
+    /// bound allows, and that bound is the SDIDI intermediate exponent range (owned solely by
+    /// <c>ArithmeticModes.IntermediateExponentRange</c>, which COBOLNET1661 enforces on the literal at bind) —
+    /// thousands of characters for one argument. The SCALE simply goes NEGATIVE instead — <c>1.0E+300</c> is 1
+    /// at scale −300 — which <c>CobolNum.Rescale</c> already carries (it is the same negative scale a PICTURE-P
+    /// trailing-scaled item uses).</para>
+    /// <para>The pair is normalized toward a NON-NEGATIVE scale while the unscaled magnitude still fits
+    /// <see cref="Int128"/>, so <c>1.5E+3</c> decomposes exactly as <c>1500</c> does. That is the visible form of
+    /// owner decision D-B's invariant — a literal's NOTATION never changes the VALUE it contributes — now true
+    /// on the argument lane as well.</para>
+    /// <para>It lives here, in the layer every compiler layer reaches, because the code generator's operand rendering
+    /// (<c>EmitText.UnscaledLit</c>, the CALL argument lane) and the bind-time lane prediction (<c>FunctionValueLane</c>,
+    /// kb/Work PB3268) read the SAME pair: a literal's digit bound is asked of one decomposition.</para>
+    /// Returns false for text that is not a canonical numeric literal; the binder has already diagnosed it
+    /// (COBOLNET1661 for an out-of-range exponent, the §8.3.3.3.3 SR2/SR3 form checks for the rest).</summary>
+    public static bool TryUnscaledParts(string text, out string digits, out int scale)
+    {
+        string t = text.Trim().TrimStart('+');
+        if (t.IndexOf('E') < 0 && t.IndexOf('e') < 0)
+        {
+            // The FIXED-POINT form, textually — byte-identical to what this helper has always produced (leading
+            // zeros and the sign are preserved; the code generator's EmitText.IntLiteralX does the magnitude test).
+            int dot = t.IndexOf('.');
+            digits = dot < 0 ? t : t.Remove(dot, 1);
+            scale = dot < 0 ? 0 : t.Length - dot - 1;
+            return true;
+        }
+        digits = ""; scale = 0;
+        if (!TryParseExact(t, out Int128 sig, out int exp10)) return false;
+        // Normalize toward scale ≥ 0 while the magnitude still fits the Int128 carrier (the guard keeps the
+        // multiply from overflowing; a literal's significand is at most 36 digits per §8.3.3.3.3 rule 2).
+        Int128 limit = Int128.MaxValue / 10;
+        while (exp10 > 0 && sig >= -limit && sig <= limit) { sig *= 10; exp10--; }
+        digits = sig.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        scale = -exp10;
+        return true;
+    }
+
+    /// <summary>The digit bound of an unscaled literal digit string (<see cref="TryUnscaledParts"/>'s <c>digits</c>):
+    /// its significant digits — leading zeros carry no magnitude and the sign is not a digit — at least 1 and at most
+    /// 39 (a compiler-synthesized HIGHEST-ALGEBRAIC literal of a 16-byte unsigned container is 2^128−1, 39 digits). The
+    /// ONE reader of a literal's magnitude bound: <c>EmitText.UnscaledLit</c>'s <c>NumX.Digits</c> and the bind-time
+    /// lane prediction's aligned operand (<c>FunctionValueLane</c>, kb/Work PB3268) both ask it.</summary>
+    public static int UnscaledDigitBound(string unscaledDigits) =>
+        Math.Clamp(unscaledDigits.TrimStart('-', '+').TrimStart('0').Length, 1, 39);
+
     /// <summary>The integer VALUE of a numeric literal of either form, whatever notation it was written in — <c>30</c>,
     /// <c>30.0</c> and <c>3.0E+1</c> are one operand (trailing zeros past the point are notation, not scale; ISO
     /// §8.3.3.3.3 rule 5 makes a floating-point literal's value "the algebraic product of the value of its significand

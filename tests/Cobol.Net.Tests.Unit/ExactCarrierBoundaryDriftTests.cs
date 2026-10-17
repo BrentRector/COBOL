@@ -2,6 +2,7 @@
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using System.Reflection;
 using System.Text.RegularExpressions;
+using CobolNet.Binding.Bound;
 using CobolNet.CodeGen.Emit;
 using CobolNet.Runtime;
 using CobolNet.Tests.Shared;
@@ -228,14 +229,14 @@ public sealed class ExactCarrierBoundaryDriftTests
             + "has stopped seeing the switch and would pass with the routing set empty");
 
         foreach (string arm in inSwitch)
-            Assert.True(IntrinsicRenderer.CrossAlignedNativeArms.Contains(arm),
+            Assert.True(IntrinsicCarrierRules.CrossAlignedNativeArms.Contains(arm),
                 $"the native arm {arm} aligns its arguments to a COMMON scale on the Int128 carrier but is not in "
-                + "IntrinsicRenderer.CrossAlignedNativeArms, so under ARITHMETIC IS STANDARD-DECIMAL it still "
+                + "IntrinsicCarrierRules.CrossAlignedNativeArms, so under ARITHMETIC IS STANDARD-DECIMAL it still "
                 + "evaluates there. Alignment multiplies — a 31-digit integer beside a scale-18 operand needs 49 "
                 + "digits — so it raises EC-SIZE-OVERFLOW where §15.4.1 rule 1 requires the equivalent arithmetic "
                 + "expression's exact SDIDI value (kb/Work PB62, then PB252 for MOD/REM).");
 
-        foreach (string arm in IntrinsicRenderer.CrossAlignedNativeArms)
+        foreach (string arm in IntrinsicCarrierRules.CrossAlignedNativeArms)
             Assert.True(inSwitch.Contains(arm),
                 $"{arm} is routed as a cross-aligning arm but no longer aligns in the native switch — the set is "
                 + "stale, and a stale entry silently changes that function's standard-mode carrier");
@@ -248,7 +249,7 @@ public sealed class ExactCarrierBoundaryDriftTests
     public void ThePureSelectionArms_AreNotRoutedAsCrossAligning()
     {
         foreach (string sel in new[] { "MaxScaled", "MinScaled", "OrdMax", "OrdMin" })
-            Assert.False(IntrinsicRenderer.CrossAlignedNativeArms.Contains(sel),
+            Assert.False(IntrinsicCarrierRules.CrossAlignedNativeArms.Contains(sel),
                 $"{sel} is pure selection (RawArgPairs rescales each argument to its OWN scale) — it forms no "
                 + "common scale and has no boundary to escape (kb/Work PB65)");
     }

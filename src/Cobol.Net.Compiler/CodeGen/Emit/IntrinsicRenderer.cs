@@ -3,7 +3,6 @@
 using System.Collections.Frozen;
 
 using CobolNet.Binding;
-using CobolNet.Binding.Procedure;
 using CobolNet.Binding.Model;
 using CobolNet.Binding.Bound;
 using CobolNet.Runtime;
@@ -87,7 +86,7 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
         // 1234567. NUMVAL-F is NOT here and must not be: §15.69.4 r2 grants native arithmetic "an approximation of
         // the numeric value represented by argument-1", so its native lane keeps the float family's determination
         // (CONFORMANCE.md item 92, PB60/RV-15.69.4-2) — the r2/r3 split is the standard drawing this exact line.
-        if (FunctionValueLane.ValueFixedByDefinition(sig.RuntimeMethod) && RenderDec(ic) is { } fixedByDefinition)
+        if (IntrinsicCarrierRules.ValueFixedByDefinition(sig.RuntimeMethod) && RenderDec(ic) is { } fixedByDefinition)
             return fixedByDefinition;
 
         // ⛔ ROUTE ON THE ARGUMENT'S TYPE, NOT ONLY THE FUNCTION'S FAMILY (fix-queue PB2). The exact family
@@ -151,7 +150,7 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
         // wider carrier must be the one that changes. The question is asked of the arguments' digit BOUNDS
         // (NumX.Digits) so an ordinary list keeps its Int128 body unchanged and only a list that may leave the
         // carrier moves; an argument whose bound is unknown keeps the escape-checked native arm.
-        if (CrossAlignedNativeArms.Contains(sig.RuntimeMethod) && AlignmentMayLeaveCarrier(ic)
+        if (IntrinsicCarrierRules.CrossAlignedNativeArms.Contains(sig.RuntimeMethod) && AlignmentMayLeaveCarrier(ic)
             && RenderDec(ic) is { } wideAligned)
             return wideAligned;
         if (sig.Float) return RenderFloat(ic, sig.RuntimeMethod);
@@ -1046,15 +1045,15 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
         Operands(ic).Any(x => x.Dec || x.Real);
 
     /// <summary>Can aligning this call's arguments to their common scale leave the <see cref="Int128"/> carrier? The rule is
-    /// <see cref="FunctionValueLane.AlignmentMayLeaveCarrier"/> (the ONE reader, which the bind-time lane prediction asks of
+    /// <see cref="IntrinsicCarrierRules.AlignmentMayLeaveCarrier"/> (the ONE reader, which the bind-time lane prediction asks of
     /// the same facts read from the bound tree); this reads them off the RAW operands: an SDIDI or binary64 operand, or
     /// one of unknown digit bound (<see cref="NumX.Digits"/> 0), is not provable and answers <c>null</c>.</summary>
     /// <remarks>INTAKE(PREDICATE) — renders only to ASK a question — of the RAW operand: its carrier flags and its digit bound.</remarks>
     private bool AlignmentMayLeaveCarrier(BoundIntrinsicCall ic) =>
-        FunctionValueLane.AlignmentMayLeaveCarrier(ic.Sig.RuntimeMethod, Operands(ic)
+        IntrinsicCarrierRules.AlignmentMayLeaveCarrier(ic.Sig.RuntimeMethod, Operands(ic)
             .Select((x, i) => x.Dec || x.Real || x.Digits == 0
-                ? (FunctionValueLane.AlignedOperand?)null
-                : new FunctionValueLane.AlignedOperand(x.Digits, x.Scale, ic.Args[i] is BoundFieldOperand { Place: TableAllPlace }))
+                ? (IntrinsicCarrierRules.AlignedOperand?)null
+                : new IntrinsicCarrierRules.AlignedOperand(x.Digits, x.Scale, ic.Args[i] is BoundFieldOperand { Place: TableAllPlace }))
             .ToList());
 
     /// <summary>Does any argument arrive on the SDIDI carrier (a native integer power — kb/Work PB69)?</summary>
@@ -1062,41 +1061,8 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
     private bool AnyDecRaw(BoundIntrinsicCall ic) => Operands(ic).Any(x => x.Dec);
 
     /// <summary>
-    /// ⛔ THE FIRST HALF OF THE ALWAYS-SDIDI SET, AND THE ONLY HALF WITH A STRUCTURAL DEFINITION: the native-switch
-    /// arms in <see cref="RenderNum"/> that CROSS-ALIGN their arguments to one common scale before evaluating.
-    /// </summary>
-    /// <remarks>
-    /// <para>Under a standard mode §15.4.1 r1 makes each of these equal its equivalent arithmetic expression
-    /// (§15.60.4 MEAN, §15.61.4 MEDIAN, §15.62.4 MIDRANGE, §15.64.4 MOD, §15.76.4 RANGE, §15.77.4 REM,
-    /// §15.88.4 SUM), and each argument converts to the SDIDI INDIVIDUALLY (§8.8.1.5.2 r1) — so no common scale is
-    /// ever formed. The NATIVE arms instead align first, on the Int128 carrier, and alignment MULTIPLIES: a
-    /// 31-digit integer beside a scale-18 item needs 49 digits, so <c>NumericRenderer.Align</c>'s per-argument
-    /// escape raises EC-SIZE-OVERFLOW where the SDIDI holds the answer exactly. That makes "does this arm
-    /// cross-align?" the exact test for "must this arm be on the Dec lane under a standard mode".</para>
-    /// <para>⛔ It was built one arm at a time and each pass believed itself complete: PB62 added the summing
-    /// family for MEAN's <c>MEAN(10³⁰, 2.0)</c>; PB252 found MOD and REM still missing — the SAME clause, the SAME
-    /// mechanism, the arm nobody swept (feedback_two_arm_dispatch). It is a SET rather than an <c>is … or …</c>
-    /// pattern so that <c>CrossAlignedArmsDriftTests</c> can hold it against the switch itself: the test reads
-    /// <c>IntrinsicRenderer.cs</c>, collects the case labels of every arm whose body calls
-    /// <see cref="AlignedArgs"/> / <see cref="AlignedArgsEx"/> or <c>NumericRenderer.Align(x, s)</c> against a
-    /// COMMON scale, and fails if any of them is missing here. A new aligning arm is therefore routed
-    /// automatically or the build goes red — it can no longer be forgotten.</para>
-    /// <para>MAX / MIN / ORD-MAX / ORD-MIN are deliberately ABSENT: <see cref="RawArgPairs"/> aligns each argument
-    /// to its OWN scale (an identity rescale), because §15.59.4 / §15.63.4 / §15.71.4 / §15.72.4 return the
-    /// CONTENT or the ORDINAL of an argument — pure selection, no cross-argument arithmetic, no common scale to
-    /// escape (kb/Work PB65).</para>
-    /// </remarks>
-    internal static readonly FrozenSet<string> CrossAlignedNativeArms = new[]
-    {
-        "ModScaled", "RemScaled",                                   // §15.64.4 / §15.77.4 — Align(a, s), Align(b, s)
-        "SumScaled", "RangeScaled",                                 // §15.88.4 / §15.76.4 — AlignedArgs
-        "MedianScaled", "MidrangeScaled",                           // §15.61.4 / §15.62.4 — AlignedArgs
-        "MeanScaled",                                               // §15.60.4 — AlignedArgsEx
-    }.ToFrozenSet(StringComparer.Ordinal);
-
-    /// <summary>
     /// The second half of the always-SDIDI set: functions whose standard-mode returned value a RULE fixes
-    /// outright, so the argument carrier cannot matter. Unlike <see cref="CrossAlignedNativeArms"/> this half has
+    /// outright, so the argument carrier cannot matter. Unlike <see cref="IntrinsicCarrierRules.CrossAlignedNativeArms"/> this half has
     /// no structural derivation — each member is here for its own cited reason and is listed one by one.
     /// </summary>
     /// <remarks>
@@ -1179,7 +1145,7 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
     /// then digit-identical to the SDIDI evaluation (documented equivalence, <c>COBOLNET_NUMERIC_DESIGN.md</c> D3;
     /// the &gt;34-digit exact residue keeps MORE precision than per-op rounding would) — that equivalence is what
     /// ALIGNMENT breaks, which is exactly why the aligning arms are unconditional (see
-    /// <see cref="CrossAlignedNativeArms"/>). Returns null for functions with no Dec body (the prose family
+    /// <see cref="IntrinsicCarrierRules.CrossAlignedNativeArms"/>). Returns null for functions with no Dec body (the prose family
     /// converts its binary64 result in <see cref="RenderFloat"/>).</para>
     /// <para>Result carriers: SIGN / ORD-MAX / ORD-MIN return INTEGERS (scale-0 exact); everything else
     /// returns the SDIDI itself (<c>Dec: true</c>), the same channel the R18 constant arms and MEAN's
@@ -1198,7 +1164,7 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
         // implementor latitude reaches only a function whose definition does NOT otherwise specify it. That
         // arm precedes this set; the pair is listed below anyway because their argument is a STRING, so
         // AnyDecOrRealRaw is false and without the membership this early-out would return null under native.
-        bool alwaysSdidi = CrossAlignedNativeArms.Contains(m) || StandardValueFixedByRule.Contains(m);
+        bool alwaysSdidi = IntrinsicCarrierRules.CrossAlignedNativeArms.Contains(m) || StandardValueFixedByRule.Contains(m);
         if (!alwaysSdidi && !AnyDecOrRealRaw(ic) && !ArgumentRoundsAtLift(ic)) return null;
 
         string mode = num.IntermediateMode;

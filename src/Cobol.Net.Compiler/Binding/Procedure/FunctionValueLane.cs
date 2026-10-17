@@ -3,7 +3,6 @@
 using System.Collections.Frozen;
 using CobolNet.Binding.Bound;
 using CobolNet.Binding.Model;
-using CobolNet.CodeGen.Emit;
 using CobolNet.Common;
 
 namespace CobolNet.Binding.Procedure;
@@ -29,7 +28,7 @@ namespace CobolNet.Binding.Procedure;
 /// the same two interfaces <c>NumericRenderer</c> implements — so a bound node added tomorrow is a COMPILE error here
 /// as it is there — following <c>NumericRenderer.CombineCore</c> and <c>Power</c> for the arithmetic around a float.
 /// A function whose value is fixed by its definition (NUMVAL, NUMVAL-C) is SDIDI-carried in every mode, and a nested
-/// cross-aligning call (SUM, RANGE, MEAN, MEDIAN, MIDRANGE) is SDIDI-carried when <see cref="AlignmentMayLeaveCarrier"/>
+/// cross-aligning call (SUM, RANGE, MEAN, MEDIAN, MIDRANGE) is SDIDI-carried when <see cref="IntrinsicCarrierRules.AlignmentMayLeaveCarrier"/>
 /// says its aligned arguments may leave the <c>Int128</c> carrier (the digit bounds of the field and literal arguments
 /// are read here as the renderer reads them; an argument whose bound only the renderer's arithmetic knows is unproven,
 /// as it is there). What it cannot see is a run-time fact (a wide exact intermediate that overflows to the SDIDI, a
@@ -80,7 +79,8 @@ internal static class FunctionValueLane
     /// render — the lane <c>IntrinsicRenderer.RenderNum</c> reaches through <c>RenderFloat</c> under NATIVE arithmetic.
     /// Always false under a decimal-engine mode. An INTEGER function (§15.2 item 5) is answered as any other is, because
     /// the renderer has no integer early-out (a binary64 argument takes INTEGER onto <c>FloorReal</c>); the intermediate
-    /// of a TOP-LEVEL integer function is described before this is asked (<c>SendingValueTemp.IntermediatePic</c>).</summary>
+    /// of a TOP-LEVEL integer function asks it too, before its scale-0 item (<c>SendingValueTemp.IntermediatePic</c>,
+    /// review R1-1).</summary>
     internal static bool ReturnsBinary64(BoundIntrinsicCall call, ArithmeticMode mode) =>
         !ArithmeticModes.IsDecimalEngine(mode) && Of(call) is CarrierKind.Real or CarrierKind.ApproximateReal;
 
@@ -90,7 +90,7 @@ internal static class FunctionValueLane
         var sig = call.Sig;
         // NUMVAL / NUMVAL-C return the SDIDI in EVERY mode — RenderNum's first arm, ahead of the mode dispatch and of
         // whatever their arguments are (the value is fixed by the function's definition).
-        if (ValueFixedByDefinition(sig.RuntimeMethod)) return CarrierKind.Dec;
+        if (IntrinsicCarrierRules.ValueFixedByDefinition(sig.RuntimeMethod)) return CarrierKind.Dec;
         // A function of a non-numeric result (reachable in a numeric context only under --permissive) is an exact value
         // (RenderNum's alphanumeric-decode arm). ⛔ AN INTEGER FUNCTION IS NOT EXEMPT (kb/Work PB3268, review R3-1):
         // RenderNum has no integer early-out, so INTEGER(1.5E0) computes FloorDec on the SDIDI, a SUM over wide integer
@@ -110,8 +110,8 @@ internal static class FunctionValueLane
         if (anyDec && sdidiBody) return OnSdidiBody(sig.RuntimeMethod);
         // A cross-aligning arm (SUM / RANGE / MEAN / MEDIAN / MIDRANGE) whose aligned arguments may leave the Int128 carrier
         // takes the SDIDI (RenderNum's PB621 arm) — ahead of the float lane, whatever the arithmetic around it.
-        if (IntrinsicRenderer.CrossAlignedNativeArms.Contains(sig.RuntimeMethod)
-            && AlignmentMayLeaveCarrier(sig.RuntimeMethod, args.Select(a => a.Aligned).ToList()))
+        if (IntrinsicCarrierRules.CrossAlignedNativeArms.Contains(sig.RuntimeMethod)
+            && IntrinsicCarrierRules.AlignmentMayLeaveCarrier(sig.RuntimeMethod, args.Select(a => a.Aligned).ToList()))
             return OnSdidiBody(sig.RuntimeMethod);
         // A mixed selection list rides the SDIDI too (RenderNum's selection arm).
         if (Selections.Contains(sig.RuntimeMethod) && anyReal && !allReal && sdidiBody) return OnSdidiBody(sig.RuntimeMethod);
@@ -135,29 +135,6 @@ internal static class FunctionValueLane
             ? Carrier.Exact(true)
             : argument;
 
-    /// <summary>
-    /// The functions whose DEFINITION fixes the returned value in EVERY arithmetic mode, so §15.4.1's
-    /// implementor latitude never reaches them and no working scale may be imposed (kb/Work PB251). Asked by
-    /// <c>IntrinsicRenderer.RenderNum</c> BEFORE the arithmetic-mode dispatch.
-    /// </summary>
-    /// <remarks>
-    /// <para>⛔ THE SET IS TWO, AND IT WAS DERIVED BY SWEEPING CLAUSE 15 RATHER THAN BY RECALL — the refuted
-    /// adjudication's screen ("standard-decimal arithmetic is in effect" + "34 digits") could only find
-    /// MODE-CONDITIONED specifications and so missed the one function that states its value unconditionally.
-    /// The sound screen is: a §15.x "Returned value rule(s)" clause that mentions NEITHER an arithmetic mode,
-    /// NOR "implementor", NOR "approximation", NOR an equivalent arithmetic expression. Over clause 15 that
-    /// yields 38 functions, and every one but these two returns an INTEGER, a STRING, or a selected argument's
-    /// own content — shapes no fraction-digit working scale can damage. E (§15.27.3 r1), PI (§15.73.3 r1),
-    /// SQRT (§15.84.4 r4) and NUMVAL-F (§15.69.4 r2) each say "native … implementor-defined approximation" in
-    /// so many words, which is why they keep the float lane and are NOT here.</para>
-    /// <para>The members: NUMVAL §15.67.4 r1 and NUMVAL-C §15.68.4 r1, both "The returned value is the numeric
-    /// value represented by argument-1". <c>IntrinsicRenderer.RenderDec</c> holds their SDIDI arms (its <c>alwaysDec</c>
-    /// list already named them), so this predicate only decides WHEN that lane is taken, never what it does.
-    /// If it ever returned <c>null</c> here the switch's <c>default</c> stages LOUD — never a quiet fallback to
-    /// a working-scale render.</para>
-    /// </remarks>
-    internal static bool ValueFixedByDefinition(string runtimeMethod) => runtimeMethod is "Numval" or "NumvalC";
-
     /// <summary>The call's RESOLVED type is Integer — the ONE reader (<see cref="IntrinsicResultType.Resolve"/>).</summary>
     private static bool IsInteger(BoundIntrinsicCall call) =>
         IntrinsicResultType.Resolve(call.Sig, call.Args) is IntrinsicType.Integer;
@@ -170,76 +147,10 @@ internal static class FunctionValueLane
     /// <summary>A carrier, whether the value is known to have scale 0 (an integer — the question
     /// <c>NumericRenderer.Power</c> asks of its exponent), and — for an exact operand whose digit bound the renderer
     /// states (<c>NumX.Digits</c>) — that bound.</summary>
-    private readonly record struct Carrier(CarrierKind Kind, bool Integral = false, AlignedOperand? Aligned = null)
+    private readonly record struct Carrier(CarrierKind Kind, bool Integral = false, IntrinsicCarrierRules.AlignedOperand? Aligned = null)
     {
         public bool IsReal => Kind is CarrierKind.Real or CarrierKind.ApproximateReal;
-        public static Carrier Exact(bool integral, AlignedOperand? aligned = null) => new(CarrierKind.Fixed, integral, aligned);
-    }
-
-    /// <summary>An exact scaled operand whose digit bound is known: its unscaled digits (<c>NumX.Digits</c>), its scale
-    /// and whether it is a table(ALL) argument, which stands for an unknown number of elements.</summary>
-    internal readonly record struct AlignedOperand(int Digits, int Scale, bool TableAll);
-
-    /// <summary>Can aligning a cross-aligning call's arguments to their common scale — and accumulating the aligned values —
-    /// leave the <see cref="Int128"/> carrier? True only when EVERY argument is an exact scaled operand with a KNOWN
-    /// digit bound (<paramref name="operands"/>: <c>null</c> for an SDIDI or binary64 operand or one of unknown bound,
-    /// for which nothing is provable and the escape-checked native arm (PB252) keeps its documented behaviour) and the
-    /// sum of the magnitudes the function adds, each bounded by its aligned digits, exceeds
-    /// <see cref="Int128.MaxValue"/>. THE ONE READER of the question: <c>IntrinsicRenderer.RenderNum</c> asks it of the
-    /// RAW operands it is about to render, and <see cref="Of"/> asks it of the same facts read from the bound tree, so
-    /// the carrier a nested SUM / RANGE / MEAN / MEDIAN / MIDRANGE answers on is predicted by the rule that picks it.</summary>
-    /// <remarks>
-    /// <para>Which magnitudes are added is a property of the FUNCTION: SUM and MEAN add every argument (a table(ALL)
-    /// argument, whose run-time count is unknown, is charged 9 more digits); RANGE subtracts two; MEDIAN and
-    /// MIDRANGE add two and halve through ×10; MOD and REM align a pair and return one of them.</para>
-    /// <para>The aligned value's own digits are an UPPER bound by construction: an argument's unscaled digits plus
-    /// the scale gap it is shifted by.</para></remarks>
-    internal static bool AlignmentMayLeaveCarrier(string runtimeMethod, IReadOnlyList<AlignedOperand?> operands)
-    {
-        // ⛔ MOD / REM ARE NOT ROUTED. Their value is a DIFFERENCE of nearly equal magnitudes: MOD(9E30, 0.12345678) is
-        // 0.1194939, which needs 39 digits of the dividend, and the SDIDI body keeps 34 — it would answer an
-        // approximation SILENTLY where the native arm refuses LOUDLY (EC-SIZE-OVERFLOW at the carrier). The summing
-        // family's value, in contrast, is as large as its arguments, so every digit a receiver can store (≤ 31) lies
-        // inside the SDIDI's 34. (PB621 names SUM, RANGE, MEAN, MEDIAN and MIDRANGE only.)
-        if (runtimeMethod is "ModScaled" or "RemScaled") return false;
-        if (operands.Count == 0 || operands.Any(x => x is null)) return false;
-        var xs = operands.Select(x => x!.Value).ToList();
-        int s = xs.Max(x => x.Scale);
-        // ⛔ THE BOUND IS ON THE VALUE, NOT ON THE WIDEST ARGUMENT PLUS A DIGIT COUNT. Argument i, aligned to the common
-        // scale, is below 10^D_i (D_i its unscaled digits plus the scale gap — a table(ALL) argument stands for an
-        // unknown number of elements, so it is charged nine more digits); the function's value is bounded by the sum of
-        // the magnitudes it adds: every argument for SUM and MEAN, the two largest for RANGE, and those two times ten
-        // for MEDIAN and MIDRANGE (added, then halved through ×10). `9(29)` beside `V9(9)` is 38 + 9 digits of two
-        // values whose sum is 1.0000000010e38 — the Int128 carrier holds it, and the old "widest + digits of n"
-        // allowance sent it to the SDIDI, which keeps 34 digits (kb/Work PB621's review follow-up).
-        var terms = xs.Select(x => Pow10Bound(x.Digits + (s - x.Scale) + (x.TableAll ? 9 : 0)))
-            .OrderByDescending(t => t).ToList();
-        UInt128? bound = runtimeMethod switch
-        {
-            "SumScaled" or "MeanScaled" => SumOf(terms),
-            "RangeScaled" => SumOf(terms.Take(2)),
-            _ => SumOf(terms.Take(2)) is { } two && two <= UInt128.MaxValue / 10 ? two * 10 : null,   // MEDIAN / MIDRANGE
-        };
-        return bound is not { } b || b > (UInt128)Int128.MaxValue;
-
-        // 10^digits − 1 — the largest magnitude of `digits` digits; null once it is past UInt128 (never fits).
-        static UInt128? Pow10Bound(int digits)
-        {
-            if (digits is < 0 or > 38) return null;
-            UInt128 p = 1;
-            for (int i = 0; i < digits; i++) p *= 10;
-            return p - 1;
-        }
-        static UInt128? SumOf(IEnumerable<UInt128?> terms)
-        {
-            UInt128 total = 0;
-            foreach (var t in terms)
-            {
-                if (t is not { } v || total > UInt128.MaxValue - v) return null;
-                total += v;
-            }
-            return total;
-        }
+        public static Carrier Exact(bool integral, IntrinsicCarrierRules.AlignedOperand? aligned = null) => new(CarrierKind.Fixed, integral, aligned);
     }
 
     /// <summary>The carrier classification of an argument — a second visitor over the operand and expression trees,
@@ -289,10 +200,13 @@ internal static class FunctionValueLane
                 ? new Carrier(CarrierKind.Dec)
                 : Carrier.Exact(NumericLiteral.TryGetIntegerValue(text, out _), LiteralBound(text));
 
-        /// <summary>The literal's own digit bound, from the ONE reader the renderer's operand uses
-        /// (<c>EmitText.UnscaledLit</c> — leading zeros carry no magnitude).</summary>
-        private static AlignedOperand? LiteralBound(string text) =>
-            EmitText.UnscaledLit(text) is { Real: false, Digits: > 0 } lit ? new AlignedOperand(lit.Digits, lit.Scale, false) : null;
+        /// <summary>The literal's own digit bound, from the ONE decomposition and the ONE bound reader the renderer's
+        /// operand (<c>EmitText.UnscaledLit</c>) uses: <see cref="NumericLiteral.TryUnscaledParts"/> and
+        /// <see cref="NumericLiteral.UnscaledDigitBound"/> (leading zeros carry no magnitude).</summary>
+        private static IntrinsicCarrierRules.AlignedOperand? LiteralBound(string text) =>
+            NumericLiteral.TryUnscaledParts(text, out string digits, out int scale)
+                ? new IntrinsicCarrierRules.AlignedOperand(NumericLiteral.UnscaledDigitBound(digits), scale, false)
+                : null;
 
         /// <summary><c>NumericRenderer.FieldNum</c>: a floating-point ITEM is a binary64, a floating-point numeric-EDITED
         /// sender de-edits onto the SDIDI, every other numeric item is an exact scaled value (a reference-modified
@@ -309,8 +223,8 @@ internal static class FunctionValueLane
                 return new Carrier(CarrierKind.Dec);
             // The renderer states the digit bound of an exact numeric item it reads as a value (a windowed or image-decoded
             // read states none): PicInfo.UnscaledDigitBound at the picture's scale.
-            AlignedOperand? bound = !item.StoreAsImage && pic.Category is PicCategory.Numeric
-                ? new AlignedOperand(pic.UnscaledDigitBound, pic.Scale, tableAllOperand)
+            IntrinsicCarrierRules.AlignedOperand? bound = !item.StoreAsImage && pic.Category is PicCategory.Numeric
+                ? new IntrinsicCarrierRules.AlignedOperand(pic.UnscaledDigitBound, pic.Scale, tableAllOperand)
                 : null;
             return Carrier.Exact(pic.ReceiverScale() == 0, bound);
         }

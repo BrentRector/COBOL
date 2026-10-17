@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using System.Text.RegularExpressions;
+using CobolNet.Binding.Bound;
 using CobolNet.Binding.Procedure;
 using CobolNet.Tests.Shared;
 using Xunit;
@@ -59,21 +60,57 @@ public sealed class FunctionValueLaneDriftTests
         return native;
     }
 
-    /// <summary>The two other function sets the prediction reads off the renderer's own members
-    /// (<c>IntrinsicRenderer.CrossAlignedNativeArms</c>, <see cref="FunctionValueLane.ValueFixedByDefinition"/>) route a call
+    /// <summary>⛔ THE PREDICTION AND THE RENDERER SHARE THEIR RULES THROUGH compiler.bound, NEVER THROUGH EACH OTHER
+    /// (kb/Work PB3268, review R1-2; DESIGN-architecture-review.md §8.1: compiler.codegen reaches compiler.bound and
+    /// compiler.model, compiler.binding never reaches compiler.codegen, and no tolerated row covers either direction
+    /// between <c>CobolNet.Binding.Procedure</c> and <c>CobolNet.CodeGen.Emit</c>). The lane once imported
+    /// <c>IntrinsicRenderer.CrossAlignedNativeArms</c> and <c>EmitText.UnscaledLit</c> while the renderer imported the
+    /// lane's <c>ValueFixedByDefinition</c> and <c>AlignmentMayLeaveCarrier</c>: a namespace cycle between the binder and
+    /// the code generator. The shared rules now live in <see cref="IntrinsicCarrierRules"/> and
+    /// <c>NumericLiteral.TryUnscaledParts</c>; this holds every file of both namespaces to it.</summary>
+    [Fact]
+    public void BindingProcedure_AndCodeGenEmit_DoNotReachEachOther()
+    {
+        string compiler = TestRepo.Src("Cobol.Net.Compiler");
+        string obj = $"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}";
+        var offenders = new List<string>();
+        foreach (string file in Directory.EnumerateFiles(compiler, "*.cs", SearchOption.AllDirectories))
+        {
+            if (file.Contains(obj, StringComparison.Ordinal)) continue;
+            string text = File.ReadAllText(file);
+            string? forbidden =
+                text.Contains("namespace CobolNet.Binding.Procedure;", StringComparison.Ordinal) ? "CobolNet.CodeGen.Emit"
+                : text.Contains("namespace CobolNet.CodeGen.Emit;", StringComparison.Ordinal) ? "CobolNet.Binding.Procedure"
+                : null;
+            if (forbidden is null) continue;
+            // A comment may name the other layer's member (the cref-free prose that says which rule it restates).
+            bool named = text.Split('\n').Any(l =>
+                !l.TrimStart().StartsWith("//", StringComparison.Ordinal) && l.Contains(forbidden, StringComparison.Ordinal));
+            if (named) offenders.Add($"{Path.GetRelativePath(compiler, file)} names {forbidden}");
+        }
+        Assert.True(offenders.Count == 0, "a cross-layer edge §8.1 does not allow: " + string.Join("; ", offenders));
+        // The shared rules depend on nothing above compiler.bound.
+        string rules = File.ReadAllText(Path.Combine(compiler, "Binding", "Bound", "IntrinsicCarrierRules.cs"));
+        Assert.DoesNotContain("using CobolNet.CodeGen", rules, StringComparison.Ordinal);
+        Assert.DoesNotContain("using CobolNet.Binding.Procedure", rules, StringComparison.Ordinal);
+        Assert.DoesNotContain("using CobolNet.Binding;", rules, StringComparison.Ordinal);
+    }
+
+    /// <summary>The two other function sets the prediction shares with the renderer
+    /// (<see cref="IntrinsicCarrierRules.CrossAlignedNativeArms"/>, <see cref="IntrinsicCarrierRules.ValueFixedByDefinition"/>) route a call
     /// to its SDIDI body, so each member needs one in <see cref="FunctionValueLane.NativeSdidiBodies"/> - else the
     /// prediction would name a lane the renderer cannot take (kb/Work PB3268, review R2-1).</summary>
     [Fact]
     public void TheSdidiRoutedSets_AreSubsetsOfNativeSdidiBodies()
     {
-        var crossAligned = CobolNet.CodeGen.Emit.IntrinsicRenderer.CrossAlignedNativeArms;
+        var crossAligned = IntrinsicCarrierRules.CrossAlignedNativeArms;
         Assert.True(crossAligned.Count > 0);
         foreach (string arm in crossAligned)
             Assert.True(FunctionValueLane.NativeSdidiBodies.Contains(arm),
                 $"CrossAlignedNativeArms names {arm}, which has no native SDIDI body in NativeSdidiBodies");
         foreach (string arm in new[] { "Numval", "NumvalC" })
         {
-            Assert.True(FunctionValueLane.ValueFixedByDefinition(arm), $"{arm} is a value-fixed-by-definition function (§15.67.4 r1 / §15.68.4 r1)");
+            Assert.True(IntrinsicCarrierRules.ValueFixedByDefinition(arm), $"{arm} is a value-fixed-by-definition function (§15.67.4 r1 / §15.68.4 r1)");
             Assert.True(FunctionValueLane.NativeSdidiBodies.Contains(arm), $"{arm} has no native SDIDI body in NativeSdidiBodies");
         }
     }

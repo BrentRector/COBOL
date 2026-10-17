@@ -251,55 +251,11 @@ internal static class EmitText
     // from Format 6 in ONE place and delegates the Format-6 half to CobolLiteral.AllLiteralRaw (kb/Work PB461).
     // A forward with no callers is a second name for a rule, and this rule had five of those.
 
-    /// <summary>⛔ THE ONE exact unscaled decomposition of a numeric literal, in EITHER notation: the signed
-    /// unscaled digit string and the fraction-digit SCALE, so that the literal's value is exactly
-    /// <c>digits × 10^−scale</c>. A FIXED-POINT literal is its digits at its decimal-point position (ISO
-    /// §8.3.3.3.2 rule 4 — "The value of a fixed-point numeric literal is the algebraic quantity represented by
-    /// the characters in the fixed-point numeric literal"); a FLOATING-POINT literal decomposes to the SAME
-    /// KIND OF PAIR, because ISO §8.3.3.3.3 rule 5 makes its value "the algebraic product of the value of its
-    /// significand and the quantity derived by raising ten to the power of the exponent" — an EXACT scaled
-    /// integer, never an approximation.
-    /// <para>⛔ NEVER A TEXT EXPANSION. The pair comes from <c>NumericLiteral.TryParseExact</c>'s (significand,
-    /// power of ten). Expanding the value to digit text would build a string as long as the literal's decade
-    /// bound allows, and that bound is the SDIDI intermediate exponent range (owned solely by
-    /// <c>ArithmeticModes.IntermediateExponentRange</c>, which COBOLNET1661 enforces on the literal at bind) —
-    /// thousands of characters for one argument. The SCALE simply goes NEGATIVE instead — <c>1.0E+300</c> is 1
-    /// at scale −300 — which <c>CobolNum.Rescale</c> already carries (it is the same negative scale a PICTURE-P
-    /// trailing-scaled item uses).</para>
-    /// <para>The pair is normalized toward a NON-NEGATIVE scale while the unscaled magnitude still fits
-    /// <see cref="Int128"/>, so <c>1.5E+3</c> decomposes exactly as <c>1500</c> does. That is the visible form of
-    /// owner decision D-B's invariant — a literal's NOTATION never changes the VALUE it contributes — now true
-    /// on the argument lane as well.</para>
-    /// Returns false for text that is not a canonical numeric literal; the binder has already diagnosed it
-    /// (COBOLNET1661 for an out-of-range exponent, the §8.3.3.3.3 SR2/SR3 form checks for the rest).</summary>
-    internal static bool TryUnscaledParts(string text, out string digits, out int scale)
-    {
-        string t = text.Trim().TrimStart('+');
-        if (t.IndexOf('E') < 0 && t.IndexOf('e') < 0)
-        {
-            // The FIXED-POINT form, textually — byte-identical to what this helper has always produced (leading
-            // zeros and the sign are preserved; IntLiteralX does the magnitude test).
-            int dot = t.IndexOf('.');
-            digits = dot < 0 ? t : t.Remove(dot, 1);
-            scale = dot < 0 ? 0 : t.Length - dot - 1;
-            return true;
-        }
-        digits = ""; scale = 0;
-        if (!CobolNet.Common.NumericLiteral.TryParseExact(t, out Int128 sig, out int exp10)) return false;
-        // Normalize toward scale ≥ 0 while the magnitude still fits the Int128 carrier (the guard keeps the
-        // multiply from overflowing; a literal's significand is at most 36 digits per §8.3.3.3.3 rule 2).
-        Int128 limit = Int128.MaxValue / 10;
-        while (exp10 > 0 && sig >= -limit && sig <= limit) { sig *= 10; exp10--; }
-        digits = sig.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        scale = -exp10;
-        return true;
-    }
-
     /// <summary>Render a numeric literal as a scaled integer: its digits as the unscaled value, its fractional
     /// digit count as the scale (e.g. <c>"3.5"</c> → <c>(35L, 1)</c>, <c>"-12"</c> → <c>(-12L, 0)</c>). A literal
     /// wider than 18 digits (legal to 31, ISO §8.3.3.3.2 — the 2002+ wide tier) emits an <c>Int128.Parse</c>
     /// since C# has no Int128 literal form.
-    /// <para>⛔ A FLOATING-POINT literal is a scaled integer TOO (<see cref="TryUnscaledParts"/>, ISO §8.3.3.3.3
+    /// <para>⛔ A FLOATING-POINT literal is a scaled integer TOO (<c>NumericLiteral.TryUnscaledParts</c>, ISO §8.3.3.3.3
     /// rule 5) and this helper's contract IS that pair. It used to return the literal's own source text as a
     /// binary64 <c>Real</c> NumX, which is not a scaled integer at all, and the two consumers that render an
     /// OPERAND through this helper — the CALL argument lane and the INVOKE argument lane — then handed a C#
@@ -312,12 +268,10 @@ internal static class EmitText
     /// form.</para></summary>
     public static NumX UnscaledLit(string text)
     {
-        if (!TryUnscaledParts(text, out string digits, out int scale))
+        if (!CobolNet.Common.NumericLiteral.TryUnscaledParts(text, out string digits, out int scale))
             return new NumX(text.Trim().TrimStart('+'), 0, Real: true);
         var (lit, u) = IntLiteralX(digits);
-        // The literal's own digit count is the exact bound (leading zeros carry no magnitude): the sign is not a digit.
-        int significant = digits.TrimStart('-', '+').TrimStart('0').Length;
-        return new NumX(lit, scale, U: u, Digits: Math.Clamp(significant, 1, 39));   // a synthesized HIGHEST-ALGEBRAIC literal is 39 digits
+        return new NumX(lit, scale, U: u, Digits: CobolNet.Common.NumericLiteral.UnscaledDigitBound(digits));
     }
 
     /// <summary>The C# literal for an unscaled integer digit string: <c>…L</c> while it fits <see cref="long"/>

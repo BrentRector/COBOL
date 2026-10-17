@@ -153,25 +153,32 @@ internal sealed class SendingValueTemp(BinderContext ctx)
     /// (PIC 9V9(15)) stored 3.141592653000000 where `MOVE FUNCTION PI TO Q3` stores 3.141592653589793.
     /// <para>The carrier follows the value, in the order the renderer chooses it:</para>
     /// <list type="number">
-    ///   <item>an INTEGER function (§15.2 item 5) — <see cref="IntegerIntermediatePic"/>, the carrier's whole width at
-    ///     scale 0, or <see cref="IntegerFunctionValuePic"/> for the one text use (its image is DOC-A.1-92's);</item>
+    ///   <item>an INTEGER function (§15.2 item 5) read as TEXT — <see cref="IntegerFunctionValuePic"/> (its image is
+    ///     DOC-A.1-92's);</item>
     ///   <item>a function the renderer returns as a BINARY64 (<see cref="FunctionValueLane.ReturnsBinary64"/>, asked of
     ///     the call and its ARGUMENTS' carriers — a floating-point literal argument takes a function with an SDIDI body
     ///     off the float lane, a binary64 argument puts any numeric-argument function onto it), or any function whose
     ///     every receiver is a floating-point item (a binary64 receiver takes the value as a binary64) —
     ///     <see cref="Binary64ReturnedValuePic"/>, so the store into the intermediate quantizes NOTHING and each
-    ///     receiver's own transfer (the ONE float landing) quantizes once, at ITS scale;</item>
+    ///     receiver's own transfer (the ONE float landing) quantizes once, at ITS scale. ⛔ AN INTEGER FUNCTION IS ASKED
+    ///     THIS TOO, BEFORE ITS SCALE-0 ITEM (kb/Work PB3268, review R1-1): §15.2 item 5 fixes the value's type, never
+    ///     its magnitude, so INTEGER of a COMP-2 holding 1.5E50 (<c>FloorReal</c>, a binary64) or INTEGER(1.5E40) into
+    ///     COMP-2 receivers is a 41- or 51-digit integer no 38-digit fixed item holds, and the integer item stored
+    ///     9.99906754673275E+37 (or 0) where `MOVE … TO C3` stores the value whole;</item>
+    ///   <item>any other INTEGER function — <see cref="IntegerIntermediatePic"/>, the carrier's whole width at scale 0;</item>
     ///   <item>otherwise a fixed-point item described by the receivers (<see cref="ShapedPic"/>), or, when no
     ///     receiver is known (an EVALUATE subject, an argument frozen for §8.4.3.2.4 GR2's order),
     ///     <see cref="ValueOperandPic"/>.</item>
     /// </list></summary>
     private PicInfo IntermediatePic(BoundOperand c, ValueUse use)
     {
-        if (IntrinsicResultType.IsIntegerOperand(c)) return use.AsText ? IntegerFunctionValuePic : IntegerIntermediatePic;
+        bool integer = IntrinsicResultType.IsIntegerOperand(c);
+        if (integer && use.AsText) return IntegerFunctionValuePic;
         var receivers = use.Receivers;
         if (c is BoundComputedOperand { Expr: BoundIntrinsicCall call } && FunctionValueLane.ReturnsBinary64(call, ctx.Data.Options.Arithmetic)
             || receivers is { Count: > 0 } && receivers.All(r => r.DenotedItem is not null && r.Item.OperandPic is { IsFloat: true }))
             return Binary64ReturnedValuePic;
+        if (integer) return IntegerIntermediatePic;
         return receivers is { Count: > 0 } ? ShapedPic(receivers) : use.AsText ? FunctionValuePic : ValueOperandPic;
     }
 
