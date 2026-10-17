@@ -13,8 +13,15 @@ PB3160); this folder is built slice by slice from its §13.
 | `wiseowl/cases/<clause>/` | WiseOwl COBOL's own regression tests, in the same format, never part of a suite |
 | `wiseowl/diagnostics.json` | WiseOwl COBOL's refusals: per test, the editions at which it refuses the program and the code or text it reports |
 | `implementor-defined.json` | The Annex A.1 items whose values the standard enumerates, and those values |
-| `harness/generate.py` | The one reader of the test headers: refuses a malformed test, writes the suites, reports completeness |
+| `harness/generate.py` | The one reader of the test headers: refuses a malformed test (and a malformed adapter, profile or baseline), writes the suites, reports completeness |
+| `harness/run.py` | The harness: runs the suites against a compiler through its adapter and reports a verdict per test |
+| `harness/config.py` | The formats of the adapters, profiles and baselines, and their one loader |
+| `harness/normalization-fixture.json` | The output normalization's one fixture, which both runners' normalizations are held to |
+| `adapters/<compiler>.json` | How the harness drives a compiler: its compile, run and flag-mode commands, its edition map, how a diagnostic's line is read, file-name limits, crash codes |
+| `profiles/<compiler>.json` | What a compiler claims: its editions, the Annex A.4 modules and A.3 elements it supports (with the evidence), its Annex A.1 values, the words it reserves beyond the standard |
+| `baselines/<compiler>.json` | A compiler's recorded verdicts, against which a run reports its changes |
 | `suites/` | Build output, never committed: `suites/<edition>/manifest.json`, `suites/wiseowl/manifest.json`, `completeness.json` |
+| `results/` | Build output, never committed: `results/<compiler>/results.json` and `junit.xml` |
 
 ## A test
 
@@ -39,12 +46,59 @@ form. Every field, every expectation and the portability lint (what a portable t
 
 ```
 python conformance-suite/harness/generate.py            # refuse, or write suites/ and print the completeness report
+python conformance-suite/harness/generate.py --out DIR  # the same, written to DIR instead of suites/
 python conformance-suite/harness/generate.py --check    # the refusals only, writing nothing
 python conformance-suite/harness/generate.py --self-test
 ```
 
-`--check` is an audit of WiseOwl COBOL's local gate and of its CI, so a malformed test is red in seconds. The harness
-that runs a suite against a compiler (`harness/run.py`, its adapters and profiles) is the next slice (kb/Work PB3175).
+`--check` is an audit of WiseOwl COBOL's local gate and of its CI, so a malformed test, adapter, profile or baseline
+is red in seconds.
+
+## Running a suite against a compiler
+
+Generate the suites first, then run them with the compiler's adapter (Python 3, standard library only):
+
+```
+python conformance-suite/harness/generate.py
+python conformance-suite/harness/run.py --compiler wiseowl --set cobol=<path to the cobol command>
+python3 conformance-suite/harness/run.py --compiler gnucobol            # where cobc is (on Windows, under WSL)
+python conformance-suite/harness/run.py --compiler gnucobol --record-baseline
+python conformance-suite/harness/run.py --self-test
+```
+
+`--editions 85,2014` and `--test <id>` narrow a run, `--jobs`, `--hang-guard` and `--keep` tune it. Each test runs in
+its own fresh working directory with its declared files and stdin closed. Its verdict is **PASS**, **FAIL** (the
+output differs, an accepted test did not translate or run, or no diagnostic was reported at a flagged test's marked
+line), **NOT APPLICABLE** (the profile lacks the edition, a required module or element, or the test uses a word the
+compiler reserves beyond the standard; or a flagged test's control did not compile) or **NO VERDICT** (the compiler
+crashed, a process exceeded the hang guard, or the harness could not run the test). Results go to
+`results/<compiler>/` as JSON and JUnit XML, with totals per edition and per clause and the changes against
+`baselines/<compiler>.json`: a run is RED only when a verdict became worse than the recorded one (or, with no
+baseline, on any FAIL or NO VERDICT).
+
+### In WiseOwl COBOL's own gate
+
+WiseOwl COBOL's test assembly `tests/Cobol.Net.Tests.Conformance` runs the suite in-process (design §5, §13 S1c):
+`ConformanceSuiteTests` generates the manifests into a directory of its own (`generate.py --out`) and runs every test
+of `suites/wiseowl/manifest.json` (both trees, at every edition each names) through `ConformanceSuiteRunner`, which
+judges exactly as `run.py` does with the WiseOwl adapter, red on FAIL or NO VERDICT; and it compiles every refusal of
+`wiseowl/diagnostics.json` at its editions, which must be refused with its code or text. `ConformanceSuiteRunnerDriftTests`
+runs `run.py` through the WiseOwl adapter on the same generated suites and requires both runners to give every suite
+test the same verdict, holds both output normalizations to the one fixture `harness/normalization-fixture.json`, and
+holds the WiseOwl adapter's locale pin (a program's default locales are its environment's) to the in-process one.
+
+### Writing an adapter for another compiler
+
+An adapter is configuration (`harness/config.py` documents every field). Its command templates fill `{source}`,
+`{program}`, `{work}`, `{std}`, `{source-format}`, `{python}` and the adapter's own `variables`. The shapes for two
+compilers this repository cannot run, unverified:
+
+- **IBM Enterprise COBOL** (z/OS, Python for z/OS): the warning mechanism is the `FLAGSTD` compiler option, the
+  editions map to `FLAGSTD` levels, and an ASSIGN name is a DD name, so the adapter's `assign` sets an environment
+  variable per declared file, or a `hook` (a `.py` file beside the adapter defining `compile(ctx)`, `run(ctx)` and
+  `flag(ctx)`, each returning a `config.Step`) submits the compile and go steps as a batch job and reads the listing.
+- **Rocket (Micro Focus) Visual COBOL**: `cob -x {source} -o {program}` with the standard-flagging directive (`FLAG`
+  set to the edition's level) for the flag-mode; an ASSIGN name maps through `dd_<name>` environment variables.
 
 ## Acknowledgment
 

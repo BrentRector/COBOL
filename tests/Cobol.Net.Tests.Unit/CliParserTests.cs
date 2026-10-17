@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using CobolNet;
 using CobolNet.Cli;
 using Xunit;
 
@@ -141,5 +142,27 @@ public sealed class CliParserTests
         Assert.Equal(85, opts.DialectLevel);
         Assert.True(opts.Permissive);
         Assert.False(opts.Run);
+    }
+
+    /// <summary>kb/Work PB3175: the exit code says WHOSE error it is. A source the binding phase refuses (an edition
+    /// diagnostic, a syntax rule the binder checks — COBOLNET1675 on an alphanumeric COMPUTE receiver) is a data/format
+    /// error of the program, 65 like a parse error, never 70, the code of the compiler's own failure (the backend
+    /// refusing its generated C#), which a conformance harness's adapter reads as the compiler having failed.</summary>
+    [Theory]
+    [InlineData(CompilerDriver.Outcome.Success, 0)]
+    [InlineData(CompilerDriver.Outcome.SourceNotFound, 66)]
+    [InlineData(CompilerDriver.Outcome.FrontendError, 65)]
+    [InlineData(CompilerDriver.Outcome.BindError, 65)]
+    [InlineData(CompilerDriver.Outcome.BackendError, 70)]
+    public void EveryCompileOutcome_HasItsSysexitsCode(CompilerDriver.Outcome outcome, int code)
+        => Assert.Equal(code, Program.ExitCode(outcome));
+
+    /// <summary>Every outcome the driver can report has a code: a new one is named in <see cref="Program.ExitCode"/>
+    /// before it ships, never left to a default.</summary>
+    [Fact]
+    public void NoCompileOutcome_IsLeftWithoutAnExitCode()
+    {
+        foreach (var outcome in Enum.GetValues<CompilerDriver.Outcome>())
+            Assert.InRange(Program.ExitCode(outcome), 0, 70);
     }
 }
