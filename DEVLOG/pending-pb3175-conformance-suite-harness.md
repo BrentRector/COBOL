@@ -60,4 +60,4 @@ arm and its `_` default was 70, so a wrong program read as a compiler failure. `
 names, the standard's keywords, the configuration refusals), `ConformanceSuiteProfileDriftTests`, two `CliParserTests`.
 No inventory row: test infrastructure (`closes_rows: []`, its reason filed). PB3176 (S1c) unblocked.
 
-**Gate:** see the report.
+**Gate:** run `20261017T043946Z-7f15b2` (HEAD 8fe3944d2): `LEG 1 ONLY (batched gating, PB2515): GREEN` — Conformance 6,072/11,913 · Unit 33,411/33,918 · Characterization 5/36 cases ran; the new Unit tests passed in leg 1 and `run.py --self-test` ran GREEN in the audits (29 s). semgrep verify PASS. LINUX GATE: the lander's (batched gating).
