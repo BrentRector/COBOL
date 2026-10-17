@@ -108,3 +108,8 @@ baseline), and `OptionsBinder.Apply` for FMT-11.9.11.1 (the INTERMEDIATE ROUNDIN
 origin/main conflicted on `SR-13.10.3-2`, which main's PB3173 had re-noted for its editions. The inventory was taken
 from main and the branch's adjudication applied over it as a batch, keeping main's editions sentence. Every
 code-location in the merged inventory now resolves (4,195 rows).
+
+**Finisher gates** at `61162c799`: Windows (run `20261017T102755Z-5d2c3b`) `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched
+gating, PB2515): GREEN — leg 2 left to CI's whole-population run: Conformance 5,787 · Unit 409 · Characterization 31 …`;
+Linux `=== LINUX GATE: GREEN (legs selftests unit characterization conformance guard selftests-built; HEAD 61162c799) ===`,
+with `EveryCodeLocation_ResolvesInTheTree` Passed in its unit leg.
