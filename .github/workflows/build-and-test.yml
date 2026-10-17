@@ -328,12 +328,17 @@ jobs:
       # which until PB2563 were named here one by one while eleven of them ran nowhere. The same runner is an audit of the
       # local gate (run_gate_legs.py AUDITS) and a leg of linux-gate.sh. A Windows-only self-test is reported NOT RUN here
       # with its reason and runs in windows-build-test; one that reads the built assemblies runs in greenfield-unit.
-      - name: Script self-tests — every self-test under scripts/, discovered (self_tests.py)
+      - name: Script self-tests — every self-test under scripts/ and conformance-suite/harness/, discovered (self_tests.py)
         if: ${{ !cancelled() }}
         run: python3 scripts/self_tests.py
       - name: Work register — every kb/Work note well-formed (work.py check)
         if: ${{ !cancelled() }}
         run: python3 scripts/spec/work.py check
+      # The conformance suite's generator, refusals only (DESIGN-conformance-suite.md §9; kb/Work PB3174): an audit of
+      # the local gate too (run_gate_legs.py AUDITS), so a refused test is red there first.
+      - name: Conformance suite — every test header, rule, control and output well-formed (generate.py --check)
+        if: ${{ !cancelled() }}
+        run: python3 conformance-suite/harness/generate.py --check
       # The fleet briefs, the pinned PUBLIC skills submodule and `.agent-fleet.json` (kb/Work PB1699). Only the
       # PUBLIC submodule is fetched — never `--recursive`/`submodules: true`, which would pull the private
       # specs-private this job deliberately does without. A brief edit is a docs-only push, so this is where it is checked.

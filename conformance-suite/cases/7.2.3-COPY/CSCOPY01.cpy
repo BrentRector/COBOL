@@ -1,0 +1,1 @@
+       01 W-GREETING PIC X(5) VALUE "HELLO".
