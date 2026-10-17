@@ -57,9 +57,11 @@ sys.path.insert(0, str(HARNESS))
 sys.path.insert(0, str(REPO / "scripts" / "spec"))
 
 import cobol_source as cobol  # noqa: E402  (this directory's: the program-text facts the refusals need)
+import config  # noqa: E402  (this directory's: the harness's adapter, profile and baseline formats)
 import inventory_schema  # noqa: E402  (the inventory's one schema: its editions, its evidence predicates)
 
 CONSTRUCTS_PATH = REPO / "tests" / "version-matrix" / "constructs.json"
+RESERVED_WORDS_PATH = REPO / "tests" / "version-matrix" / "reserved-words.json"
 SPEC_PATH = REPO / "specs" / "ISO_COBOL.md"
 IMPLEMENTOR_DEFINED_PATH = SUITE / "implementor-defined.json"
 DIAGNOSTICS_PATH = SUITE / "wiseowl" / "diagnostics.json"
@@ -138,6 +140,11 @@ class Case:
     marked_line: int | None
     #: `(edition or None, ((item, value), ...)) -> .out path`: every expected-output file, parsed from its name.
     outputs: dict[tuple[str | None, tuple[tuple[int, str], ...]], Path] = field(default_factory=dict)
+    #: The COBOL words of the program and of the library text it copies (upper case, each holding a letter), and the
+    #: user-defined words among them that the program defines (cobol_source.defined_names): what `entry_for` reduces to
+    #: the words a runner checks against a profile's extra reserved words (§5), so no runner reads the program.
+    words: frozenset[str] = frozenset()
+    defined: frozenset[str] = frozenset()
 
     @property
     def in_suite(self) -> bool:
@@ -161,6 +168,12 @@ class Inputs:
     #: The two evidence predicates of the report, injectable so the self-test can drive every witness kind.
     determined: Callable[[dict[str, Any]], bool]
     derived: Callable[[dict[str, Any]], bool]
+    #: edition -> the words the standard reserves there (tests/version-matrix/reserved-words.json), and the standard's
+    #: other keywords (its context-sensitive words, intrinsic function names and compiler-directive words, ISO 8.10-8.12).
+    #: A manifest entry's `words` are the program's words that are none of these, and the names it defines that its
+    #: edition does not reserve: the uses of a user-defined word a compiler's added reserved word can stop (ISO 4.2.10).
+    reserved: dict[str, frozenset[str]] = field(default_factory=dict)
+    keywords: frozenset[str] = frozenset()
 
     @property
     def editions(self) -> list[str]:
@@ -457,6 +470,9 @@ class Reader:
                                             f"test (`files`, §3.1)")
         # A run-time expectation at 85 (§3.2), in the program or in the library text it copies.
         expanded = cobol.expand_copies(tokens, lambda name: self._library(case, name))
+        case.words = frozenset(t.text.upper() for t in expanded
+                               if t.kind == cobol.WORD and any(ch.isalpha() for ch in t.text))
+        case.defined = frozenset(cobol.defined_names(expanded))
         observed = cobol.observes_exception(expanded)
         if observed is not None:
             early = [e for e in case.accept if self.inputs.editions.index(e) < self.inputs.editions.index(
@@ -752,10 +768,12 @@ def _posix(p: Path) -> str:
 
 def entry_for(case: Case, edition: str, inputs: Inputs) -> dict[str, Any]:
     """A test's manifest entry at one edition: what a runner needs, and nothing it would have to re-derive."""
+    reserved = inputs.reserved.get(edition, frozenset())
     entry: dict[str, Any] = {
-        "id": case.test_id, "source": _posix(case.path), "source-format": case.source_format,
+        "id": case.test_id, "clause": case.folder, "source": _posix(case.path), "source-format": case.source_format,
         "rules": list(case.rules), "files": [_posix(case.path.parent / f) for f in case.files],
         "requires": list(case.requires),
+        "words": sorted((case.words - reserved - inputs.keywords) | (case.defined - reserved)),
     }
     if edition in case.accept:
         expected = {}
@@ -885,6 +903,42 @@ def load_implementor_defined(path: Path, rows: dict[str, dict[str, Any]]) -> tup
     return items, problems
 
 
+def reserved_words() -> dict[str, frozenset[str]]:
+    """edition -> the words reserved-words.json records the standard reserving at that edition (its `r<edition>`)."""
+    words = json.loads(RESERVED_WORDS_PATH.read_text(encoding="utf-8"))["words"]
+    editions = inventory_schema.load_schema().editions
+    return {e: frozenset(w["word"] for w in words if w.get(f"r{e}")) for e in editions}
+
+
+#: §8.10 is a table whose first column is the word; §8.11 lists one name a line; §8.12 is a table of words.
+_KEYWORD_SECTIONS = (("8.10", "first cell"), ("8.11", "line"), ("8.12", "every cell"))
+_KEYWORD = re.compile(r"^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*$")
+
+
+def standard_keywords(spec_text: str) -> frozenset[str]:
+    """The standard's context-sensitive words (ISO 8.10), intrinsic function names (8.11) and compiler-directive
+    words (8.12), read from its transcription."""
+    words: set[str] = set()
+    for number, shape in _KEYWORD_SECTIONS:
+        section = re.search(rf"(?ms)^### {re.escape(number)} .*?(?=^### )", spec_text)
+        if section is None:
+            raise ValueError(f"specs/ISO_COBOL.md has no section {number}")
+        for line in section.group(0).splitlines()[1:]:
+            if shape == "line":
+                cells = [line.strip()]
+            else:
+                cells = [c.strip().strip("*") for c in line.strip().strip("|").split("|")] if line.startswith("|") else []
+                cells = cells[:1] if shape == "first cell" else cells
+            words.update(c for c in cells if _KEYWORD.match(c))
+    return frozenset(words)
+
+
+def suite_ids(cases: list[Case], editions: list[str]) -> dict[str, set[str]]:
+    """edition -> the ids of the tests its suite holds (what a baseline may name)."""
+    return {e: {c.test_id for c in cases if c.in_suite and (e in c.accept or (c.flag is not None and e in c.flag.at))}
+            for e in editions}
+
+
 def repository_inputs() -> tuple[Inputs, list[str]]:
     schema = inventory_schema.load_schema()
     rows = {r["rule-id"]: r for r in inventory_schema.load_inventory()}
@@ -893,11 +947,12 @@ def repository_inputs() -> tuple[Inputs, list[str]]:
     a1, problems = load_implementor_defined(IMPLEMENTOR_DEFINED_PATH, rows)
     diagnostics = json.loads(DIAGNOSTICS_PATH.read_text(encoding="utf-8")) if DIAGNOSTICS_PATH.is_file() else {}
     register = schema.register_items()
+    spec = SPEC_PATH.read_text(encoding="utf-8")
     inputs = Inputs(
-        schema=schema, rows=rows, constructs=constructs, requirable=annex_names(SPEC_PATH.read_text(encoding="utf-8")),
+        schema=schema, rows=rows, constructs=constructs, requirable=annex_names(spec),
         implementor_defined=a1, diagnostics={k: v for k, v in diagnostics.items() if not k.startswith("$")},
         determined=lambda row: schema.anchor_for(row) is not None and row.get("rule-id") in register,
-        derived=schema.derivation_stands)
+        derived=schema.derivation_stands, reserved=reserved_words(), keywords=standard_keywords(spec))
     return inputs, problems
 
 
@@ -911,6 +966,10 @@ def generate(root: Path, inputs: Inputs, problems: list[str], out: Path | None,
     check_cases(reader)
     for p in problems:
         reader.refuse(IMPLEMENTOR_DEFINED_PATH.name, 1, p)
+    # The harness's configuration (§5): every adapter, profile and baseline, against what only the repository knows.
+    for rel, message in config.check_tree(root, inputs.editions, inputs.requirable, inputs.implementor_defined,
+                                          suite_ids(reader.cases, inputs.editions)):
+        reader.refuse(rel, 1, message)
     if reader.refusals:
         if echo:
             for r in sorted(reader.refusals, key=lambda r: (r.path, r.line, r.message)):
@@ -975,7 +1034,10 @@ def _planted_inputs(diagnostics: dict[str, dict[str, Any]] | None = None) -> Inp
         diagnostics=diagnostics if diagnostics is not None else {
             "flagged": {"refuse-at": ["85", "2002", "2014", "2023"], "expect": "X1"},
             "free-flag": {"refuse-at": ["2002"], "expect": "X2"}},
-        determined=lambda r: r["rule-id"] in ("DOC-A.1-9", "DOC-A.1-10"), derived=lambda r: bool(r.get("derivation")))
+        determined=lambda r: r["rule-id"] in ("DOC-A.1-9", "DOC-A.1-10"), derived=lambda r: bool(r.get("derivation")),
+        reserved={"85": frozenset({"IDENTIFICATION", "DIVISION", "PROGRAM-ID", "DATA", "WORKING-STORAGE", "SECTION",
+                                   "PIC", "VALUE", "PROCEDURE", "DISPLAY", "STOP", "RUN"})},
+        keywords=frozenset({"STOP", "W-E"}))
 
 
 def _fixed(header: list[str], body: list[str]) -> str:
@@ -1077,6 +1139,14 @@ def self_test() -> int:
                   m2002["free-flag"]["line"] == 11 and m2002["free-flag"]["control"] == "free-test", m2002)
             check("arm: a test's declared files reach its entry",
                   m85["tests"][1]["files"] == ["cases/1.1.1-Rule/CPY1.cpy"], m85["tests"][1])
+            check("arm: an entry names its clause folder, and its words without the edition's reserved ones (a "
+                  "copied library text's words included)",
+                  m85["tests"][1]["clause"] == "1.1.1-Rule"
+                  and m85["tests"][1]["words"] == ["MAIN-PARA", "P", "W-A", "W-C", "W-E", "W-N"], m85["tests"][1])
+            check("arm: ... a word that is neither reserved nor a keyword stays (2023 here reserves none); a keyword "
+                  "the program does not define goes (STOP); a keyword it defines as a name stays (W-E)",
+                  "DISPLAY" in pe["accepted"]["words"] and "STOP" not in pe["accepted"]["words"]
+                  and "W-E" in pe["accepted"]["words"], pe["accepted"]["words"])
             check("arm: an unverified test, an _unassigned test and a wiseowl test are in no suite",
                   not {"unverified", "loose", "own"} & {t["id"] for m in (m85, m2023) for t in m["tests"]})
             w2023 = {t["id"]: t for t in mw["editions"]["2023"]}
@@ -1242,6 +1312,16 @@ def self_test() -> int:
                                                            "files: [ECCPY.cpy]", "source-format: fixed"],
                                                           _PROGRAM[:9] + ["           COPY ECCPY."] + _PROGRAM[9:]),
                                                    "run-time expectation"),
+        "a profile claiming no module of the standard": (
+            "profiles/vendor.json", json.dumps({"compiler": "vendor", "editions": ["85"], "modules": {"A.4.99": "x"},
+                                                "implementor-defined": {"9": "one"}}),
+            "A.4.99 is not an Annex A.4 module of the standard"),
+        "a profile with no value of an enumerated A.1 item": (
+            "profiles/silent.json", json.dumps({"compiler": "silent", "editions": ["85"]}),
+            "states no value of Annex A.1 item 9"),
+        "a baseline of no adapter": (
+            "baselines/nobody.json", json.dumps({"compiler": "nobody", "verdicts": {"85": {"ok": "PASS"}}}),
+            "a baseline of 'nobody', which has no adapter"),
         "duplicate id": ("wiseowl/cases/1.1.1-Rule/ok.cob",
                          _fixed(["id: ok", "rules: [GR-1.1.1-1]", "accept: [85]", "source-format: fixed"], _PROGRAM),
                          "is also"),
@@ -1331,6 +1411,24 @@ def self_test() -> int:
     check("arm: a reference-modified numeric display item is alphanumeric; a computational one is not; a floating "
           "comment is no operand", issues == [("A", "a data item of class " + cobol.NUMERIC_COMPUTATIONAL_CLASS)],
           issues)
+    named = cobol.defined_names(cobol.tokenize(cobol.read_lines("\n".join([
+        "       PROGRAM-ID. PROG1.",
+        "       FILE-CONTROL. SELECT OPTIONAL F1 ASSIGN TO \"F1\".",
+        "       FD F1.",
+        "       01 PREVIOUS PIC X. 88 IS-Y VALUE \"Y\".",
+        "       01 FILLER PIC X.",
+        "       PROCEDURE DIVISION.",
+        "       MAIN-PARA.",
+        "           READ F1 PREVIOUS RECORD AT END CONTINUE END-READ.",
+        "       S1 SECTION.",
+    ]), "fixed")))
+    check("arm: the defined names are the data, condition, file, program, paragraph and section names (a keyword "
+          "use of PREVIOUS is not a definition; FILLER names nothing)",
+          named == {"PROG1", "F1", "PREVIOUS", "IS-Y", "MAIN-PARA", "S1"}, named)
+    keywords = standard_keywords(SPEC_PATH.read_text(encoding="utf-8"))
+    check("arm: the standard's keywords hold a context-sensitive word (8.10), a function name (8.11) and a "
+          "directive word (8.12), and no table heading", {"PREVIOUS", "ABS", "IMP"} <= keywords
+          and not {"CONTEXT-SENSITIVE", "LANGUAGE"} & keywords, sorted(keywords)[:12])
     cont = cobol.tokenize(cobol.read_lines("\n".join([
         "           DISPLAY \"ABC",
         "      -    \"DEF\" W-X.",

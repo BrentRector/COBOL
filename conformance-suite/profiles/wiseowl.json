@@ -1,0 +1,67 @@
+{
+  "$comment": [
+    "WiseOwl COBOL's claims (DESIGN-conformance-suite.md §4, §5). The modules and elements are the rows",
+    "docs/CONFORMANCE.md §5 (Annex A.4) and §2 (Annex A.3) dispose Claimed or Partial (§5: the conformance",
+    "summary claims what is Claimed or Partial there); ConformanceSuiteProfileDriftTests holds this file to those",
+    "tables. The A.1 values are the register's determinations (docs/CONFORMANCE.md §7, DOC-A.1-148 and",
+    "DOC-A.1-204), which the A.1-valued tests verify by running. WiseOwl reserves exactly the standard's words",
+    "(tests/version-matrix/reserved-words.json), so it has no extra reserved words."
+  ],
+  "compiler": "wiseowl",
+  "editions": [
+    "85",
+    "2002",
+    "2014",
+    "2023"
+  ],
+  "modules": {
+    "A.4.4": "docs/CONFORMANCE.md §5, A.4.4 Dynamic capacity tables: Claimed",
+    "A.4.5": "docs/CONFORMANCE.md §5, A.4.5 DYNAMIC LENGTH elementary items: Partial",
+    "A.4.6": "docs/CONFORMANCE.md §5, A.4.6 Extended letters: Claimed",
+    "A.4.7": "docs/CONFORMANCE.md §5, A.4.7 File sharing and record locking: Claimed",
+    "A.4.9": "docs/CONFORMANCE.md §5, A.4.9 Locale support and related functions: Claimed",
+    "A.4.10": "docs/CONFORMANCE.md §5, A.4.10 Object orientation optional items: Partial",
+    "A.4.11": "docs/CONFORMANCE.md §5, A.4.11 Report Writer: Partial",
+    "A.4.12": "docs/CONFORMANCE.md §5, A.4.12 RESUME statement: Claimed"
+  },
+  "elements": {
+    "A.3-1": "docs/CONFORMANCE.md §2, A.3 item 1: Claimed",
+    "A.3-3": "docs/CONFORMANCE.md §2, A.3 item 3: Claimed",
+    "A.3-5": "docs/CONFORMANCE.md §2, A.3 item 5: Claimed",
+    "A.3-9": "docs/CONFORMANCE.md §2, A.3 item 9: Claimed",
+    "A.3-10": "docs/CONFORMANCE.md §2, A.3 item 10: Claimed",
+    "A.3-11": "docs/CONFORMANCE.md §2, A.3 item 11: Claimed",
+    "A.3-12": "docs/CONFORMANCE.md §2, A.3 item 12: Partial",
+    "A.3-14": "docs/CONFORMANCE.md §2, A.3 item 14: Claimed",
+    "A.3-15": "docs/CONFORMANCE.md §2, A.3 item 15: Claimed",
+    "A.3-16": "docs/CONFORMANCE.md §2, A.3 item 16: Claimed",
+    "A.3-17": "docs/CONFORMANCE.md §2, A.3 item 17: Partial",
+    "A.3-18": "docs/CONFORMANCE.md §2, A.3 item 18: Claimed",
+    "A.3-22": "docs/CONFORMANCE.md §2, A.3 item 22: Claimed",
+    "A.3-23": "docs/CONFORMANCE.md §2, A.3 item 23: Claimed",
+    "A.3-24": "docs/CONFORMANCE.md §2, A.3 item 24: Claimed",
+    "A.3-25": "docs/CONFORMANCE.md §2, A.3 item 25: Claimed",
+    "A.3-27": "docs/CONFORMANCE.md §2, A.3 item 27: Partial",
+    "A.3-28": "docs/CONFORMANCE.md §2, A.3 item 28–30: Partial",
+    "A.3-29": "docs/CONFORMANCE.md §2, A.3 item 28–30: Partial",
+    "A.3-30": "docs/CONFORMANCE.md §2, A.3 item 28–30: Partial",
+    "A.3-31": "docs/CONFORMANCE.md §2, A.3 item 31: Claimed",
+    "A.3-32": "docs/CONFORMANCE.md §2, A.3 item 32: Claimed",
+    "A.3-33": "docs/CONFORMANCE.md §2, A.3 item 33–34: Partial",
+    "A.3-34": "docs/CONFORMANCE.md §2, A.3 item 33–34: Partial",
+    "A.3-35": "docs/CONFORMANCE.md §2, A.3 item 35: Claimed",
+    "A.3-36": "docs/CONFORMANCE.md §2, A.3 item 36: Claimed",
+    "A.3-37": "docs/CONFORMANCE.md §2, A.3 item 37: Claimed",
+    "A.3-38": "docs/CONFORMANCE.md §2, A.3 item 38: Claimed",
+    "A.3-39": "docs/CONFORMANCE.md §2, A.3 item 39: Claimed",
+    "A.3-41": "docs/CONFORMANCE.md §2, A.3 item 41–42: Partial",
+    "A.3-42": "docs/CONFORMANCE.md §2, A.3 item 41–42: Partial",
+    "A.3-43": "docs/CONFORMANCE.md §2, A.3 item 43: Claimed — on BOTH organizations the item names, at every supported edition",
+    "A.3-44": "docs/CONFORMANCE.md §2, A.3 item 44: Claimed",
+    "A.3-46": "docs/CONFORMANCE.md §2, A.3 item 46: Claimed"
+  },
+  "implementor-defined": {
+    "148": "variable",
+    "204": "not-available"
+  }
+}
