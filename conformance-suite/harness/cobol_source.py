@@ -58,6 +58,21 @@ class SourceLine:
     text: str
 
 
+#: The byte-order marks a library text may open with, longest first (a UTF-32LE mark begins with UTF-16LE's), and
+#: the encoding each names. A text without one is UTF-8.
+_BOMS = ((b"\x00\x00\xfe\xff", "utf-32-be"), (b"\xff\xfe\x00\x00", "utf-32-le"), (b"\xef\xbb\xbf", "utf-8"),
+         (b"\xfe\xff", "utf-16-be"), (b"\xff\xfe", "utf-16-le"))
+
+
+def decode(data: bytes) -> str:
+    """A program or library text's characters: the encoding its byte-order mark names (the mark dropped), else UTF-8.
+    A test's library text may be stored in UTF-16 or UTF-32 to witness the compiler's reading of it."""
+    for mark, encoding in _BOMS:
+        if data.startswith(mark):
+            return data[len(mark):].decode(encoding)
+    return data.decode("utf-8")
+
+
 # ── reference format ─────────────────────────────────────────────────────────────────────────────────────────────────
 
 def _strip_floating(text: str, quote: str | None) -> tuple[str, str | None]:
@@ -227,10 +242,15 @@ class CopyStatement:
 
 
 def copy_statements(tokens: list[Token]) -> list[CopyStatement]:
-    """Every COPY statement in `tokens` (ISO 7.2.3: COPY {text-name-1 | literal-1} [{OF|IN} ...] ...)."""
+    """Every COPY statement in `tokens` (ISO 7.2.3: COPY {text-name-1 | literal-1} [{OF|IN} ...] ...). A COPY after a
+    directive on its line is no COPY statement: it is that compiler directive's text (a PAGE directive's comment-text
+    "shall serve only as documentation", ISO 7.3.19.4 GR 1)."""
     found = []
+    directive_lines = {(t.source, t.line) for t in tokens if t.kind == DIRECTIVE}
     for i, tok in enumerate(tokens):
         if tok.kind != WORD or tok.upper != "COPY" or i + 1 >= len(tokens):
+            continue
+        if (tok.source, tok.line) in directive_lines:
             continue
         target = tokens[i + 1]
         if target.kind == ALPHANUMERIC:
