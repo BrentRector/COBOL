@@ -37,7 +37,7 @@ public sealed class OoClassSymbol(string name, string csName, CobolParserCore.Cl
     public string? BaseName { get; init; }
 
     /// <summary>The FULL `INHERITS FROM` list as written (ISO §11.3 permits several; SSOT §18 #18 / A.4.10
-    /// restricts v1 to SINGLE inheritance and REJECTS 2+ bases LOUDLY — COBOLNET0849 at pass-1 — so the extra
+    /// restricts v1 to SINGLE inheritance and REJECTS 2+ bases LOUDLY — COBOLNET0849, the declined Annex A.4.10 item 1, at pass-1 — so the extra
     /// bases are representable here for the diagnostic, never silently dropped).</summary>
     public IReadOnlyList<string> Bases { get; init; } = [];
 

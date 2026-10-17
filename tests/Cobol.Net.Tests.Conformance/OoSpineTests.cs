@@ -1294,6 +1294,53 @@ public sealed class OoSpineTests
             """), "COBOLNET2791");
     }
 
+    /// <summary>§11.3.3 SR4 is a rule of EVERY class on a cycle and of no class that merely inherits into one (kb/Work
+    /// PB1784): with A30 → B30 ⇄ C30, B30 and C30 each break it and A30 breaks nothing. The cycle walk used to cut the
+    /// links as it went, so it reported A30 and never reached C30. A class named like an interface is ONE §8.3.2.2
+    /// report (COBOLNET0820), not that report plus a duplicate-class one.</summary>
+    [Fact]
+    public void InheritsCycle_ReportsEachMember_AndNotTheClassLeadingIntoIt()
+    {
+        var errors = ErrorsOf("""
+            IDENTIFICATION DIVISION.
+            CLASS-ID. A30 INHERITS FROM B30.
+            ENVIRONMENT DIVISION.
+            CONFIGURATION SECTION.
+            REPOSITORY.
+                CLASS B30.
+            END CLASS A30.
+
+            IDENTIFICATION DIVISION.
+            CLASS-ID. B30 INHERITS FROM C30.
+            ENVIRONMENT DIVISION.
+            CONFIGURATION SECTION.
+            REPOSITORY.
+                CLASS C30.
+            END CLASS B30.
+
+            IDENTIFICATION DIVISION.
+            CLASS-ID. C30 INHERITS FROM B30.
+            ENVIRONMENT DIVISION.
+            CONFIGURATION SECTION.
+            REPOSITORY.
+                CLASS B30.
+            END CLASS C30.
+
+            IDENTIFICATION DIVISION.
+            INTERFACE-ID. D30.
+            END INTERFACE D30.
+            IDENTIFICATION DIVISION.
+            CLASS-ID. D30.
+            END CLASS D30.
+            """);
+        Assert.Single(errors, e => e.Contains("COBOLNET2791: class 'B30'", StringComparison.Ordinal));
+        Assert.Single(errors, e => e.Contains("COBOLNET2791: class 'C30'", StringComparison.Ordinal));
+        Assert.DoesNotContain(errors, e => e.Contains("class 'A30'", StringComparison.Ordinal));
+        Assert.Single(errors, e => e.Contains("'D30'", StringComparison.Ordinal));
+        Assert.Contains(errors, e => e.Contains("COBOLNET0820: 'D30' is defined as both a class and an interface",
+            StringComparison.Ordinal));
+    }
+
     // ── The 3a/3b adversarial-review fixes (workflow find→verify, DEVLOG 603) ───────────────────────────────
 
     /// <summary>§14.8.3.3 rule 1 — RETURNING delivery follows SET rules: a method returning a SUBCLASS object
@@ -1976,7 +2023,7 @@ public sealed class OoSpineTests
             REPOSITORY.
                 CLASS BAS46.
             END CLASS SUB46.
-            """), "COBOLNET0839");
+            """), "COBOLNET2791");   // a FINAL superclass is §11.3.3 SR5, the INHERITS clause's rule (kb/Work PB1784)
     }
 
     /// <summary>OVERRIDE is a legal USER word at COBOL-85 (§8.9 reserves it from 2002) — the continuity
@@ -2875,13 +2922,13 @@ public sealed class OoSpineTests
     public void RaiseObject_BindViolations(string stmt, string code)
         => EditionHarness.AssertHasDiagnostic(ErrorsOf(EcOoDriver("OOEC13", "", stmt)), code);
 
-    /// <summary>The 0849 band (§14.9.18.3 SR4): a UNIVERSAL identifier (SR4d) and a declared class missing
-    /// from the PD-header RAISING list (SR4a).</summary>
+    /// <summary>The §14.9.18.3 SR4 band, COBOLNET4211 (split off the A.4.10 decline COBOLNET0849, kb/Work PB745): a
+    /// UNIVERSAL identifier (SR4d) and a declared class missing from the PD-header RAISING list (SR4a).</summary>
     [Theory]
     [InlineData("    GOBACK RAISING U.")]
     [InlineData("    GOBACK RAISING E.")]
-    public void GobackRaising_BindViolations_0849(string stmt)
-        => EditionHarness.AssertHasDiagnostic(ErrorsOf(EcOoDriver("OOEC14", "", stmt)), "COBOLNET0849");
+    public void GobackRaising_BindViolations_4211(string stmt)
+        => EditionHarness.AssertHasDiagnostic(ErrorsOf(EcOoDriver("OOEC14", "", stmt)), "COBOLNET4211");
 
     /// <summary>§14.2.2 SR7 — a header RAISING exception-name shall be level-3 EC-USER (0858).</summary>
     [Fact]

@@ -989,8 +989,8 @@ internal sealed class BinderDriver
             if (externalized.TryGetValue(name, out var first))
             {
                 // §8.4.6.4 states its OWN compilation-group uniqueness for object-class-names and
-                // interface-names, and the OO class table enforces it on the declared WORD (COBOLNET0820 /
-                // COBOLNET0840). A pair already reported THERE is skipped here rather than doubled — but only
+                // interface-names, and the OO class table enforces it on the declared WORD (COBOLNET0820,
+                // OoDefinitionNameNotUnique). A pair already reported THERE is skipped here rather than doubled — but only
                 // that pair: two class definitions whose words DIFFER and whose AS literals coincide are
                 // §8.3.2.2's business alone, and nothing else in the compiler looks at them.
                 if (IsOo(kind) && IsOo(first.Kind) && CobolNames.Same(word, first.Word)) continue;

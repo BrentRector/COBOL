@@ -46,7 +46,7 @@ public static class OoNameResolution
 
     /// <summary>A resolution outcome. <see cref="Class"/> and <see cref="Interface"/> are mutually exclusive:
     /// classes and interfaces share ONE name namespace (<see cref="OoClassTable"/> rejects a collision as
-    /// COBOLNET0840), so at most one can be set.
+    /// COBOLNET0820, ISO §8.3.2.2), so at most one can be set.
     /// <para><see cref="IsFormal"/> is the third outcome, and sets neither: the name is a PARAMETER-NAME of the
     /// parameterized definition the reference is written in (§11.3.4 GR6 / §11.6.4 GR4 — "may be specified within
     /// this class definition only where an object-class-name or an interface-name is permitted"). It names whatever

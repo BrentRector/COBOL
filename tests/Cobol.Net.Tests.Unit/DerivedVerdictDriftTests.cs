@@ -555,8 +555,8 @@ public sealed class DerivedVerdictDriftTests
             Assert.Contains(id, ids);
 
         // ⛔ ITEM 2 IS SUPPORTED AND THIS IS NOW THE OWNER'S ROW, NOT AN AGENT'S READING (kb/Work PB285).
-        // CobolOO.g4:77 parses `INHERITS FROM interfaceName+`; OoClassTable enforces §11.6.3 SR2/SR3/SR6 with
-        // COBOLNET0840. SR-11.6.3-6's text is verbatim parallel to SR-11.3.3-7 and matches the pattern, so the
+        // CobolOO.g4:77 parses `INHERITS FROM interfaceName+`; OoClassTable enforces §11.6.3 SR2 (COBOLNET0840) and
+        // SR3/SR6 (COBOLNET2791). SR-11.6.3-6's text is verbatim parallel to SR-11.3.3-7 and matches the pattern, so the
         // `interface-name` exclusion is the only thing holding it out; if it returns, an implemented, shipping
         // facility is being documented as unsupported. SR-11.6.3-5 is ordinary work to adjudicate.
         Assert.DoesNotContain("SR-11.6.3-6", ids);

@@ -93,7 +93,7 @@ the standard gives it:
 |---|---|---|---|
 | the whole compilation group | §8.3.2.2's OWN list item 1, as far as this compiler models it — OUTERMOST program definitions, FUNCTION definitions, CLASS definitions and INTERFACE definitions, by `ExternalizedName` | §8.3.2.2 — SAME-kind pairs by its “refer to the same instance” sentence, CROSS-kind pairs by its “same kind of entity or item” sentence | COBOLNET2213 |
 | ONE outermost program | its containment subtree, by declared `Name` | §8.4.6.3 — *“The names assigned to programs that are contained directly or indirectly within the same outermost program shall be unique within that outermost program”* | COBOLNET2214 |
-| the compilation group | object-class / interface definitions, by `Name` | §8.4.6.4 — its own explicit uniqueness sentences | COBOLNET0820 / COBOLNET0840 |
+| the compilation group | object-class / interface definitions, by `Name` | §8.4.6.4 — its own explicit uniqueness sentences | COBOLNET0820 |
 | the compilation group | FUNCTION definitions, by declared WORD | §8.4.6.7 — a REPOSITORY `FUNCTION word` entry names the user-function-NAME, so two definitions sharing a word are ambiguous even under different `AS` literals | COBOLNET1508 |
 
 All four definition kinds are ONE namespace in the first row, not four, because §8.3.2.2's list item 1
