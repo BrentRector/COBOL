@@ -2736,7 +2736,10 @@
   "pb656-cobol-reserved-through-2014",
   "pb3233-inspect-figurative-literal1-size",
   "pb3233-inspect-figurative-literal4-size",
-  "pb3233-inspect-symbolic-literal1-size"
+  "pb3233-inspect-symbolic-literal1-size",
+  "pb3254-sort-in-inverted-section-sort-procedure-first",
+  "pb3254-sort-in-inverted-section-sort-procedure-last",
+  "pb3254-merge-in-inverted-section-sort-procedure"
  ],
  "pending": []
 }
