@@ -132,7 +132,7 @@ internal sealed class StatementEmitter : IBoundStatementVisitor<bool>
     public bool Visit(BoundStopLiteral n)
     {
         // X3.23-1985 STOP literal: communicate to the operator (stderr), then continue (BoundTree doc).
-        _ctx.Writer.Line($"Console.Error.WriteLine({Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(n.Text, quote: true)});");
+        _ctx.Writer.Line($"global::System.Console.Error.WriteLine({Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(n.Text, quote: true)});");
         return false;
     }
 

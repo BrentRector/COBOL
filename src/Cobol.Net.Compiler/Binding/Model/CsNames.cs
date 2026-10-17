@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using System.Collections.Frozen;
+using CobolNet.Runtime;
 
 namespace CobolNet.Binding.Model;
 
@@ -16,6 +17,10 @@ namespace CobolNet.Binding.Model;
 /// <para>⛔ A NEW MEMBER THE EMITTER WRITES INTO A RECORD STRUCT OR A PROGRAM CLASS IS ADDED TO ITS SET HERE, in the
 /// same change — <c>CsNameReservationDriftTests</c> reads every member declaration the code generator writes and is
 /// red when one is spelled like a COBOL word and is in neither set.</para>
+/// <para>⛔ EVERY SCOPE IS ALSO SEEDED WITH <see cref="ImportedTypeNames"/> (kb/Work PB3270): the generated file imports
+/// <c>System</c> and the runtime's namespaces and names their types by SIMPLE name (<c>CobolString.Store(…)</c>,
+/// <c>HostLanding.LandText(…)</c>, <c>Int128</c>), and a member, field or parameter spelled like one of them shadows the
+/// type for every such reference in its scope — the CS errors that rejected legal COBOL.</para>
 /// </summary>
 public static class CsNames
 {
@@ -43,6 +48,49 @@ public static class CsNames
     /// names each record type by its simple name, which a parameter of that spelling would shadow — so a description
     /// whose word spells any of them is given the next free name.</summary>
     public static readonly FrozenSet<string> HostEntryMembers = FrozenSet.ToFrozenSet(["Call", "Cancel"], StringComparer.Ordinal);
+
+    /// <summary>The namespaces the generated file's using directives import (<c>ProgramEmitter.Emit</c> writes each as
+    /// <c>using global::&lt;namespace&gt;;</c>, the runtime's inside the module's namespace), so the types of each are named
+    /// by SIMPLE name in the emitted C#. The ONE list <see cref="ImportedTypeNames"/> is derived from;
+    /// <c>ImportedTypeNameDriftTests</c> is red when the emitter writes a using directive naming a namespace that is
+    /// not here.</summary>
+    public static readonly IReadOnlyList<string> ImportedNamespaces =
+    [
+        nameof(System),
+        typeof(ICobolProgram).Namespace!,                                          // the substrates and the inter-program ABI
+        typeof(CobolNet.Runtime.IO.CobolFile).Namespace!,                          // the file-I/O facade
+        typeof(CobolNet.Runtime.Exceptions.CobolFatalException).Namespace!,        // the EC signal type
+        typeof(CobolNet.Runtime.Globalization.CharacterClassification).Namespace!, // OBJECT-COMPUTER CHARACTER CLASSIFICATION
+    ];
+
+    /// <summary>The simple name of every type the generated file's using directives import
+    /// (<see cref="ImportedNamespaces"/>): the public, non-nested types of those namespaces in the runtime assembly and,
+    /// for <c>System</c>, in the core library the generated code is compiled against. DERIVED by reflection, never listed
+    /// by hand, so a type added to the runtime is reserved by the build that adds it. A COBOL word spelled like one is
+    /// given the next free name by <see cref="Allocate"/> in every <see cref="CsNameScope"/> — the type it would shadow
+    /// is named by simple name in the scope's code. Case-sensitive, as C# is: <c>HostLanding</c> is reserved,
+    /// <c>HOSTLANDING</c> is a different identifier.</summary>
+    public static readonly FrozenSet<string> ImportedTypeNames = DeriveImportedTypeNames();
+
+    private static FrozenSet<string> DeriveImportedTypeNames()
+    {
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        var runtimeNamespaces = ImportedNamespaces.Where(static n => n != nameof(System)).ToHashSet(StringComparer.Ordinal);
+        foreach (Type t in typeof(ICobolProgram).Assembly.GetExportedTypes())
+            if (!t.IsNested && t.Namespace is { } ns && runtimeNamespaces.Contains(ns))
+                names.Add(SimpleName(t));
+        foreach (Type t in typeof(object).Assembly.GetExportedTypes())
+            if (!t.IsNested && t.Namespace == nameof(System))
+                names.Add(SimpleName(t));
+        return names.ToFrozenSet(StringComparer.Ordinal);
+    }
+
+    /// <summary>A type's name as C# source writes it: without a generic type's arity (<c>Func`1</c> is written <c>Func</c>).</summary>
+    private static string SimpleName(Type t)
+    {
+        int tick = t.Name.IndexOf('`');
+        return tick < 0 ? t.Name : t.Name[..tick];
+    }
 
     /// <summary>The namespace every type a module emits lives in (docs/rearchitecture/DESIGN-external-repository.md
     /// §4.5; kb/Work PB2097): <c>Cobol.&lt;S&gt;</c>, where <c>&lt;S&gt;</c> is the assembly simple name made ONE C#
@@ -87,30 +135,52 @@ public sealed record ModuleNamespace(string CsName, string ClrName)
 /// <see cref="CsNames.Allocate"/>.</summary>
 public sealed class CsNameScope
 {
+    /// <summary>The names every scope of a kind holds before it claims one: the kind's own members and
+    /// <see cref="CsNames.ImportedTypeNames"/>. Shared, never copied — a program with a thousand groups makes a thousand
+    /// record-struct scopes.</summary>
+    private readonly FrozenSet<string> _reserved;
+
     private readonly HashSet<string> _claimed;
 
-    private CsNameScope(IEnumerable<string> reserved) => _claimed = new HashSet<string>(reserved, StringComparer.Ordinal);
+    private CsNameScope(FrozenSet<string> reserved, IEnumerable<string> claimed)
+    {
+        _reserved = reserved;
+        _claimed = new HashSet<string>(claimed, StringComparer.Ordinal);
+    }
 
-    /// <summary>A record struct's member scope (<see cref="CsNames.RecordStructMembers"/>).</summary>
-    public static CsNameScope RecordStruct() => new(CsNames.RecordStructMembers);
+    private static readonly FrozenSet<string> RecordStructReserved =
+        CsNames.RecordStructMembers.Union(CsNames.ImportedTypeNames).ToFrozenSet(StringComparer.Ordinal);
 
-    /// <summary>A program class's member scope (<see cref="CsNames.ProgramClassMembers"/>).</summary>
-    public static CsNameScope ProgramClass() => new(CsNames.ProgramClassMembers);
+    private static readonly FrozenSet<string> ProgramClassReserved =
+        CsNames.ProgramClassMembers.Union(CsNames.ImportedTypeNames).ToFrozenSet(StringComparer.Ordinal);
+
+    private static readonly FrozenSet<string> HostEntryReserved =
+        CsNames.HostEntryMembers.Union(CsNames.ImportedTypeNames).ToFrozenSet(StringComparer.Ordinal);
+
+    /// <summary>A record struct's member scope (<see cref="CsNames.RecordStructMembers"/> and
+    /// <see cref="CsNames.ImportedTypeNames"/>).</summary>
+    public static CsNameScope RecordStruct() => new(RecordStructReserved, []);
+
+    /// <summary>A program class's member scope (<see cref="CsNames.ProgramClassMembers"/> and
+    /// <see cref="CsNames.ImportedTypeNames"/>).</summary>
+    public static CsNameScope ProgramClass() => new(ProgramClassReserved, []);
 
     /// <summary>A host-entry class's member scope (<see cref="CsNames.HostEntryMembers"/>), seeded with the class's
     /// own name, which no member may spell (CS0542; DESIGN-external-repository §4.3 "Names"). Its <c>Call</c>
     /// parameters are allocated in it too, so a parameter never shadows a published record type the body names.</summary>
-    public static CsNameScope HostEntry(string className) => new(CsNames.HostEntryMembers.Append(className));
+    public static CsNameScope HostEntry(string className) => new(HostEntryReserved, [className]);
 
     /// <summary>A module namespace's type scope (DESIGN-external-repository §4.5): the host-entry classes are allocated in
     /// it, seeded with every type name the module already declares there (<paramref name="reserved"/> — the
-    /// registrar, the entry class, the atom table, the program classes and the OO classes and interfaces).</summary>
-    public static CsNameScope ModuleTypes(IEnumerable<string> reserved) => new(reserved);
+    /// registrar, the entry class, the atom table, the program classes and the OO classes and interfaces) and with
+    /// <see cref="CsNames.ImportedTypeNames"/>: a host class spelled like an imported type would capture that type's
+    /// simple name for the whole namespace, since a namespace's own types win over a using directive's.</summary>
+    public static CsNameScope ModuleTypes(IEnumerable<string> reserved) => new(CsNames.ImportedTypeNames, reserved);
 
     /// <summary>Claim names this scope already holds from elsewhere — a container's GLOBAL roots, bridged into this
     /// unit's class under their own member names (kb/Work PB1047).</summary>
     public void Reserve(IEnumerable<string> names) => _claimed.UnionWith(names);
 
     /// <summary>Claim <paramref name="name"/> when it is free; false when the scope already holds it.</summary>
-    internal bool TryClaim(string name) => _claimed.Add(name);
+    internal bool TryClaim(string name) => !_reserved.Contains(name) && _claimed.Add(name);
 }
