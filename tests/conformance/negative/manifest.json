@@ -17,6 +17,7 @@
   "pb3164-method-duplicate-constant-unequal",
   "pb374-async-messaging-below-2023",
   "pb374-ec-mcs-name-below-2023",
+  "pb3149-ec-mcs-no-requestor-unknown",
   "pb2532-comment-paragraph-repeated",
   "pb2532-comment-paragraph-out-of-order",
   "pb3129-type-index-in-constant-record",
