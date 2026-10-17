@@ -238,7 +238,7 @@ internal sealed partial class EcBinder(BinderContext ctx, StatementBinder host)
             {
                 // NULL references no object, and §14.9.18.4 GR1 b) 2. makes "the object referenced by identifier-1"
                 // the exception object — there is nothing to propagate (kb/Work PB1425's determination).
-                ctx.Edition.Error("COBOLNET0849", isNull
+                ctx.Edition.Error(DiagnosticCatalog.RaisingObjectOperandRule, isNull
                     ? $"{site.Context} NULL: the predefined NULL references no object, and the object referenced by "
                       + $"identifier-1 is what becomes the exception object in the activating runtime element "
                       + $"({site.Cite(site.ObjectRule)}; GR1 b) 2.)"
@@ -253,7 +253,7 @@ internal sealed partial class EcBinder(BinderContext ctx, StatementBinder host)
             var od = opic.ObjectRef ?? ObjectRefDescriptor.Universal;
             if (od.IsUniversal)
             {
-                ctx.Edition.Error("COBOLNET0849",
+                ctx.Edition.Error(DiagnosticCatalog.RaisingObjectOperandRule,
                     $"{site.Context} '{op.Item.CobolName}': identifier-1 shall not be a UNIVERSAL object "
                     + $"reference ({site.Cite(site.ObjectRule, "d")})");
                 return null;
@@ -261,7 +261,7 @@ internal sealed partial class EcBinder(BinderContext ctx, StatementBinder host)
             // a) / b) / c) — each asks the identifier's description (the ObjectRefDescriptor tuple) against the
             // PD-header RAISING phrase (the RaisingTarget tuples), FACTORY flag to FACTORY flag.
             if (RaisingObjectMismatch(host.OoClasses, od, ctx.EcState.PdRaisingObjects) is { } bad)
-                ctx.Edition.Error("COBOLNET0849", $"{site.Context} '{op.Item.CobolName}': {bad.Message} "
+                ctx.Edition.Error(DiagnosticCatalog.RaisingObjectOperandRule, $"{site.Context} '{op.Item.CobolName}': {bad.Message} "
                     + $"({site.Cite(site.ObjectRule, bad.Sub)})");
             return new BoundRaising(null, IsLast: false, Fatal: false, ObjectSource: op);
         }
@@ -298,7 +298,7 @@ internal sealed partial class EcBinder(BinderContext ctx, StatementBinder host)
     private Place? RaisingObjectOperand(Core.ObjectReferenceContext oref, EcRaiseSite site)
     {
         if (host.Oo.OoBindComputedObjectReference(oref) is { } computed)
-            return host.Oo.OoObjectReferenceTemporary(computed, oref, "COBOLNET0849",
+            return host.Oo.OoObjectReferenceTemporary(computed, oref, DiagnosticCatalog.RaisingObjectOperandRule.Code,
                 $"identifier-1 shall be an object reference ({site.Cite(site.ObjectRule)})");
         var term = oref.objectReferenceAtom()!.objectReferenceTerm()!;
         if (term.selfAndSuper() is { } selfOrSuper)

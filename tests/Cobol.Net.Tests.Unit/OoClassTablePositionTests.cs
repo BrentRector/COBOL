@@ -96,7 +96,7 @@ public sealed class OoClassTablePositionTests
                 CLASS PS2.
             END CLASS PS3.
             IDENTIFICATION DIVISION.
-            CLASS-ID. PS4 INHERITS PS2 USING T. *> @0839
+            CLASS-ID. PS4 INHERITS PS2 USING T. *> @2791
             ENVIRONMENT DIVISION.
             CONFIGURATION SECTION.
             REPOSITORY.

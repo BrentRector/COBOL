@@ -469,9 +469,9 @@ IMPLEMENTS is §8.10 CONTEXT-SENSITIVE (spec :10853) — a user word at EVERY ed
 NEVER CheckedTokenTypes. The VALUE clause needed a loop guard (both the valueItem list AND the
 multi-operand `valueClauseOperand+` item): at 2002+ PROPERTY terminates a VALUE clause — reserved, never a
 constant-name operand — else `VALUE 100 PROPERTY.` swallows the clause. PASS-1: interfaces build FIRST
-(OoInterfaceSymbol; prototypes via TryAddPrototype; the 0840 structural family — one class/interface
-namespace §8.3.2.2, §11.7.3 SR2/SR8 no prototype attributes, §10.6.2 SR4 header-only +
-LINKAGE-only data division); prototype LINKAGE binds through the SAME OoBindMethodData machinery
+(OoInterfaceSymbol; prototypes via TryAddPrototype; one descriptor per rule — 0820 one class/interface
+namespace §8.4.6.4/§8.3.2.2, 4212 §11.7.3 SR2/SR8 no prototype attributes, 0822 a second prototype of one name
+(A.4.10 item 3), §10.6.2 SR4 header-only + LINKAGE-only data division); prototype LINKAGE binds through the SAME OoBindMethodData machinery
 (`OoBindInterfaceData`), so ValidateImplements compares RESOLVED descriptions. CONFORMANCE: the
 §9.3.11-via-§9.3.8.2.3 pass over the §11.8.4 GR2 closure (`ImplementsClosure`: direct + interface-INHERITed
 + class-INHERITed, cycle-safe; instance and factory sides separately) is BINDER-authoritative = **0841**,
@@ -1106,8 +1106,9 @@ The LIVE fragment is `src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4:18-98`: cla
 ### Binder seam
 `CallCollectUnits` collects `classDefinition` units and builds the pass-1 `OoClassTable`
 (`src/Cobol.Net.Compiler/Oo/OoClassTable.cs` — class → base link → method roster with HasUsing/HasReturning;
-structural diagnostics 0820 duplicate-class/END-mismatch, 0821 unknown-INHERITS-base [trap #8], 0822
-duplicate-method [D9]) BEFORE any unit binds, so a class defined anywhere in the group is RESOLVABLE from any
+structural diagnostics, one descriptor per rule (kb/Work PB1784): 0820 duplicate class/interface name, 0821
+unknown-INHERITS-base [trap #8], 2791 the INHERITS clauses' own rules, 0822 duplicate-method [D9], 0849 a
+multi-base class) BEFORE any unit binds, so a class defined anywhere in the group is RESOLVABLE from any
 unit — the cross-unit forward reference D1 exists for.
 
 ⛔ **RESOLVABLE IS NOT REFERENCEABLE, and `OoNameResolution` (`src/Cobol.Net.Compiler/Oo/OoNameResolution.cs`)

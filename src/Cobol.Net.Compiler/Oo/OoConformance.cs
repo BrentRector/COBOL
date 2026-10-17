@@ -45,7 +45,7 @@ public static class OoConformance
                 string where = $"class '{cls.Name}', method '{m.Name}' overriding '{baseM.Owner.Name}'.'{baseM.Name}'";
                 foreach (var err in MethodConformanceMismatches(table, m, baseM,
                              $"the overridden method of class '{baseM.Owner.Name}'", cls.Name, baseM.Owner.Name))
-                    edition.Error("COBOLNET0829", $"{where}: {err}; ISO §11.7.3 SR9");
+                    edition.Error(DiagnosticCatalog.OverrideSignatureMismatch, $"{where}: {err}; ISO §11.7.3 SR9");
             }
     }
 
@@ -117,7 +117,7 @@ public static class OoConformance
                     if (impl is null)
                     {
                         using var atClass = edition.At(cls.Ctx.classIdParagraph().className(0));
-                        edition.Error("COBOLNET0841",
+                        edition.Error(DiagnosticCatalog.InterfaceNotImplemented,
                             $"class '{cls.Name}': the {side}interface '{iface.Name}' requires a method "
                             + $"'{proto.SourceName}' and none is defined or inherited (ISO §9.3.11 — a class "
                             + "shall implement ALL the method prototypes of its interfaces, including "
@@ -130,7 +130,7 @@ public static class OoConformance
                                      $"the '{iface.Name}' prototype", cls.Name, iface.Name))
                         {
                             conforms = false;
-                            edition.Error("COBOLNET0841", $"class '{cls.Name}', method '{impl.SourceName}': {err}");
+                            edition.Error(DiagnosticCatalog.InterfaceNotImplemented, $"class '{cls.Name}', method '{impl.SourceName}': {err}");
                         }
                     // Conformant-but-covariant RETURNING: C# needs the explicit-implementation adapter — a question about
                     // the two C# TYPES the returns project to, not about their COBOL descriptions: two ACTIVE-CLASS

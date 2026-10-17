@@ -2750,7 +2750,10 @@
   "pb3254-merge-in-inverted-section-sort-procedure",
   "pb3191-numeric-constant-name-as-condition",
   "pb3191-numeric-constant-name-boolean-operand",
-  "pb3191-boolean-constant-name-length-two-condition"
+  "pb3191-boolean-constant-name-length-two-condition",
+  "pb1784-class-inherits-into-cycle",
+  "pb1784-interface-inherits-unresolved-twice",
+  "pb1784-interface-duplicate-prototype"
  ],
  "pending": []
 }

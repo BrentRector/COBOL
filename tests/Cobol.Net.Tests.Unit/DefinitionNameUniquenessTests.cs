@@ -144,7 +144,7 @@ public sealed class DefinitionNameUniquenessTests : CobolNetTestBase
     }
 
     /// <summary>§8.4.6.4 owns class-name and interface-name uniqueness and the OO class table enforces it on the
-    /// declared WORD (COBOLNET0820 / COBOLNET0840). The group-wide externalized check must not RESTATE that
+    /// declared WORD (COBOLNET0820, for classes and interfaces alike). The group-wide externalized check must not RESTATE that
     /// sentence — one fault, one diagnostic — so a duplicate CLASS-ID draws 0820 and NOT 2213.</summary>
     [Fact]
     public void ADuplicateClassNameStaysTheOoTablesDiagnostic()

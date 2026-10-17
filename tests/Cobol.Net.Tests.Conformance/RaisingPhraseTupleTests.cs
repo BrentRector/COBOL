@@ -117,11 +117,11 @@ public sealed class RaisingPhraseTupleTests
     /// <summary>§14.9.14.3 SR5 a): "the presence or absence of the FACTORY phrase shall be the same" — the header
     /// lists the class WITH FACTORY, identifier-1 is an INSTANCE reference of it.</summary>
     [Fact]
-    public void ExitProgramRaising_FactoryPresenceDiffers_0849()
+    public void ExitProgramRaising_FactoryPresenceDiffers_4211()
     {
         var errors = ErrorsOf(ExitProgramRaising("RPT5", "FACTORY OF CRPT5", "CRPT5")
             .Replace("SET F TO CRPT5.", "INVOKE CRPT5 \"NEW\" RETURNING F."));
-        EditionHarness.AssertHasDiagnostic(errors, "COBOLNET0849");
+        EditionHarness.AssertHasDiagnostic(errors, "COBOLNET4211");
         Assert.Contains(errors, e => e.Contains("§14.9.14.3 SR5a", StringComparison.Ordinal));
     }
 

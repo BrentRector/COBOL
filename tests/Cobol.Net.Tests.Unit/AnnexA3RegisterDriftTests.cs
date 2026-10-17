@@ -142,11 +142,11 @@ public sealed class AnnexA3RegisterDriftTests
     /// §4.2.6 ¶3's warning mechanism — so a stale code silently converts an observable claim into an
     /// unobservable one, which is the PB292 defect in a different disguise.
     /// <para>⛔ THE ORACLE IS "IS IT EMITTED", NOT "IS IT IN THE CATALOGUE", and the difference was MEASURED
-    /// here: rows 2, 17, 19 and 45 cite COBOLNET0806, COBOLNET1564 and COBOLNET0822, all three of which are
-    /// still emitted as BARE STRING LITERALS from the binder rather than as <see cref="DiagnosticCatalog"/>
-    /// descriptors (`OptionsBinder`, `DataBinder`/`IntrinsicArgumentRules`, `OoClassTable`). A catalogue-only
-    /// test would have gone red on four rows that document the truth, so it would have been weakened or
-    /// deleted; migrating those three descriptors is a separate mechanism, and this register's obligation is
+    /// here: rows 2, 17 and 19 cite COBOLNET0806 and COBOLNET1564, both still emitted as BARE STRING LITERALS from
+    /// the binder rather than as <see cref="DiagnosticCatalog"/> descriptors (`OptionsBinder`,
+    /// `DataBinder`/`IntrinsicArgumentRules`; row 45's COBOLNET0822 became a descriptor in kb/Work PB745 and moved to
+    /// §5, the register of the annex it declines). A catalogue-only test would have gone red on rows that document
+    /// the truth, so it would have been weakened or deleted; migrating those descriptors is a separate mechanism, and this register's obligation is
     /// only that its citations are live. <c>DiagnosticRegistryDriftTests</c> owns the catalogue-membership
     /// question and must stay the only place that asks it (feedback_one_rule_one_place).</para></summary>
     [Fact]

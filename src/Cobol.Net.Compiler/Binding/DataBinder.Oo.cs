@@ -865,7 +865,7 @@ public sealed partial class DataBinder
             using var _ = Edition.At(subject);
             if (subject.CobolName is not { } subjName)
             {
-                Edition.Error("COBOLNET0842", $"{where}: a PROPERTY clause requires a named data item "
+                Edition.Error(DiagnosticCatalog.PropertyClauseUnnamedSubject, $"{where}: a PROPERTY clause requires a named data item "
                     + "(ISO §13.18.42 — FILLER cannot be a property subject)");
                 continue;
             }
