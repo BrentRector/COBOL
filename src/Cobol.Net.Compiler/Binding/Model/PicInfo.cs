@@ -706,7 +706,8 @@ public sealed record PicInfo(
     /// scale — over-counting is safe, under-counting is not) over <paramref name="pics"/>, so one value rendered or
     /// frozen for the set loses no digit any receiver can hold. A null PICTURE (an index, an object) contributes
     /// nothing. <c>ReceiverContext.OfSet</c> builds an arithmetic statement's context from it, and
-    /// <c>MoveBinder</c> sizes the intermediate a MOVE freezes a numeric function's value into from it.</summary>
+    /// <c>ReceivingReach.Of</c> sizes the fixed-point intermediate a MOVE freezes a numeric function's value into
+    /// from it (over the fixed-point receivers only — a floating-point one has no scale to fold).</summary>
     public static (int Scale, int IntegerDigits) WidestReceiving(IEnumerable<PicInfo?> pics)
     {
         int scale = 0, integerDigits = 0;

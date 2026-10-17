@@ -42,3 +42,20 @@ compares every multi-receiver result with its single-receiver twin, and DOC-A.1-
 The sibling sweep found the same receiver-first order in the arithmetic statements (`ADD FUNCTION SQRT (NEG) TO N (I)`
 selects EC-BOUND-SUBSCRIPT; `ADD N (I) 1 GIVING O (1)` selects EC-BOUND-ODO), which is ArithmeticEmitter's store and a
 different mechanism; it is reported as a lead.
+
+The branch review (round 1, finding R1-1) found the digits fix one shape short: a FLOATING-POINT receiver. The fixed-point
+temporary cannot carry a binary64 receiver's value at all, so the new N = 1 freeze made `MOVE FUNCTION PI TO F (I)` into
+a FLOAT-LONG store 3.141592653 under `>>TURN EC-BOUND CHECKING ON` (and the full 3.141592653589793 without it), and
+`FUNCTION EXP (100)` 4.004359629035547E+20 where the un-frozen MOVE stores 2.6881171418161356E+43; the same truncation
+already stood on main at N > 1 (`MOVE FUNCTION PI TO F1 F2`), and a floating-point numeric-edited receiver
+(`PIC +9.9(9)E+99`) lost the magnitude the same way. The intermediate's shape is now decided by the receivers in ONE
+place, `ReceivingReach.Of`: when every receiver is a floating-point item or a floating-point edited one the intermediate
+is itself floating-point (the receivers' one usage, so `MOVE temp TO b` is §14.9.25.4 GR6 c)'s same-usage transfer
+"without change"; binary32 for several binary32 usages; binary64 otherwise), and a floating-point receiver beside
+fixed-point ones takes the fixed-point intermediate at every fraction digit the 38-digit carrier keeps (the documented
+limit of a mixed set). `MoveBinder.ReceivingReach` is deleted; golden `2002/pb370_move_function_value_digits` gains legs
+L, M, N, Q, R, X and Y (FLOAT-LONG, FLOAT-SHORT, an exact-valued NUMVAL, two floating receivers, a mixed pair and a
+floating-point edited receiver), six of which fail on the reviewed head. The sweep of the other `SendingValueTemp`
+callers found the same fixed scale-9 temporary under an EVALUATE subject (`EVALUATE FUNCTION PI WHEN 1 ... WHEN G`
+takes WHEN OTHER where `IF FUNCTION PI = G` is true), which has no receivers to decide the shape from; it is reported as
+a lead.

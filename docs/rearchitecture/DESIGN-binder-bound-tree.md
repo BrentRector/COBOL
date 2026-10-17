@@ -617,9 +617,16 @@ placement `ArgumentOrder` uses for a function argument too), so it also precedes
 `Place.IdentifiesAtRunTime` is ABSTRACT: a new place kind cannot compile without answering whether identifying it
 evaluates anything (a subscript, a reference modifier, an occurs-depending length, an omitted-formal guard, or a
 BASED entry's pointer, §13.18.5.4 GR3). A NUMERIC function-identifier's temporary is sized for the MOVE's receivers
-(`SendingValueTemp.ReturnedValuePicFor` over `PicInfo.WidestReceiving`): the fixed 30-digit, scale-9 description
+(`SendingValueTemp.ReturnedValuePicFor` over `ReceivingReach.Of`): the fixed 30-digit, scale-9 description
 stored `MOVE FUNCTION PI TO S1 S2` into `PIC 9V9(12)` as 3.141592653000 where the single-receiver MOVE stores
 3.141592653589, so the equivalence was exact only for receivers of scale 9 or less and 21 integer digits or fewer.
+`ReceivingReach` decides the intermediate's SHAPE from the receivers: when every receiver is floating-point the
+intermediate is floating-point too (the receivers' one usage, binary32 for several binary32 usages, otherwise
+binary64), because no scaled integer carries a binary64's magnitude or digits — a scale-9 intermediate stored
+`MOVE FUNCTION PI TO F (I)` into a FLOAT-LONG as 3.141592653 under a >>TURN that made the N = 1 freeze owed, where
+the un-frozen MOVE stores 3.141592653589793. Otherwise it is fixed-point at the widest
+fixed-point receiver's scale and integer digits (`PicInfo.WidestReceiving`), and a floating-point or
+floating-point-edited receiver beside them asks for every fraction digit the 38-digit carrier keeps.
 
 **The intermediate's CAPACITY is counted in §8.4.3.3.4 GR5 positions, not in characters.** GR5 a) fixes the unit —
 "If the usage of identifier-1 is bit, positions used in evaluation are bit positions; otherwise, positions used
