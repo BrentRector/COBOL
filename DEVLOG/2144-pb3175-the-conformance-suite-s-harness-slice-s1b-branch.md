@@ -1,4 +1,4 @@
-## PB3175 — the conformance suite's harness (slice S1b), branch review round 1: an `--editions` record keeps the other editions, and the WiseOwl adapter reads a diagnostic of any code
+## Entry 2144 — 2026-10-17 03:40 PDT — PB3175 — the conformance suite's harness (slice S1b), branch review round 1: an `--editions` record keeps the other editions, and the WiseOwl adapter reads a diagnostic of any code
 
 kb/Work PB3175, design `docs/rearchitecture/DESIGN-conformance-suite.md` §5 and §13 S1b. Entry 2143 landed S1b as
 its implementer left it (through PB3176's branch, which merged that head); this landing carries the four findings of
@@ -39,3 +39,4 @@ PB2515): GREEN` — Conformance 6,125/11,947 · Unit 33,506/33,926 · Characteri
 facts passed in leg 1, and the SELF-TESTS audit re-ran `run.py --self-test` GREEN. The leg-2 fact
 `BothRunners_GiveEverySuiteTestTheSameVerdict` (`run.py` and the in-process runner on the merged adapter) passed on
 the gate's build. LINUX GATE: the lander's (batched gating).
+
