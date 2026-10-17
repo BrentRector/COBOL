@@ -223,6 +223,60 @@ public sealed class HostEntryShapeDriftTests : CobolNetTestBase
             "HostLanding.RequireCapacity(", r.Members.OfType<MethodDeclarationSyntax>().Single(m => m.Identifier.Text == "__PutDyn").Body!.ToString()));
     }
 
+    /// <summary>A strongly-typed group holding BOTH a dynamic-length item and a pointer, beside two units that publish.</summary>
+    private const string RestrictionFixture = """
+               IDENTIFICATION DIVISION.
+               PROGRAM-ID. H3MAIN.
+               PROCEDURE DIVISION.
+                   DISPLAY "MAIN"
+                   GOBACK.
+               END PROGRAM H3MAIN.
+               IDENTIFICATION DIVISION.
+               PROGRAM-ID. H3OK.
+               DATA DIVISION.
+               LINKAGE SECTION.
+               01 L-A PIC X(3).
+               PROCEDURE DIVISION USING L-A.
+                   GOBACK.
+               END PROGRAM H3OK.
+               IDENTIFICATION DIVISION.
+               PROGRAM-ID. H3BOTH.
+               DATA DIVISION.
+               WORKING-STORAGE SECTION.
+               01 TB TYPEDEF STRONG.
+                  05 TB-N PIC 9(2).
+                  05 TB-D PIC X DYNAMIC LENGTH LIMIT IS 8.
+                  05 TB-P USAGE POINTER.
+               LINKAGE SECTION.
+               01 L-B TYPE TB.
+               PROCEDURE DIVISION USING L-B.
+                   GOBACK.
+               END PROGRAM H3BOTH.
+               """;
+
+    /// <summary>⛔ THE §14.2.3 13) RESTRICTION IS THE BOUNDARY'S (DESIGN-external-repository §4.3, DOC-A.1-141; kb/Work
+    /// PB3273). A unit one of whose group formals holds both a variable-length component (§8.5.1.12.1) and a pointer or
+    /// object-reference member publishes NO entry — the other units of the group still do — because no crossing form of the
+    /// boundary carries that group: the activated program's own formal of that description stages the Tier-C loud at its
+    /// copy-in, so an entry for it could only reach a loud. The second half is the pin: the day the CALL lane gains a form
+    /// for the shape this test is red, and the restriction (<c>PublishedRecordEmitter.Renders</c>) is to be lifted
+    /// together with the record's composition of that form's storage, never left standing and never lifted alone.</summary>
+    [Fact]
+    public void AGroupHoldingAComponentAndAReference_PublishesNoEntry_WhileTheBoundaryHasNoFormForIt()
+    {
+        var (ok, stdout, detail) = CompileAndRun(RestrictionFixture, dialectLevel: 2023);
+        Assert.True(ok, detail);
+        Assert.Equal("MAIN", stdout);
+        string generated = File.ReadAllText(Path.Combine(TempDir, "prog.g.cs"));
+        var root = CSharpSyntaxTree.ParseText(generated).GetRoot();
+        var entries = root.DescendantNodes().OfType<ClassDeclarationSyntax>()
+            .Where(c => c.Members.OfType<MethodDeclarationSyntax>().Any(m => m.Identifier.Text == "Call")
+                        && c.Modifiers.Any(SyntaxKind.StaticKeyword))
+            .Select(c => c.Identifier.Text).Order().ToArray();
+        Assert.Equal(["H3MAIN", "H3OK"], entries);
+        Assert.Contains("variable-length group image of 'L-B' with a pointer/object-class leaf", generated);
+    }
+
     /// <summary>⛔ ONE RENDERER (DESIGN-external-repository §17.3): what a host entry's argument states for §14.9.4.4 3) d) —
     /// its storage length and its description — is rendered by the CALL lane's <c>CallEmitter.Described</c>, the renderer a
     /// CALL statement's argument is stated by, from the builders a CALL argument's facts come from

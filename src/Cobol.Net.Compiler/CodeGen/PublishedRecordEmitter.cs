@@ -35,8 +35,16 @@ internal sealed class PublishedRecordEmitter(Func<DataItem, string> profileOf)
     /// VARIABLE-LENGTH group (<see cref="HoldsComponents"/>) whenever the CALL lane carries it — its current extent
     /// composes (<see cref="DataItem.CurrentExtentImageCapable"/>, the gate of every §8.5.1.12 carrier) — as the CALL
     /// lane's variable-length carrier (<c>CobolVarGroup</c>, <see cref="EmitVar"/>). One shape is the GR13 restriction
-    /// DESIGN-external-repository §4.3 states: a group holding BOTH a variable-length component and a pointer or
-    /// object-reference member, whose references the variable-length carrier has no slot for.</summary>
+    /// DESIGN-external-repository §4.3 states (ISO §14.2.3 13): a group holding BOTH a variable-length component and a
+    /// pointer or object-reference member. ⛔ <b>THE RESTRICTION IS THE BOUNDARY'S, NOT THIS EMITTER'S</b> (kb/Work PB3273):
+    /// no crossing form carries that group — the variable-length carrier has no slot for a reference, the cell area has no
+    /// component, and the activated program's own formal of that description stages the Tier-C loud at its copy-in
+    /// (<c>TierCIsland</c>; a COBOL CALL of it is COBOLNET1688) — so an entry would only reach a loud. The
+    /// <see cref="HoldsSlots"/> conjunct is therefore implied today by <see cref="DataItem.CurrentExtentImageCapable"/>
+    /// (a reference leaf is no member of its law), and it STAYS as the guard: when the boundary gains a form for the
+    /// shape, this emitter must compose that form's storage (the cell area's slots beside the carrier's components) before
+    /// the restriction lifts, or a record would silently drop its references. <c>HostEntryShapeDriftTests</c> pins both
+    /// halves.</summary>
     internal static bool Renders(DataItem group) =>
         group.IsGroup && DataItem.DescendantsOf(group).Where(Occupies).All(d => !d.IsAnyLength)
         && (!HoldsComponents(group) || (group.CurrentExtentImageCapable && !HoldsSlots(group)));

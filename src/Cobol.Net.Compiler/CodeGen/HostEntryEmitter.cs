@@ -40,8 +40,10 @@ internal sealed class HostEntryEmitter(SignEncoding signEncoding, OoClassTable? 
             && d.IsFunction == u.IsFunction && string.Equals(d.ExternalizedName, u.ExternalizedName, StringComparison.Ordinal)))
             && Published(u));
 
-    /// <summary>Whether every GROUP formal and RETURNING item of the unit has a published record this slice renders
-    /// (<see cref="PublishedRecordEmitter.Renders"/>; its WIP remark names the shapes still to come).</summary>
+    /// <summary>Whether every GROUP formal and RETURNING item of the unit has a published record
+    /// (<see cref="PublishedRecordEmitter.Renders"/>). A unit with one that has none publishes no entry at all (the §14.2.3
+    /// 13) restriction DOC-A.1-141 states): a group holding both a variable-length component and a reference, which no
+    /// crossing form of the boundary carries.</summary>
     private static bool Published(BoundUnit u) =>
         u.Data.LinkageFormals.Select(f => (DataItem?)f.Item).Append(u.Data.LinkageReturning)
             .All(d => d is not { IsGroup: true } || PublishedRecordEmitter.Renders(d));
