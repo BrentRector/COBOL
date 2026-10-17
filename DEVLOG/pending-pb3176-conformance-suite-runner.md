@@ -53,4 +53,7 @@ nothing; the theories are one class each until S2 partitions them.
 
 No inventory row: test infrastructure (`closes_rows: []`, its reason filed). PB3177 (S2) unblocked.
 
-**Gate:** pending.
+**Gate:** run `20261017T055145Z-02fca5` (HEAD fb9fe788f): `LEG 1 ONLY (batched gating, PB2515): GREEN` — Conformance
+6,108/11,947 · Unit 33,478/33,924 · Characterization 5/36 cases ran; all 29 new cases passed in leg 1 (an earlier gate,
+run `20261017T054358Z-b28e70` at 3f0eaea13, was GREEN before the self-review fixes). semgrep verify PASS. LINUX GATE:
+the lander's (batched gating).
