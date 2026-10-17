@@ -3,6 +3,7 @@
  "enabled": [
   "pb370_open_unsuccessful_order",
   "pb374_ec_mcs_names_accept_inert",
+  "pb3149_ec_mcs_no_requester_table13",
   "pb2586_unstring_sr2_category_operands",
   "pb2841_continue_after_non_finite",
   "pb241_continue_bare_equals_after_zero",
