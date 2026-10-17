@@ -1,4 +1,4 @@
-## PB3270: a COBOL word spelled like a runtime or System type no longer shadows it in the generated C#
+## Entry 2128 — 2026-10-16 18:19 PDT — PB3270: a COBOL word spelled like a runtime or System type no longer shadows it in the generated C#
 
 The generated file imports `System` and four runtime namespaces and names their types by simple name:
 `CobolString.Store(...)`, `HostLanding.LandText(...)`, `Int128`. The four C# name scopes (`CsNames`) were seeded with
@@ -35,3 +35,4 @@ Self-review (architecture, full code, performance, duplication): one list drives
 kind, so a thousand record structs allocate nothing for it; no second copy of the rule. Gate: `=== BUILD-LOCAL GATE:
 LEG 1 ONLY (batched gating, PB2515): GREEN` (run 20261017T003242Z-dbf4b3; the golden and the four drift facts passed in
 leg 1). Linux gate: the lander's (batched gating).
+
