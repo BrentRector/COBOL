@@ -1,4 +1,4 @@
-## PB3198: one command-line model for every guard hook rule (heredoc bodies cut at their delimiter, git calls read once)
+## Entry 2133 — 2026-10-16 20:11 PDT — PB3198: one command-line model for every guard hook rule (heredoc bodies cut at their delimiter, git calls read once)
 
 **Mechanism (kb/Work PB3198, R2 finding tests-scripts-ci-3--architecture--f2#2, cluster PB1754).** The guard hooks
 had no one model of a shell command line. `forbidden_commands.py` read five private views of the raw text: rules 1
@@ -96,3 +96,4 @@ stage only to its first command, so `echo 'git stash' | ( cd X; bash )` passed, 
 `echo 'git stash' | x=$(bash)`). Each now does; a script read from stdin consumes it. Tests: `test_forbidden_commands.py`
 222 → 232 (6 of the new cases fail on the reviewed head ff8f1c01b), `test_shell_location.py` 125 → 135 (7 fail there),
 `test_worktree_rm_allow.py` 56 → 57 (a pin: a group never grants).
+
