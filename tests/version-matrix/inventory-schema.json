@@ -1297,8 +1297,8 @@
     "disqualifying-method-patterns": ["MatchesLegacy$", "MatchesGnuCobol$", "MatchesOracle$"],
     "forms": {
       "conformance": {
-        "syntax": "conformance:<edition>/<case>   where edition is 85 | 2002 | 2014 | 2023 | negative",
-        "path-template": "tests/conformance/{0}.cob",
+        "syntax": "conformance:<tree>/<clause folder>/<id>   a conformance-suite test, where tree is cases | wiseowl/cases (docs/rearchitecture/DESIGN-conformance-suite.md §4)",
+        "path-template": "conformance-suite/{0}.cob",
         "spec-derived": true
       },
       "nist": {

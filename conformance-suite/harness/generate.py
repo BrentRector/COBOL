@@ -73,6 +73,9 @@ OPTIONS_PATH = SUITE / "wiseowl" / "options.json"
 #: command's --sign-encoding and --flag-extensions). Only a test of the wiseowl tree may name one.
 WISEOWL_OPTIONS = {"sign-encoding": ("ibm", "ascii"), "flag-extensions": ("on", "off")}
 OUT = SUITE / "suites"
+#: The corpus slice S2 moved into the suite (kb/Work PB3177). A file there is a test a branch cut before the move
+#: added, which no runner would ever run: refused, so the branch is red in seconds (§13 S2).
+REMOVED_CORPUS = Path("tests") / "conformance"
 VERDICT = "=== CONFORMANCE SUITE: "
 
 #: The two trees of tests: the suites' (`cases/`) and WiseOwl's own regression tests (`wiseowl/cases/`, §4).
@@ -1031,12 +1034,21 @@ def repository_inputs() -> tuple[Inputs, list[str]]:
 
 # ── running ──────────────────────────────────────────────────────────────────────────────────────────────────────────
 
+def removed_corpus_files(repo: Path) -> list[str]:
+    """The files under the removed `tests/conformance/` of `repo`, as repository-relative POSIX paths."""
+    old = repo / REMOVED_CORPUS
+    return sorted(f.relative_to(repo).as_posix() for f in old.rglob("*") if f.is_file()) if old.is_dir() else []
+
+
 def generate(root: Path, inputs: Inputs, problems: list[str], out: Path | None,
              echo: bool = True) -> tuple[int, Reader]:
     """Read and refuse; when nothing is refused and `out` is given, write the manifests and the report there."""
     reader = Reader(root, inputs)
     reader.read_tree()
     check_cases(reader)
+    for rel in removed_corpus_files(root.parent):
+        reader.refuse(f"../{rel}", 1, "a file under tests/conformance/, which the suite replaced (kb/Work PB3177): "
+                                      "move the test into conformance-suite/cases/ (README, 'Adding a test')")
     for p in problems:
         reader.refuse(IMPLEMENTOR_DEFINED_PATH.name, 1, p)
     # The harness's configuration (§5): every adapter, profile and baseline, against what only the repository knows.
@@ -1591,6 +1603,13 @@ def self_test() -> int:
     check("arm: free form strips a floating comment and reads a line-initial one as a comment",
           [t.text for t in cobol.tokenize(cobol.read_lines("*> all comment\nMOVE A TO B *> rest\n", "free"))]
           == ["MOVE", "A", "TO", "B"])
+    with tempfile.TemporaryDirectory() as tmp:
+        stray = Path(tmp) / REMOVED_CORPUS / "2023" / "late.cob"
+        stray.parent.mkdir(parents=True)
+        stray.write_text("       IDENTIFICATION DIVISION.\n", encoding="utf-8")
+        check("arm: a file under the removed tests/conformance/ is refused (a branch cut before the move)",
+              removed_corpus_files(Path(tmp)) == ["tests/conformance/2023/late.cob"]
+              and removed_corpus_files(Path(tmp) / "nowhere") == [])
     copies = cobol.copy_statements(fixed_tokens("       >>PAGE COPY FOO IS DOCUMENTATION", "           COPY BAR."))
     check("arm: a COPY in a directive's text (a PAGE directive's comment-text, 7.3.19.4 GR 1) is no COPY statement",
           [c.name for c in copies] == ["BAR"], copies)

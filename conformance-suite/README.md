@@ -42,6 +42,40 @@ requires a compiler to diagnose carries `flag: {kind, at}`, names its `control` 
 violation) and marks the diagnosed line: `<<` opening the sequence number area in fixed form, a closing `*> <<` in free
 form. Every field, every expectation and the portability lint (what a portable test may DISPLAY) are in design §3.
 
+## Adding a test (the authoring guide)
+
+**Every rule implemented or determination documented ships with at least one witness here, in the same commit as
+the feature** (CLAUDE.md rule 3). The tests are the per-edition conformance evidence, WiseOwl COBOL's regression net,
+and the `test-ref` witnesses the traceability inventory cites as `conformance:<tree>/<clause folder>/<id>`
+(`tests/version-matrix/inventory-schema.json`); `docs/CONFORMANCE.md` holds the implementor-defined determinations
+the tests pin.
+
+- **Where.** A test of a rule a program can observe portably goes in `cases/<clause>-<Name>/`, the folder of its
+  rules' clause (`cases/14.9.8-COMPUTE/`). A test of WiseOwl COBOL's own behaviour goes in
+  `wiseowl/cases/<clause>-<Name>/`: documented non-support, an implementor-defined value the standard does not
+  enumerate, a WiseOwl compile option, free form at 85 (WiseOwl's `--source-format free` extension), a library
+  folder (`COPY X OF LIB`, whose location is the implementor's). The generator refuses a file under the removed
+  `tests/conformance/`.
+- **The program.** `<id>.cob`, opening with its metadata block (above; a long list continues on lines indented four
+  spaces past `*>`, so a fixed-form block stays inside margin R and a free-form line inside its 255 positions), then a
+  comment block naming the ISO clause, quoting the rule (each citation through `scripts/spec/cite.py --check`) and
+  stating **why each leg can fail**. The expected values are DERIVED from the standard (or from a documented
+  implementor determination), never copied from a run. `PROGRAM-ID`s are unique across both trees (.NET would serve a
+  stale same-named assembly). UTF-8, no BOM, LF (`.gitattributes`); a library text may carry a UTF-16 or UTF-32 mark.
+- **The expectation.** An accepted test's `<id>.out` is its exact standard output, compared through
+  `CutRunner.Normalize` / `run.py`'s `normalize()` (LF, per-line trailing-space trim, no trailing newline); a test that
+  only proves translation ends in `STOP RUN` with an empty `.out`.
+- **A program WiseOwl must refuse** names no `accept` edition and has an entry in `wiseowl/diagnostics.json`: the
+  editions WiseOwl refuses it at (`refuse-at`) and the code or message substring it reports (`expect`).
+  `ConformanceSuiteTestsBase.WiseOwlRefusal_RefusesTheSourceWithItsDiagnostic` compiles it at each and requires the
+  front end or the binder to refuse it with that text. A clause pass (design §6 step 2) turns such a test into a
+  flagged test with a control.
+- **A WiseOwl compile option** a WiseOwl test needs is its entry in `wiseowl/options.json` (`sign-encoding`:
+  `ibm` · `ascii`; `flag-extensions`: `on` · `off`); the generator refuses one for a test of `cases/`.
+- **Migrated tests.** The programs of the former `tests/conformance/` corpus (design §6 step 1, kb/Work PB3177)
+  carry `portable: unverified`, are accepted at the edition their old directory named, and wait for their clause
+  pass; one no inventory row cited is in `cases/_unassigned/`.
+
 ## Running the generator
 
 ```
