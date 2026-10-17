@@ -18,8 +18,8 @@ first). COMPUTE and GIVING were right only under EC-SIZE checking, whose size-er
 **Fix.** One store primitive, `PlaceIdentification.SenderFirst`: when the sender and the receiver both identify at run
 time it evaluates the value into a block-scoped `__sending` local before the store; otherwise the store is rendered as
 before, so a static receiver's generated code does not change. `PlaceIdentification.IdentifiesAtRunTime` answers the
-question for a place by asking `Freeze` whether it would hoist a fragment (plus an occurs-depending length and an
-omitted-formal guard), so the two cannot drift. Every MoveEmitter store arm renders through it; INITIALIZE keeps the
+question for a place by asking `Freeze` whether it would hoist a fragment (plus an occurs-depending length, a
+reference modification's range test and an omitted-formal guard), so the two cannot drift. Every MoveEmitter store arm renders through it; INITIALIZE keeps the
 receiver first (`ImplicitMovePhrase.ReceiverIdentifiedFirst`: §14.6.4 7)'s left-to-right order identifies
 identifier-1 before the REPLACING sender, a determination recorded on the note), and so does an overlap prefill. The
 pointer-family SET stores take it too (§14.9.39.4 GR12, GR14, GR16). The arithmetic statements now materialize the
@@ -31,7 +31,9 @@ is, its order is not. Found on the way: SET program-pointer cited §14.9.39.4 GR
 
 **Golden.** `conformance:2002/pb3261_sender_first_order`: thirteen statements that fail on both sides (five MOVE
 shapes in both directions, four arithmetic forms, two STRING positions, INITIALIZE), the nonfatal-first EVALUATE shape,
-and in-range legs that check the stored values. No negative: the order is not edition-gated.
+and in-range legs that check the stored values. `conformance:2023/pb3261_sender_first_runtime_length`: the same
+order when the sender's reference modifier has integer-literal positions (see the review round below). No negative:
+the order is not edition-gated.
 
 **Rows.** GR-14.9.49.4-11 PARTIAL → CONFORMS (batch `w1102g-pb3261`, GAP 60 → 59); PB3261 and PB370 landed.
 
@@ -45,3 +47,17 @@ reuses the existing `Snapshot`.
 order decision read a third), so the overlap-prefill exception moved into `EmitStore` beside the prefill it reads. The
 re-gate (run `20261017T031527Z-6d6fa0`): `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` —
 Conformance 5,888 · Unit 33,173 · Characterization 5 cases ran in leg 1, the golden among them.
+
+**Branch review, round 1.** R1-1: `IdentifiesAtRunTime(Place)` asked only `Freeze`, which hoists nothing for a
+reference modifier with integer-literal positions, so `MOVE DL(1:5) TO T(I)` and `STRING DL(1:5) DELIMITED BY SIZE
+INTO T(I)` over a DYNAMIC LENGTH item holding two characters still ran EC-BOUND-SUBSCRIPT's declarative, and so did
+`MOVE X(1:20) TO T(I)` over a PIC X(8) item, which binds with its warning (COBOLNET2671) while EC-BOUND-REF-MOD
+checking is on. ISO §8.4.3.3.4 5) c) measures the slice against "the number of positions in the data item referenced
+by identifier-1", and every read and splice of a slice tests it when it executes, so a reference-modified place now
+always identifies at run time. A test that cannot fail costs one block-scoped local; answering "can it fail" would
+restate the bind-time screen `ReferenceResolver.LiteralRefModRangeViolation`. The new 2023 golden flipped D1, D2 and F1
+from EC-BOUND-SUBSCRIPT to EC-BOUND-REF-MOD against the reviewed build; D3 (a function sender), D4 (two receivers) and
+R1 (the receiver side) were already right. R1-2: the new predicate's doc comment had been inserted under `Snapshot`'s
+summary; each now carries its own. Sweeping the same shape found four more doubled summaries in files the branch
+touched (`EmitCompute`, `MoveEmitter.ElementaryStore`, `BoundIntrinsicCall.Anycase`, `BoundBoolAll`), fixed here; 47
+remain across the tree, left for a drift test of their own.

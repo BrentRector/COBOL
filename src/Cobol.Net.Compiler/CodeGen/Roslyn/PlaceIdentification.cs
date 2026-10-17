@@ -85,8 +85,19 @@ internal static class PlaceIdentification
     /// <summary>True when identifying <paramref name="place"/> evaluates something at run time: an address fragment
     /// <see cref="Freeze(Place, Func{string, string})"/> would hoist (a subscript, a reference modifier, a window
     /// offset — asked of Freeze itself, so the two cannot drift), an occurs-depending length (§14.6.4 step 6, which
-    /// reads the DEPENDING ON item and may raise EC-BOUND-ODO), or the guard of a formal that may be omitted
-    /// (EC-PROGRAM-ARG-OMITTED).</summary>
+    /// reads the DEPENDING ON item and may raise EC-BOUND-ODO), a reference modification's range test, or the guard
+    /// of a formal that may be omitted (EC-PROGRAM-ARG-OMITTED).
+    /// <para>⛔ A REFERENCE MODIFICATION IS RANGE-TESTED AT RUN TIME WHATEVER ITS POSITIONS (kb/Work PB3261 review
+    /// R1-1). ISO §8.4.3.3.4 5) c): "The sum of leftmost-position and length minus the value one shall be less than or
+    /// equal to the number of positions in the data item referenced by identifier-1", and every read and splice of a
+    /// <see cref="RefModPlace"/> tests it when it executes (<c>StrRefMod</c> / <c>StrSpliceInto</c>), raising
+    /// EC-BOUND-REF-MOD. Integer-literal positions are no exception: over a DYNAMIC LENGTH or ANY LENGTH identifier-1
+    /// the number of positions is the item's current one, so <c>MOVE DL(1:5) TO T(I)</c> with DL holding two
+    /// characters failed the sender's test only after the receiver's subscript, and over a fixed-size item a literal
+    /// out of range binds (with its warning) where EC-BOUND-REF-MOD checking is on
+    /// (<c>ReferenceResolver.LiteralRefModRangeViolation</c>). Answering "can this test fail?" would restate that
+    /// screen here; a test that cannot fail costs the hoist one block-scoped local, so the answer is the rule's,
+    /// true.</para></summary>
     public static bool IdentifiesAtRunTime(Place place)
     {
         bool runTime = false;
@@ -96,7 +107,7 @@ internal static class PlaceIdentification
 
     private static bool EvaluatesBesidesItsAddress(Place place) => place switch
     {
-        OdoGroupPlace => true,
+        OdoGroupPlace or RefModPlace => true,
         PlaceDecorator d => EvaluatesBesidesItsAddress(d.Inner),
         MemberPlace m => Guarded(m.Path),
         DynTablePlace d => Guarded(d.Path),

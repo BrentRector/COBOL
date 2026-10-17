@@ -223,8 +223,6 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
         return (dividend, divisor, new NumX(sq, 0, Dec: true), _ => quotient);
     }
 
-    /// <summary>COMPUTE: the RHS is rendered per receiver (so a quotient is computed at that receiver's scale + mode)
-    /// then stored, rounded by the receiver's ROUNDED mode, under the ON SIZE ERROR phrase if any.</summary>
     /// <summary>COMPUTE Format 2 — boolean-compute (ISO §14.9.8): render the boolean RHS ONCE at the §14.9.8.4
     /// GR3 width (the largest boolean ITEM referenced, carried at run time — <see cref="BooleanRenderer.RenderAtItemWidth"/>;
     /// an all-literal expression keeps its own length and the per-receiver store fits it), then store into each
@@ -259,6 +257,8 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
         }
     }
 
+    /// <summary>COMPUTE: the RHS is rendered per receiver (so a quotient is computed at that receiver's scale + mode)
+    /// then stored, rounded by the receiver's ROUNDED mode, under the ON SIZE ERROR phrase if any.</summary>
     public void EmitCompute(BoundCompute c)
         => EmitArith(c.SizeError, ise =>
         {
@@ -382,9 +382,6 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
     /// string + the unit's DECIMAL-POINT IS COMMA).</summary>
     private string EditCfg(PicInfo? pic) => ctx.EditCfg(pic);
 
-    /// <summary>Materialize a rendered sender/initial-evaluation into a local temp (ISO §14.7.7 GR4 + NOTE 3 —
-    /// ONE initial evaluation; results independent of sender/receiver storage overlap). Inlining the expression
-    /// into each receiver's store would re-read its fields after earlier receivers stored.</summary>
     /// <summary>⛔ IS THE INITIAL EVALUATION MATERIALIZED BEFORE THE FIRST RECEIVER IS STORED? ISO §14.7.7 rule 4 orders an
     /// arithmetic statement: a) "The initial evaluation of the statement is done and the result of this operation is placed
     /// in an intermediate data item", then b) "Item identification for the receiving data items is done as each data item is
@@ -399,6 +396,9 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
     private static bool MaterializesInitialEvaluation(IReadOnlyList<Receiver> targets) =>
         targets.Count > 1 || PlaceIdentification.IdentifiesAtRunTime(targets[0].Place);
 
+    /// <summary>Materialize a rendered sender/initial-evaluation into a local temp (ISO §14.7.7 GR4 + NOTE 3 —
+    /// ONE initial evaluation; results independent of sender/receiver storage overlap). Inlining the expression
+    /// into each receiver's store would re-read its fields after earlier receivers stored.</summary>
     private NumX Snapshot(NumX v)
     {
         string t = $"__ie{ctx.Names.NextStoreTmp()}";

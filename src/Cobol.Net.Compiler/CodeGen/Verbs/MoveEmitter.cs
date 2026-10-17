@@ -199,12 +199,6 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
         }
     }
 
-    /// <summary>The ONE-STATEMENT store of an ELEMENTARY move — the <see cref="MoveKind.Convert"/> and
-    /// <see cref="MoveKind.FigurativeToNumericImage"/> renderings, RETURNED rather than written so GR1's
-    /// zero-length-item test can place BOTH of its arms inside one emitted <c>if/else</c> (kb/Work PB425)
-    /// instead of the emitter growing a second copy of either rendering. The kind is re-asked of THIS sender
-    /// because GR1's two arms differ in it: the substituted figurative into a numeric receiver is the image
-    /// fill, the written sender is the conversion.</summary>
     /// <summary>Why a FILL is being stored into a numeric receiver — the rule to blame when the receiver has no
     /// character image to hold it (<see cref="FigurativeToNumericImageStore"/>'s narrow loud). Three provenances,
     /// three different rules, and only one of them is the removed construct.</summary>
@@ -220,6 +214,12 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
              + "§14.9.25.3 SR5 / Annex E.2 item 1",
     };
 
+    /// <summary>The ONE-STATEMENT store of an ELEMENTARY move — the <see cref="MoveKind.Convert"/> and
+    /// <see cref="MoveKind.FigurativeToNumericImage"/> renderings, RETURNED rather than written so GR1's
+    /// zero-length-item test can place BOTH of its arms inside one emitted <c>if/else</c> (kb/Work PB425)
+    /// instead of the emitter growing a second copy of either rendering. The kind is re-asked of THIS sender
+    /// because GR1's two arms differ in it: the substituted figurative into a numeric receiver is the image
+    /// fill, the written sender is the conversion.</summary>
     private string ElementaryStore(Place target, BoundOperand source, MoveSenderOrigin origin, bool senderFirst) =>
         MoveClassifier.Kind(source, target) is MoveKind.FigurativeToNumericImage
             ? FigurativeToNumericImageStore(target, source, FillCite(origin))
