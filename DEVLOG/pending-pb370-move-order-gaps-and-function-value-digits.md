@@ -78,4 +78,9 @@ single-receiver twin. The build has 0 warnings and 0 errors, and `semgrep/verify
 
 **Gate.** Run `20261017T124929Z-c76990`: `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN — leg 2
 left to CI's whole-population run: Conformance 5,088 · Unit 377 · Characterization 31 … ===`. All three PB370 corpus
-cases and `pb3261_sender_first_order` passed in leg 1, and the leg-1 trx files hold 0 failed results.
+cases and `pb3261_sender_first_order` passed in leg 1, and the leg-1 trx files hold 0 failed results. After the R1-1
+fix, run `20261017T131742Z-9c0235`: `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN — leg 2 left to
+CI's whole-population run: Conformance 4,611 · Unit 371 · Characterization 31 … ===`. The new golden
+`pb370_move_property_receiver_order`, the other PB370 cases, the `ReceiverBracketDriftTests` and the property-receiver
+goldens (`pb2618_*`, `pb2078_property_receivers_in_phrases`, `oo_property_ref`) passed in leg 1, with 0 failed results.
+`semgrep/verify.py` PASS.
