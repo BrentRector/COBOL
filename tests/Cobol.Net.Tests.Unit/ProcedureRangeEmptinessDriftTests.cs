@@ -123,7 +123,8 @@ public sealed class ProcedureRangeEmptinessDriftTests
         foreach (var c in cases)
         {
             PcRange composed = c.First.Through(c.Thru);
-            Assert.Equal((c.Name, c.Spanned), (c.Name, composed.SpannedPcs().ToArray()));
+            Assert.True(c.Spanned.SequenceEqual(composed.SpannedPcs()),
+                $"{c.Name}: spanned [{string.Join(", ", composed.SpannedPcs())}]");
             for (int pc = 0; pc <= 10; pc++)
                 Assert.Equal((c.Name, pc, c.Spanned.Contains(pc)), (c.Name, pc, composed.Spans(pc)));
             // The span and the carried emptiness are one fact: a range that spans no paragraph is the empty set.
