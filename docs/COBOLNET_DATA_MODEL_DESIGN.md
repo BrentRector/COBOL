@@ -792,7 +792,7 @@ items inside one byte — which is exactly why `RecordLayout`'s `int` character 
    bit position (**no padding** — this is the only case that shares a byte).
 2. **Any other bit item** → advance the cursor to the next byte boundary, then place. (Covers a bit item after a
    character item, after a bit item of a *different* level, and a group's first item when it is not a bit item or is
-   ALIGNED — a first bit item begins where its group begins, see 6.)
+   ALIGNED — a first bit item begins where its group begins, and a group where its first item does, see 6 and 7.)
 3. A **non-bit item** → advance to the next byte boundary (its natural boundary), then place `ByteWidth × 8` bits.
    The implicit filler this generates is §8.5.1.6.3's "as needed to advance alignment to a required natural
    boundary for the next item within that group".
@@ -810,8 +810,20 @@ items inside one byte — which is exactly why `RecordLayout`'s `int` character 
    byte of the record. `BitLayout.PhaseOf(group)` is where in a byte the group begins (0 for everything but a
    GROUP-USAGE BIT group that shares its predecessor's byte); the walk starts its cursor there and subtracts it from
    the extents and starts it reports, which stay group-relative. The walk passes the phase DOWN (the `…At` readers) and
-   never asks `PhaseOf` per child (`BitGroupPhaseDriftTests`). A TABLE of bit groups lays every occurrence out as the
-   first one — the stride must be uniform — so only the first occurrence's byte boundaries are the record's.
+   never asks `PhaseOf` per child (`BitGroupPhaseDriftTests`).
+7. **A group begins where its first item does, and a phase-dependent table strides whole bytes** (kb/Work PB3167).
+   The sentence rule 6 quotes binds both ways: a bit group whose first item is placed on a byte (ALIGNED, a TYPE
+   subject, a dynamic-capacity table) begins on that byte, so the filler before it is the enclosing group's
+   (`BitLayout.KeepsPosition` asks the first item; §13.18.44.3 SR15's "requires a byte boundary" for a REDEFINES
+   subject is its negation). A TABLE whose element lays out differently at different phases — it, or a member at any
+   depth, is placed at "the first bit position of the first available byte" (`BitLayout.HoldsByteStart`) — has the
+   stride `RoundUpToByte(width)` (`BitLayout.StrideBits`), so every occurrence begins at the first one's phase, its
+   ALIGNED members land on bytes of the record in EVERY occurrence (§13.18.1.4 GR2), and the one walk at the first
+   occurrence's phase is exact for all of them. The filler between occurrences is the table's `TrailingFillerBits`
+   short of the stride after the LAST occurrence (`TableBits`), and BOTH ODO extent channels give it back before any
+   rounding (`CobolTable.OdoExtentTrimmed` / `OdoExtentChars`): such a table can begin mid-byte, where its
+   stride-counted end lies a byte past its real one. An element with no such member is packed bit by bit, stride =
+   width. The DETERMINATION and the rejected reading are in `docs/CONFORMANCE.md` (USAGE BIT).
 
 **Bits per character position is a pinned implementor choice** (§8.1.2 makes it implementor-specified): **8**,
 consistent with `ByteWidth`'s existing "DISPLAY = 1 byte per character position". Documented in

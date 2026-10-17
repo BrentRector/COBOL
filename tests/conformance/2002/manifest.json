@@ -894,6 +894,7 @@
   "pb2722_evaluate_partial_not_ownership",
   "pb2740_omitted_branch_turn_valid_names",
   "pb3158_aligned_in_mid_byte_bit_group",
+  "pb3167_aligned_member_in_bit_group_table",
   "pb3154_half_data_named_like_class_words",
   "pb3154_half_data_hides_class_symbolic",
   "pb3154_sum_counter_hides_symbolic",

@@ -97,6 +97,13 @@ internal static class BitLayout
         && IsBitItem(c)
         && (c.IsElementary || c.Children.Count == 0 || KeepsPosition(c.Children[0]));   // §8.5.1.6.3 — a group begins where its first item does
 
+    /// <summary>⛔ THE ONE PLACEMENT DISPATCH: does <paramref name="c"/> continue where the item before it ended
+    /// (<see cref="SharesByteWith"/>), or, as a group's first child (<paramref name="prev"/> null), where its group
+    /// began (<see cref="KeepsPosition"/>)? False is "the first bit position of the first available byte". The walk,
+    /// <see cref="PhaseOf"/> and <see cref="HoldsByteStart"/> all ask it, so the two arms are written once (kb/Work
+    /// PB3167: the dispatch had three spellings).</summary>
+    private static bool Continues(DataItem? prev, DataItem c) => prev is null ? KeepsPosition(c) : SharesByteWith(prev, c);
+
     /// <summary>⛔ THE ONE ANSWER TO "which of these siblings SHARE bytes" (ISO §8.5.1.6.3): a RUN is a maximal
     /// stretch of consecutive same-level bit members — "an elementary bit data item immediately following an
     /// elementary bit data item or bit group item of the same level" — and it is what makes a run's members
@@ -299,7 +306,7 @@ internal static class BitLayout
         foreach (var c in item.Children)
         {
             if (c.RedefinesTargetName is not null) continue;            // overlays its target, places nothing (§13.18.44)
-            if (prev is null ? !KeepsPosition(c) : !SharesByteWith(prev, c)) return true;   // the walk's round-up
+            if (!Continues(prev, c)) return true;                       // the walk rounds it up to a byte
             if (HoldsByteStart(c)) return true;
             prev = c;
         }
@@ -376,7 +383,7 @@ internal static class BitLayout
             DataItem? prev = null;
             for (int i = at - 1; i >= 0 && prev is null; i--)
                 if (siblings[i].RedefinesTargetName is null) prev = siblings[i];
-            if (prev is null ? !KeepsPosition(item) : !SharesByteWith(prev, item)) return 0;   // a byte of its own
+            if (!Continues(prev, item)) return 0;                                               // a byte of its own
             if (prev is null) return PhaseOf(parent);                                           // begins where its group does
         }
         int parentPhase = PhaseOf(parent);
@@ -437,7 +444,7 @@ internal static class BitLayout
             if (c.RedefinesTargetName is not null) continue;   // overlays its target — no advance (§13.18.44)
 
             // Rule 1 vs 2 (and §13.18.1.4 GR1) — ONE predicate.
-            if (!(prev is null ? KeepsPosition(c) : SharesByteWith(prev, c))) cursor = RoundUpToByte(cursor);   // rules 2 and 3 — same advance, different reasons
+            if (!Continues(prev, c)) cursor = RoundUpToByte(cursor);   // rules 2 and 3 — same advance, different reasons
             if (starts is not null) starts[i] = cursor - phase;
             cursor += RunBitsAt(c, cursor % BitsPerCharacter);   // width, or the ALIGNED per-occurrence stride × (n−1) + width (GR2)
             prev = c;
