@@ -1641,7 +1641,7 @@ def self_test() -> int:
     with tempfile.TemporaryDirectory() as tmp:
         stray = Path(tmp) / REMOVED_CORPUS / "2023" / "late.cob"
         stray.parent.mkdir(parents=True)
-        stray.write_text("       IDENTIFICATION DIVISION.\n", encoding="utf-8")
+        stray.write_text("       IDENTIFICATION DIVISION.\n", encoding="utf-8", newline="\n")
         check("arm: a file under the removed tests/conformance/ is refused (a branch cut before the move)",
               removed_corpus_files(Path(tmp)) == ["tests/conformance/2023/late.cob"]
               and removed_corpus_files(Path(tmp) / "nowhere") == [])
