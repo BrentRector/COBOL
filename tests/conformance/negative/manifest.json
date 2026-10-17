@@ -2698,6 +2698,7 @@
   "pb2983-supplementary-letters-gate-error-column",
   "pb2490-debugging-line-between-literal-parts-source",
   "pb2848-lock-clause-below-2002",
+  "pb242-delete-lock-below-2002",
   "pb2548-template-renames-unresolved",
   "pb2548-template-key-unresolved",
   "pb2548-template-odo-counter-not-integer",
