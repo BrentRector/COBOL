@@ -32,3 +32,10 @@ keeps that number, and this entry carries what 2143 lacks.
 `ConformanceSuiteRunnerDriftTests` and `ConformanceSuiteTests` (the in-process runner on the merged adapter).
 
 No inventory row: test infrastructure (`closes_rows: []`, PB3175's reason filed).
+
+**Gate (finisher, after the merge):** run `20261017T101109Z-b91b2b` (HEAD 2ce394253): `LEG 1 ONLY (batched gating,
+PB2515): GREEN` — Conformance 6,125/11,947 · Unit 33,506/33,926 · Characterization 5/36 cases ran;
+`ConformanceSuiteAdapterDriftTests`, `ConformanceSuiteTests` (25 rows) and two `ConformanceSuiteRunnerDriftTests`
+facts passed in leg 1, and the SELF-TESTS audit re-ran `run.py --self-test` GREEN. The leg-2 fact
+`BothRunners_GiveEverySuiteTestTheSameVerdict` (`run.py` and the in-process runner on the merged adapter) passed on
+the gate's build. LINUX GATE: the lander's (batched gating).
