@@ -1,4 +1,4 @@
-## PB3173: every inventory row names its editions, and a band runs through 2023
+## Entry 2139 — 2026-10-16 21:21 PDT — PB3173: every inventory row names its editions, and a band runs through 2023
 
 Conformance-suite slice S0b (kb/Work PB3173; `docs/rearchitecture/DESIGN-conformance-suite.md` §6 step 0, §13 S0b),
 on PB3172's branch. A per-edition suite needs to know which editions each rule belongs to, and 148 inventory rows
@@ -85,3 +85,4 @@ review fixes, the re-gate (20261017T034637Z-d9e64e) reads `=== BUILD-LOCAL GATE:
 PB2515): GREEN — leg 2 left to CI's whole-population run: Conformance 5,850 · Unit 599 · Characterization 31`, and
 `EveryFunctionRule_StartsNoEarlierThanItsFunction` reads Passed in its `leg-1-Unit.trx`.
 `semgrep/verify.py` passes with no count raised.
+
