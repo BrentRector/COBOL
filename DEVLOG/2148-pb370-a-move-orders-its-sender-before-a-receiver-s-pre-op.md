@@ -1,4 +1,4 @@
-## PB370: a MOVE orders its sender before a receiver's pre-op and an occurs-depending receiver, and its frozen function value keeps every digit
+## Entry 2148 — 2026-10-17 11:11 PDT — PB370: a MOVE orders its sender before a receiver's pre-op and an occurs-depending receiver, and its frozen function value keeps every digit
 
 This branch began in wave 1102 F as the fix for `GR-14.9.49.4-11` (§14.9.49.4 GR11: "the first one that occurs in
 the order of evaluation of the statement"): `MOVE X (1:L) TO T (I)` with L and I both out of range selected the
@@ -84,3 +84,4 @@ CI's whole-population run: Conformance 4,611 · Unit 371 · Characterization 31 
 `pb370_move_property_receiver_order`, the other PB370 cases, the `ReceiverBracketDriftTests` and the property-receiver
 goldens (`pb2618_*`, `pb2078_property_receivers_in_phrases`, `oo_property_ref`) passed in leg 1, with 0 failed results.
 `semgrep/verify.py` PASS.
+
