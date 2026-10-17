@@ -85,6 +85,11 @@ def convert(findings: list[dict], catalog: dict[str, dict], schema: Schema) -> t
         except ValueError as e:
             problems.append(f"{where}: {e}")
             continue
+        # The band itself is the one validator's question (named, a run through the newest edition: kb/Work
+        # PB3173), asked here so a finding with no band is a problem the converter names, not a refused batch.
+        if err := schema.editions_error(editions):
+            problems.append(f"{where}: {err}")
+            continue
         for rid in ids:
             if rid not in catalog:
                 problems.append(f"{where}: rule-id {rid!r} is not in the catalog")
@@ -140,7 +145,8 @@ def self_test() -> int:
         "FMT-14.9.1.2-1": {"id": "FMT-14.9.1.2-1", "kind": "FMT", "section": "14.9.1.2"},
         "GR-14.9.1.4-1": {"id": "GR-14.9.1.4-1", "kind": "GR", "section": "14.9.1.4"},
     }
-    base = {"section": "14.9.1", "construct": "ACCEPT", "grammar_site": "Core/X.g4#acceptStatement"}
+    base = {"section": "14.9.1", "construct": "ACCEPT", "grammar_site": "Core/X.g4#acceptStatement",
+            "editions": "85,2002,2014,2023"}
     cases = [
         ("MATCHES becomes CONFORMS",
          [{**base, "verdict": "MATCHES", "rule_ids": ["SR-14.9.1.3-1"]}], 1, None),
@@ -160,6 +166,10 @@ def self_test() -> int:
           {**base, "verdict": "DIVERGES", "rule_ids": ["SR-14.9.1.3-1"]}], 1, "disagree"),
         ("an edition the schema lacks is a problem, not a record",
          [{**base, "verdict": "MATCHES", "rule_ids": ["SR-14.9.1.3-1"], "editions": "85,1974"}], 0, "not in"),
+        ("a finding with no editions is a problem, not a record (kb/Work PB3173)",
+         [{**base, "verdict": "MATCHES", "rule_ids": ["SR-14.9.1.3-1"], "editions": ""}], 0, "editions is empty"),
+        ("a band that is not a run through the newest edition is a problem",
+         [{**base, "verdict": "MATCHES", "rule_ids": ["SR-14.9.1.3-1"], "editions": "85,2023"}], 0, "not a run"),
     ]
     schema = load_schema()
     rc = 0

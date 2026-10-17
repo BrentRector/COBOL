@@ -30,6 +30,17 @@ internal static class SpecClauseText
     /// not eat it as a list, and both forms are matched.</summary>
     private static readonly Regex Numbered = new(@"^(\d+)\\?\)\s+(.*)$", RegexOptions.Compiled);
 
+    /// <summary>A clause 15 function heading, <c>### 15.60 MEAN function</c>: the captures are the section and the
+    /// function name.</summary>
+    private static readonly Regex FunctionHeading =
+        new(@"\n### (15\.\d+) ([A-Z0-9-]+) function\s*\n", RegexOptions.Compiled);
+
+    /// <summary>Every intrinsic function clause 15 defines, as (section, name) in document order: <c>15.60</c>,
+    /// <c>MEAN</c>. The one map from a §15.x rule to the function it belongs to. Three drift guards wrote this
+    /// regex privately until the third copy (kb/Work PB3173, branch review round 1) extracted it.</summary>
+    public static List<(string Section, string Name)> FunctionSections(string spec) =>
+        [.. FunctionHeading.Matches(spec).Select(m => (m.Groups[1].Value, m.Groups[2].Value))];
+
     /// <summary>The transcription, line by line. Read on every call: a drift guard that cached it could not be
     /// used to prove a repair landed.</summary>
     public static string[] Lines() => File.ReadAllLines(TestRepo.Specs("ISO_COBOL.md"));

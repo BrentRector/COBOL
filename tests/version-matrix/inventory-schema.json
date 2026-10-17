@@ -1209,11 +1209,21 @@
       "out of order as well), so every reader parsed it its own way. `inventory_schema.Schema.editions_error` is",
       "the one validator (record_verdicts.py asks it of every record, and SpecTraceabilityInventoryDriftTests",
       "mirrors it over the whole inventory); `Schema.spell_editions` is the one writer of the spelling",
-      "(build_inventory.py, normalize_batch.py, grammar_findings_to_batch.py). An EMPTY field claims nothing and",
-      "stays legal until kb/Work PB3173 (S0b) decides every empty row from the standard."
+      "(build_inventory.py, normalize_batch.py, grammar_findings_to_batch.py).",
+      "`required` (kb/Work PB3173, S0b): an EMPTY field is refused. Every row names the editions its rule exists",
+      "at, decided from the standard and docs/VERSION_CHANGE_REFERENCE.md, so a per-edition conformance suite can",
+      "tell whether the rule belongs to it (the 148 empty rows were decided 2026-10-16, each with its evidence in",
+      "the row's notes). A row new to a catalog rebuild arrives empty and is decided by a record_verdicts batch.",
+      "`run-through-last` (kb/Work PB3173): the band is a RUN of `values` ending at the last one. Every row is a",
+      "rule of the newest standard's text (the catalog is extracted from it), so the rule exists at that edition,",
+      "and from the edition that introduced it on, with no gap. Before this rule 20 rows wrote a band some other",
+      "way: a start edition alone ('2002' on nine constant-entry rows, '85' on six), endpoints ('85,2023',",
+      "'85,2002,2023') or a band stopping at 2014 on rules the 2023 text states."
     ],
     "values": ["85", "2002", "2014", "2023"],
-    "separator": ","
+    "separator": ",",
+    "required": true,
+    "run-through-last": true
   },
 
   "code-location": {

@@ -45,8 +45,8 @@ public sealed class IntrinsicArgumentDomainDriftTests
     public void EveryBinary64RowsArgumentDomain_IsExactlyItsSection15ValueRule()
     {
         string spec = File.ReadAllText(TestRepo.Specs("ISO_COBOL.md"));
-        var sections = Regex.Matches(spec, @"\n### (15\.\d+) ([A-Z0-9-]+) function\s*\n")
-            .ToDictionary(m => m.Groups[2].Value, m => m.Groups[1].Value, StringComparer.OrdinalIgnoreCase);
+        var sections = SpecClauseText.FunctionSections(spec)
+            .ToDictionary(f => f.Name, f => f.Section, StringComparer.OrdinalIgnoreCase);
         string src = File.ReadAllText(TestRepo.Src("Cobol.Net.Compiler", "Binding", "IntrinsicCatalog.cs"));
         var rows = Row.Matches(src).Select(m => m.Groups["n"].Value).ToList();
         Assert.True(rows.Count >= 18, $"only {rows.Count} Float catalog rows parsed — the Add(new(...)) shape changed; fix the regex.");
