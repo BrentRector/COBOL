@@ -29,7 +29,7 @@ class of each data item, the DISPLAY operands) and refuses what it cannot classi
 
 **Wiring.** `--check` (refusals only, about 0.2 s) is the gate audit `CONFORMANCE SUITE` in `run_gate_legs.py`
 AUDITS and a step of CI's `audits` job, so a refused test is red before the slot and the build (§9). `--self-test`
-(58 arms) is discovered by `scripts/self_tests.py`, whose discovery trees became `ROOTS = ("scripts",
+(68 arms) is discovered by `scripts/self_tests.py`, whose discovery trees became `ROOTS = ("scripts",
 "conformance-suite/harness")`; `SelfTestDiscoveryDriftTests` reads that tuple for its net and names the generator
 among the known self-tests.
 

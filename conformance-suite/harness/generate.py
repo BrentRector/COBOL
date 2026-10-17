@@ -455,8 +455,9 @@ class Reader:
             if not any(f == stmt.name or Path(f).stem == stmt.name for f in declared):
                 self.refuse(rel, stmt.line, f"COPY {stmt.name}: the library text is not a declared file of this "
                                             f"test (`files`, §3.1)")
-        # A run-time expectation at 85 (§3.2).
-        observed = cobol.observes_exception(tokens)
+        # A run-time expectation at 85 (§3.2), in the program or in the library text it copies.
+        expanded = cobol.expand_copies(tokens, lambda name: self._library(case, name))
+        observed = cobol.observes_exception(expanded)
         if observed is not None:
             early = [e for e in case.accept if self.inputs.editions.index(e) < self.inputs.editions.index(
                 FIRST_RUN_TIME)]
@@ -478,7 +479,6 @@ class Reader:
                 for number in cobol.program_text_past_margin(text):
                     self.refuse(rel, number, f"program text past column {cobol.FIXED_TEXT_END}: margin R is "
                                              f"implementor-defined (ISO 6.3.1)")
-            expanded = cobol.expand_copies(tokens, lambda name: self._library(case, name))
             for issue in cobol.display_issues(expanded, cobol.data_classes(expanded)):
                 self.refuse(rel, issue.line, f"portability lint: DISPLAY {issue.operand}: {issue.why} (§3.3; ISO "
                                              f"14.9.11.4 GR 1 makes its device form the implementor's)")
@@ -515,6 +515,9 @@ class Reader:
     # ── a folder ──
 
     def read_tree(self) -> None:
+        if not (self.root / TREES["cases"]).is_dir():
+            # A missing tree is a refusal, never a GREEN over nothing: the audit would pass a deleted suite.
+            self.refuse(TREES["cases"], 1, "there is no cases/ tree: the suites' tests are missing")
         for tree, sub in TREES.items():
             base = self.root / sub
             if not base.is_dir():
@@ -955,6 +958,9 @@ def _planted_inputs(diagnostics: dict[str, dict[str, Any]] | None = None) -> Inp
     rows = {r["rule-id"]: r for r in (
         row("GR-1.1.1-1", "1.1.1", "GR", "85,2002,2014,2023"),
         row("SR-1.1.1-1", "1.1.1", "SR", "85,2002,2014,2023"),
+        row("SR-1.1.1-2", "1.1.1", "SR", "2002,2014,2023"),
+        row("AR-1.1.1-1", "1.1.1", "AR", "85,2002,2014,2023"),
+        row("SR-2.2.2-1", "2.2.2", "SR", "85,2002,2014,2023"),
         row("GR-1.1.1-2", "1.1.1", "GR", "2002,2014,2023"),
         row("GR-1.1.1-3", "1.1.1", "GR", "85,2002,2014,2023", verdict=NON_SUPPORT),
         row("GR-1.1.1-4", "1.1.1", "GR", "85,2002,2014,2023", test_ref="unit:Some.Test_PinnedToSpec"),
@@ -966,8 +972,9 @@ def _planted_inputs(diagnostics: dict[str, dict[str, Any]] | None = None) -> Inp
     return Inputs(
         schema=schema, rows=rows, constructs={"c-2002": (2002, None), "c-gone-2002": (85, 2002)},
         requirable=frozenset({"A.4.11", "A.3-2"}), implementor_defined={9: ("one", "two")},
-        diagnostics=diagnostics if diagnostics is not None else {"flagged": {"refuse-at": ["85", "2002", "2014",
-                                                                                           "2023"], "expect": "X1"}},
+        diagnostics=diagnostics if diagnostics is not None else {
+            "flagged": {"refuse-at": ["85", "2002", "2014", "2023"], "expect": "X1"},
+            "free-flag": {"refuse-at": ["2002"], "expect": "X2"}},
         determined=lambda r: r["rule-id"] in ("DOC-A.1-9", "DOC-A.1-10"), derived=lambda r: bool(r.get("derivation")))
 
 
@@ -1033,6 +1040,10 @@ def self_test() -> int:
                                           "*> accept: [2002]\n*> source-format: free\n*>---\n"
                                           + "\n".join(line.strip() for line in _PROGRAM) + "\n",
         "cases/2.2.2-Free/free-test.out": "OK ABC  0\n",
+        "cases/2.2.2-Free/free-flag.cob": "*>--- conformance-case\n*> id: free-flag\n*> rules: [SR-2.2.2-1]\n"
+                                          "*> flag: {kind: syntax, at: [2002]}\n*> control: free-test\n"
+                                          "*> source-format: free\n*>---\nIDENTIFICATION DIVISION.\nPROGRAM-ID. F.\n"
+                                          "PROCEDURE DIVISION.\nMOVE 1 TO X. *> <<\nSTOP RUN.\n",
     }
     with tempfile.TemporaryDirectory() as d:
         root = Path(d)
@@ -1060,6 +1071,10 @@ def self_test() -> int:
             check("arm: a flagged test carries its kind, its marked line and its control",
                   {k: pe["flagged"][k] for k in ("expect", "flag", "line", "control")}
                   == {"expect": "flag", "flag": "syntax", "line": 17, "control": "accepted"}, pe["flagged"])
+            m2002 = {t["id"]: t for t in json.loads((root / "suites/2002/manifest.json").read_text(
+                encoding="utf-8"))["tests"]}
+            check("arm: a free-form test marks its line with a closing `*> <<`",
+                  m2002["free-flag"]["line"] == 11 and m2002["free-flag"]["control"] == "free-test", m2002)
             check("arm: a test's declared files reach its entry",
                   m85["tests"][1]["files"] == ["cases/1.1.1-Rule/CPY1.cpy"], m85["tests"][1])
             check("arm: an unverified test, an _unassigned test and a wiseowl test are in no suite",
@@ -1073,10 +1088,10 @@ def self_test() -> int:
             r85 = report["85"]
             check("arm: completeness counts each row once under its first witness kind",
                   {k: r85[k] for k in WITNESS_KINDS} == {"documented-non-support": 1, "suite": 3, "determination": 1,
-                                                         "derivation": 1, "wiseowl-only": 1, "none": 1}
-                  and r85["rows"] == 8 and r85["observable"] == 6, r85)
-            check("arm: a row not in the edition's band is not counted there (GR-1.1.1-2 is 2002 on)",
-                  report["2002"]["rows"] == 9, report["2002"])
+                                                         "derivation": 1, "wiseowl-only": 1, "none": 3}
+                  and r85["rows"] == 10 and r85["observable"] == 8, r85)
+            check("arm: a row not in the edition's band is not counted there (GR-1.1.1-2, SR-1.1.1-2 are 2002 on)",
+                  report["2002"]["rows"] == 12, report["2002"])
         shutil.rmtree(root / "suites", ignore_errors=True)
         rc_check, _ = generate(root, inputs, [], None)
         check("arm: --check writes nothing", rc_check == 0 and not (root / "suites").exists())
@@ -1193,6 +1208,40 @@ def self_test() -> int:
                                 "control: ok", "source-format: fixed"],
                                _PROGRAM[:9] + ["<<         MOVE 1 TO W-A"] + _PROGRAM[9:]),
                         "needs an entry in wiseowl/diagnostics.json"),
+        "control without flag": ("cases/1.1.1-Rule/ctl-unflagged.cob",
+                                 _fixed(["id: ctl-unflagged", "rules: [GR-1.1.1-1]", "accept: [85]", "control: ok",
+                                         "source-format: fixed"], _PROGRAM), "this test is not flagged"),
+        "accepted and flagged": ("cases/1.1.1-Rule/both.cob",
+                                 _fixed(["id: both", "rules: [SR-1.1.1-1]", "accept: [85]",
+                                         "flag: {kind: syntax, at: [85]}", "control: ok", "source-format: fixed"],
+                                        _PROGRAM[:9] + ["<<         MOVE 1 TO W-A"] + _PROGRAM[9:]),
+                                 "accepted and flagged at 85"),
+        "flag kind": ("cases/1.1.1-Rule/loud.cob",
+                      _fixed(["id: loud", "rules: [SR-1.1.1-1]", "flag: {kind: loud, at: [85]}", "control: ok",
+                              "source-format: fixed"], _PROGRAM), "flag kind is one of"),
+        "flag syntax on an AR row": ("cases/1.1.1-Rule/ar-flag.cob",
+                                     _fixed(["id: ar-flag", "rules: [AR-1.1.1-1]", "flag: {kind: syntax, at: [85]}",
+                                             "control: ok", "source-format: fixed"],
+                                            _PROGRAM[:9] + ["<<         MOVE 1 TO W-A"] + _PROGRAM[9:]),
+                                     "only syntax rules and general formats"),
+        "flagged outside the band": ("cases/1.1.1-Rule/early-flag.cob",
+                                     _fixed(["id: early-flag", "rules: [SR-1.1.1-2]", "flag: {kind: syntax, at: [85]}",
+                                             "control: ok", "source-format: fixed"],
+                                            _PROGRAM[:9] + ["<<         MOVE 1 TO W-A"] + _PROGRAM[9:]),
+                                     "flagged at 85, where SR-1.1.1-2 does not exist"),
+        "unverified control": ("cases/1.1.1-Rule/weak-ctl.cob",
+                               _fixed(["id: weak-ctl", "rules: [SR-1.1.1-1]", "flag: {kind: syntax, at: [85]}",
+                                       "control: rough", "source-format: fixed"],
+                                      _PROGRAM[:9] + ["<<         MOVE 1 TO W-A"] + _PROGRAM[9:]),
+                               "is not a cleared suite test"),
+        "missing declared file": ("cases/1.1.1-Rule/gone.cob",
+                                  _fixed(["id: gone", "rules: [GR-1.1.1-1]", "accept: [85]", "files: [GONE.cpy]",
+                                          "source-format: fixed"], _PROGRAM), "which is not beside the test"),
+        "exception observed in a copybook at 85": ("cases/1.1.1-Rule/ec-copy.cob",
+                                                   _fixed(["id: ec-copy", "rules: [GR-1.1.1-1]", "accept: [85]",
+                                                           "files: [ECCPY.cpy]", "source-format: fixed"],
+                                                          _PROGRAM[:9] + ["           COPY ECCPY."] + _PROGRAM[9:]),
+                                                   "run-time expectation"),
         "duplicate id": ("wiseowl/cases/1.1.1-Rule/ok.cob",
                          _fixed(["id: ok", "rules: [GR-1.1.1-1]", "accept: [85]", "source-format: fixed"], _PROGRAM),
                          "is also"),
@@ -1222,8 +1271,14 @@ def self_test() -> int:
     base["cases/2.2.2-Free/free85.out"] = "x\n"
     base["cases/COMPUTE/folder.out"] = "x\n"
     base["wiseowl/cases/1.1.1-Rule/ok.out"] = "x\n"
-    diagnostics = {t: {"refuse-at": ["85"], "expect": "X"} for t in ("no-control", "late-control", "gr-flag",
-                                                                    "unmarked")}
+    for name in ("ctl-unflagged", "gone", "ec-copy"):
+        base[f"cases/1.1.1-Rule/{name}.out"] = "x\n"
+    base["cases/1.1.1-Rule/ECCPY.cpy"] = "           IF FUNCTION EXCEPTION-STATUS = SPACE CONTINUE END-IF.\n"
+    base["cases/1.1.1-Rule/rough.cob"] = _fixed(["id: rough", "rules: [GR-1.1.1-1]", "accept: [85]",
+                                                 "portable: unverified", "source-format: fixed"], _PROGRAM)
+    base["cases/1.1.1-Rule/rough.out"] = "x\n"
+    diagnostics = {t: {"refuse-at": ["85"], "expect": "X"} for t in (
+        "no-control", "late-control", "gr-flag", "unmarked", "loud", "ar-flag", "early-flag", "weak-ctl")}
     diagnostics["ghost"] = {"refuse-at": ["85"], "expect": "X"}
     diagnostics["ok"] = {"refuse-at": ["85"], "expect": "X"}
     with tempfile.TemporaryDirectory() as d:
@@ -1243,6 +1298,10 @@ def self_test() -> int:
               any("ok: WiseOwl refuses it at 85, where the test must be accepted" in r for r in refused))
         check("arm: a problem in implementor-defined.json is refused", any("planted" in r for r in refused))
         check("arm: a refused tree writes nothing", not (root / "suites").exists())
+    with tempfile.TemporaryDirectory() as d:
+        rc_empty, reader = generate(Path(d), _planted_inputs({}), [], None, echo=False)
+        check("arm: a tree with no cases/ is RED, never a GREEN over nothing",
+              rc_empty == 1 and any("there is no cases/ tree" in r.message for r in reader.refusals))
 
     # The program-text reader's own arms.
     src = cobol.tokenize(cobol.read_lines("\n".join([
