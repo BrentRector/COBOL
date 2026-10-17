@@ -1202,8 +1202,8 @@ def self_test() -> int:
         # --out DIR names a directory the user chose: only what a previous run wrote there is ever removed (R1-1).
         mine = root / "mine"
         (mine / "precious").mkdir(parents=True)
-        (mine / "todo.txt").write_text("keep\n", encoding="utf-8")
-        (mine / "precious" / "notes.txt").write_text("keep\n", encoding="utf-8")
+        (mine / "todo.txt").write_text("keep\n", encoding="utf-8", newline="\n")
+        (mine / "precious" / "notes.txt").write_text("keep\n", encoding="utf-8", newline="\n")
         rc_mine, _ = generate(root, inputs, [], mine, echo=False)
         check("arm: an output directory holding anything the generator does not write is refused, and nothing in it "
               "is deleted or written", rc_mine == 2 and sorted(p.name for p in mine.iterdir()) == ["precious", "todo.txt"]
@@ -1213,8 +1213,8 @@ def self_test() -> int:
         check("arm: an output path that is a file is refused, and the file is kept",
               rc_file == 2 and (mine / "todo.txt").read_text(encoding="utf-8") == "keep\n")
         rc_first, _ = generate(root, inputs, [], root / "suites", echo=False)
-        (root / "suites" / "85" / "stale.json").write_text("{}", encoding="utf-8")
-        (root / "suites" / "completeness.json").write_text("{}", encoding="utf-8")
+        (root / "suites" / "85" / "stale.json").write_text("{}", encoding="utf-8", newline="\n")
+        (root / "suites" / "completeness.json").write_text("{}", encoding="utf-8", newline="\n")
         rc_again, _ = generate(root, inputs, [], root / "suites", echo=False)
         check("arm: a previous run's output is replaced whole: its manifest directories and report are rewritten",
               rc_first == 0 and rc_again == 0 and not (root / "suites" / "85" / "stale.json").exists()

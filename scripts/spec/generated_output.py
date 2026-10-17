@@ -62,15 +62,15 @@ def self_test() -> int:
         check("arm: an empty directory is ready", prepare(root / "empty", mine) is None)
         prev = root / "prev"
         (prev / "a" / "deep").mkdir(parents=True)
-        (prev / "a" / "deep" / "x.json").write_text("{}", encoding="utf-8")
-        (prev / "b.json").write_text("{}", encoding="utf-8")
+        (prev / "a" / "deep" / "x.json").write_text("{}", encoding="utf-8", newline="\n")
+        (prev / "b.json").write_text("{}", encoding="utf-8", newline="\n")
         check("arm: a previous run's output is removed whole", prepare(prev, mine) is None
               and list(prev.iterdir()) == [], list(prev.iterdir()))
         user = root / "user"
         (user / "a").mkdir(parents=True)
         (user / "precious").mkdir()
-        (user / "precious" / "notes.txt").write_text("keep", encoding="utf-8")
-        (user / "todo.txt").write_text("keep", encoding="utf-8")
+        (user / "precious" / "notes.txt").write_text("keep", encoding="utf-8", newline="\n")
+        (user / "todo.txt").write_text("keep", encoding="utf-8", newline="\n")
         why = prepare(user, mine)
         check("arm: a directory holding anything else is refused, naming it, and nothing in it is deleted",
               why == "it holds precious, todo.txt, which this generator does not write"
@@ -81,7 +81,7 @@ def self_test() -> int:
         many = root / "many"
         many.mkdir()
         for i in range(7):
-            (many / f"f{i}").write_text("", encoding="utf-8")
+            (many / f"f{i}").write_text("", encoding="utf-8", newline="\n")
         why = prepare(many, mine)
         check("arm: a long foreign list names five and counts the rest",
               why == "it holds f0, f1, f2, f3, f4 and 2 more, which this generator does not write", why)

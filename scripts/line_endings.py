@@ -21,8 +21,8 @@ the attributes — so this check holds the rule, in three arms:
   WORKING TREE the same rule over the checkout's bytes, which are what a Windows gate compiles and compares. A checkout
                made before PB3029 is CRLF throughout: `--fix` rewrites it once, then re-states the index entries the
                rewrite made stale (`refresh_index`), so `git status` reads every rewritten file clean.
-  WRITERS      every text-mode write in a live Python tool (scripts/, .claude/) states `newline=`: Python on Windows
-               otherwise translates each "\\n" to CRLF, so a generator run on Windows leaves a CRLF working tree that
+  WRITERS      every text-mode write in a live Python tool (scripts/, .claude/, conformance-suite/harness/) states
+               `newline=`: Python on Windows otherwise translates each "\\n" to CRLF, so a generator run on Windows leaves a CRLF working tree that
                the second arm then reports. `--fix-writers` adds `newline="\\n"` mechanically (re-run it after a rebase
                brings in a new writer). PowerShell and C# writers of tracked files write LF by construction at their
                few sites (the generators, the test-side regeneration modes); the WORKING TREE arm catches a new one at
@@ -49,9 +49,11 @@ REPO = Path(__file__).resolve().parents[1]
 CR, LF, NUL = b"\r", b"\n", b"\0"
 CRLF = CR + LF
 
-#: Where the WRITERS arm looks: the live tools. `docs/**/evidence/**` and `adjudication/**` hold frozen records, never run
-#: against the tree, and `tools/claude-skills` is a submodule with its own repository.
-LIVE_ROOTS = ("scripts/", ".claude/")
+#: Where the WRITERS arm looks: the live tools, including the conformance suite's harness (its generator is a gate
+#: audit and writes the manifests every runner reads; kb/Work PB3174, PB3176). `docs/**/evidence/**` and
+#: `adjudication/**` hold frozen records, never run against the tree, and `tools/claude-skills` is a submodule with
+#: its own repository.
+LIVE_ROOTS = ("scripts/", ".claude/", "conformance-suite/harness/")
 
 #: How many findings of one arm the report prints before it says "and N more".
 SHOWN = 40
