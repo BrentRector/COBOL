@@ -1,3 +1,4 @@
-## PB3312 filed: an Agent-SDK unit runner so the plan's included API credit can pay for waves
+## Entry 2131 — 2026-10-16 20:01 PDT — PB3312 filed: an Agent-SDK unit runner so the plan's included API credit can pay for waves
 
 Notes-only. The owner decided on 2026-10-16 to file a tooling item after learning that the Max 20x plan includes $200/month of API credit. The platform docs cover the Claude API, the Agent SDK and Managed Agents with that credit and do not cover Claude Code (`claude -p`) or cloud sessions, so the loop's units cannot spend it today. `kb/Work/PB3312.md` records the docs facts with their page names, what an SDK-hosted unit runner would need (settings, hooks and agents from the tree, handoff files, stdin-open lifetime, a dollar-priced `budget.py` account with a stop margin, and an open question about a rolling-wave equivalent), and the per-plan, per-organization credit rules relevant to account 2. The runner is not scheduled; no code changed.
+
