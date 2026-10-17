@@ -1153,7 +1153,7 @@ internal static class PlaceRenderer
     /// positions already ARE characters). This is what the <c>AsImage</c>/<c>FromImage</c> channel slices at.</summary>
     public static string CharLengthExpr(OdoGroupPlace p) =>
         RuntimeApi.TableOdoExtentChars(CountRead(p.Depending), p.MinOccurs, p.MaxOccurs,
-            p.FixedUnits, p.ElemUnits, p.PositionsPerCharacter);
+            p.FixedUnits, p.ElemUnits, p.TrailingUnits, p.PositionsPerCharacter);
 
     /// <summary>True for an elementary DYNAMIC-LENGTH item described in the LINKAGE SECTION — whose storage the
     /// activating element owns and wrote through its own DYNAMIC LENGTH clause (ISO §14.2.3 GR8), so a sending read

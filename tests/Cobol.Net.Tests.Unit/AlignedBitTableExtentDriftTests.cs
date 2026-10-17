@@ -69,6 +69,30 @@ public sealed class AlignedBitTableExtentDriftTests
         Assert.Equal("101011", CobolBits.Strided(["101", "011"], 3));
     }
 
+    /// <summary>The third reader of the rule, <see cref="OdoTail"/> (the variable-length group codec's and a cell window's
+    /// geometry of the table, kb/Work PB3167 review R1-1), over a table that strides whole bytes but begins INSIDE a
+    /// character: <c>05 ABA PIC 1(2) USAGE BIT. 05 ASUB GROUP-USAGE BIT OCCURS 0 TO 3 DEPENDING ON N. 10 ASA PIC 1 USAGE
+    /// BIT. 10 ATA PIC 1(5) USAGE BIT ALIGNED.</c> — lead 2 bits, stride 16, width 11, so trailing filler 5. Its characters
+    /// at every count are the character channel's (<see cref="CobolTable.OdoExtentChars"/> over the same fixed bits), and
+    /// at the maximum the table is 6 characters (bit 45), never the stride count's 7 (bit 50). The receiving splice keeps
+    /// the occurrences past the count from bit <c>lead + count × stride</c> of the member.</summary>
+    [Fact]
+    public void OdoTail_AgreesWithTheCharacterExtent_AtEveryCount_WhenTheTableBeginsInsideACharacter()
+    {
+        var tail = new OdoTail(16, 3, 0, 2, 8, 5);
+        Assert.Equal(6, tail.Width);
+        for (int count = 0; count <= 3; count++)
+            Assert.Equal(CobolTable.OdoExtentChars(count, 0, 3, 2, 16, 5, 8), tail.Width - tail.CutAt(count));
+        // The member's image at the maximum is the table's 6 characters (lead bits included): ABA = 11, then occurrence
+        // 1 ASA = 1, TA = 10101; occurrence 2 ASA = 1, TA = 01010; occurrence 3 all zero. The receiver keeps occurrence
+        // 3 (bits 34..44) when the count is 2.
+        static string Image(string bits) => CobolBits.Pack(bits.PadRight(48, '0'));
+        string received = Image("11" + "100000" + "10101" + "000" + "00" + "100000" + "01010" + "000" + "00" + "000000" + "00000");
+        string current = Image("00" + "000000" + "00000" + "000" + "00" + "000000" + "00000" + "000" + "00" + "100000" + "11111");
+        Assert.Equal(Image("11" + "100000" + "10101" + "000" + "00" + "100000" + "01010" + "000" + "00" + "100000" + "11111"),
+            tail.KeepUnused(received, current, 2));
+    }
+
     [Fact]
     public void OdoExtentTrimmed_AndStrided_AgreeAtEveryCount()
     {
