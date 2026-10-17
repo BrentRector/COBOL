@@ -48,8 +48,8 @@ Counting rule: a "program" is a manifest entry (`enabled` + `pending`); the file
   verdict they are 394 CONFORMS (222 of them Annex A.1 documentation rows pinned by `docs/CONFORMANCE.md`, 46 carrying
   a derivation), 45 DOCUMENTED-NON-SUPPORT, 44 PARTIAL, 12 DIVERGES, 1 NOT-IMPLEMENTED. 476 positive and 590
   negative programs are cited by no row. 457 rows are DOCUMENTED-NON-SUPPORT; 84 negative programs witness them,
-  asserting that WiseOwl refuses a standard facility. The `editions` field is written two ways and is empty on 153
-  rows.
+  asserting that WiseOwl refuses a standard facility. The `editions` field has one spelling (§13 S0a) and is
+  decided on every row (§13 S0b): a run from the rule's introducing edition through 2023.
 - NIST CCVS85 (`tests/nist/`, 364 programs) covers COBOL-85 only.
 - Consumers of the layout: `git grep -l -E 'tests/conformance|CorpusRunnerTests|ConformanceCorpus|CorpusManifest'`,
   excluding the history trees (`kb/`, `DEVLOG/`, `adjudication/`) and the corpus itself, lists 144 files (60 docs, 84
@@ -212,7 +212,7 @@ conformance-suite/
 
 ## 6. Migration
 
-0. **First, as its own wave: the inventory's `editions` field.** One spelling, and each of the 153 empty rows decided
+0. **First, as its own wave: the inventory's `editions` field.** One spelling, and each empty row decided
    from the standard. These are adjudications, not mechanical edits, so they do not ride in step 1.
 1. **One mechanical, behaviour-neutral move (one change).** A converter moves every program, with the files it uses,
    into `conformance-suite/cases/<clause>/`, the clause taken from the rows that cite it (a program cited from several
@@ -331,13 +331,28 @@ hold the status, this section the scope. Every slice ships its own tests and dri
 `build-local.ps1`, and updates this document where it corrects it (CLAUDE.md rules 2, 5, 6).
 
 - **S0a — one spelling for `editions` (PB3172).** Every row's `editions` is the comma-separated ascending list with no
-  spaces (`85,2002,2014,2023`); `scripts/spec/inventory_schema.py`, the one validator, refuses any other spelling,
-  and every writer (`build_inventory.py`, `record_verdicts.py`, `derive_verdict_batch.py`,
-  `grammar_findings_to_batch.py`) writes it. Empty stays legal until S0b.
-- **S0b — the 153 empty `editions` rows decided (PB3173).** For each, the editions at which the rule exists, derived
+  spaces (`85,2002,2014,2023`). The rule is data, the schema's `editions` entry (`values` in ascending order and the
+  `separator`). `scripts/spec/inventory_schema.py` holds the one validator, `Schema.editions_error`, which refuses any
+  other spelling (a space, an out-of-order list, a doubled separator, an unknown or repeated edition), and the one
+  writer of the spelling, `Schema.spell_editions`. `record_verdicts.py` asks the validator of every record;
+  `build_inventory.py` carries each row's field through the writer (so a rebuild on a merged tree respells a row
+  recorded before S0a), as do `normalize_batch.py` (an agent's batch) and `grammar_findings_to_batch.py` (a
+  grammar finding); `derive_verdict_batch.py` carries the row's own value. `SpecTraceabilityInventoryDriftTests`
+  (`EveryEditionsField_IsTheOneSpelling`) holds the whole inventory to the rule's C# twin, and
+  `inventory_schema.py --self-test` proves the rule. Empty stays legal until S0b.
+- **S0b — the empty `editions` rows decided (PB3173; 148 on 2026-10-16).** For each, the editions at which the rule exists, derived
   from the standard and the version-change reference (`docs/VERSION_CHANGE_REFERENCE.md`), each with its citation
   checked by `cite.py`; then the validator refuses an empty field. An adjudication slice: an adjudicator decides, a
-  refuter checks each decision.
+  refuter checks each decision. **As landed:** each decision names the facility that bounds the rule and its
+  evidence (an Annex E or F item through `cite.py`; for an edge below 2023, which the 2023 text cannot quote, the
+  compiler's own edition record: a `constructs.json` row, the `IntrinsicCatalog` window, the first edition
+  `reserved-words.json` reserves the word at, or a decided sibling row), and the decision script checks every piece
+  before it writes the batch; the row's `notes` carry the decision. **One design correction:** every row is a rule of
+  the 2023 text, so its band always ends at 2023 and has no gap. The schema's `editions` entry now says so as data
+  (`required`, `run-through-last`), the one validator and its C# twin refuse any other band, and the 20 rows that
+  wrote one (a start edition alone, endpoints, or a band stopping at 2014) were corrected in the same batch, with the
+  wrong FORMAT / SELECT WHEN band (85, a clause whose keyword is first reserved at 2002) and four sibling bands
+  that contradicted the compiler's own edition windows.
 - **S1a — the generator (PB3174).** `conformance-suite/harness/generate.py`: the one header parser (fixed and free
   form), every refusal of §4, the per-edition manifests and the `wiseowl` manifest, the completeness report by witness
   kind (§4), `--check` (the refusals only, writing nothing) as a gate audit (§9), `--self-test` (discovered by
