@@ -4,7 +4,8 @@ using Antlr4.Runtime;                // ParserRuleContext — the source-element
 using CobolNet.Binding;              // FlagState / PictureAnalyzer / EditionContext
 using CobolNet.Binding.Model;        // Usage / PicCategory / PicInfo
 using CobolNet.Binding.Passes;       // GroupBindContext
-using CobolNet.Binding.Procedure;    // ConditionBinder.SoleDataRef (the canonical bare-operand unwrap)
+using CobolNet.Binding.Procedure;    // PhraseBlocks (the AT END-OF-PAGE branch test)
+using CobolNet.Common;               // CobolLiteral (the one literal decoder)
 using CobolNet.Editions;             // IDiagnosticSink / EditionDiagnostic / EditionSeverity
 using CobolNet.Editions.Diagnostics; // DiagnosticCatalog
 using CobolNet.Frontend.Cst;         // DataReferenceCst / SpecialRegister
@@ -35,18 +36,13 @@ internal sealed partial class FlagConformancePass : CursorFollowingVisitor   // 
 {
     private readonly FlagState _flag;
     private readonly IDiagnosticSink _sink;
-    // Resolved-model lookups keyed by SOURCE NAME (the flag pass runs before the file-connector renaming, so the
-    // model still carries source names — see BinderDriver): the WRITE targets (record- and file-names) whose file
-    // has a LINAGE clause (FLAG-14 m), and the report-names whose description carries a VARYING clause (FLAG-02 f).
-    private readonly IReadOnlySet<string> _linageWriteTargets;
-    private readonly IReadOnlySet<string> _varyingReports;
-    // FILE-STATUS reference tagging (FLAG-14 e I-O-STATUS-04 / f I-O-STATUS-07): the source names of the data items
-    // named in a SELECT … FILE STATUS clause (a relation comparing one to '04'/'07' is the flagged reference), and
-    // the level-88 condition-names defined ON such an item whose (singleton) VALUE is '04' / '07' (a reference to
-    // that condition-name is likewise "a reference … that tests for '04'/'07'").
-    private readonly IReadOnlySet<string> _fileStatusNames;
-    private readonly IReadOnlySet<string> _fileStatus88Is04;
-    private readonly IReadOnlySet<string> _fileStatus88Is07;
+    // ⛔ THE PASS KNOWS NO NAME SET (kb/Work PB3288). Every detector that needs a model fact — the FILE a WRITE
+    // targets (m WRITE-END-OF-PAGE: LINAGE), the REPORT a TERMINATE names (FLAG-02 f: VARYING), the data item and the
+    // condition-name a FLAG-14 e/f test references (I-O-STATUS-04/07: a FILE STATUS item, a level-88 on one) —
+    // resolves its operand in the CURRENT unit's name scope (§8.4.2.2, §8.4.6.2.1) through the same resolvers d and e
+    // use, then reads the ROLE off the resolved object: the FileModel's Linage, the ReportModel's HasVarying, a
+    // DataItem that IS (reference identity) some visible file's FileStatusItem. A name shared by an unrelated item
+    // of another program, or of another group of the same program, is therefore no reference to the role.
     // The compile-time directive states the state-coupled options read: the >>REF-MOD-ZERO-LENGTH tri-state (i) and
     // the >>TURN EC-checking model (i needs EC-BOUND-REF-MOD; e needs EC-RANGE-INDEX).
     private readonly RefModZeroLengthState _refModZl;
@@ -63,6 +59,9 @@ internal sealed partial class FlagConformancePass : CursorFollowingVisitor   // 
     private readonly IReadOnlyDictionary<CobolParserCore.MethodDefinitionContext, MethodNameScope> _methodScopes;
     private DataBinder? _currentData;
     private ReferenceResolver? _currentRefs;
+    // The program unit the walk is in (null in a class's method body — files and reports live in program units): its
+    // Parent chain is the set of containing programs whose GLOBAL files are visible here (§13.18.27.4 GR1).
+    private BoundUnit? _currentUnit;
 
     /// <summary>Where a METHOD's operands resolve: the OBJECT or FACTORY forest that holds the method, its resolver,
     /// and the method's own §11.7.4 GR5 name scope, which shadows that forest's names while the method's body is
@@ -103,8 +102,6 @@ internal sealed partial class FlagConformancePass : CursorFollowingVisitor   // 
     private readonly EditionContext _discard = new(2023);
 
     private FlagConformancePass(FlagState flag, IDiagnosticSink sink,
-        IReadOnlySet<string> linageWriteTargets, IReadOnlySet<string> varyingReports,
-        IReadOnlySet<string> fileStatusNames, IReadOnlySet<string> fileStatus88Is04, IReadOnlySet<string> fileStatus88Is07,
         RefModZeroLengthState refModZl, TurnState turn,
         IReadOnlyDictionary<CobolParserCore.IdentificationDivisionContext, BoundUnit> unitByIdentification,
         IReadOnlyDictionary<CobolParserCore.MethodDefinitionContext, MethodNameScope> methodScopes,
@@ -113,11 +110,6 @@ internal sealed partial class FlagConformancePass : CursorFollowingVisitor   // 
         _methodScopes = methodScopes;
         _flag = flag;
         _sink = sink;
-        _linageWriteTargets = linageWriteTargets;
-        _varyingReports = varyingReports;
-        _fileStatusNames = fileStatusNames;
-        _fileStatus88Is04 = fileStatus88Is04;
-        _fileStatus88Is07 = fileStatus88Is07;
         _refModZl = refModZl;
         _turn = turn;
         _unitByIdentification = unitByIdentification;
@@ -131,45 +123,9 @@ internal sealed partial class FlagConformancePass : CursorFollowingVisitor   // 
     {
         if (!flag.Any) return;
 
-        // Build the two source-name lookups the statement detectors need (m WRITE-END-OF-PAGE / f
-        // TERMINATE-WITH-VARYING). Files/reports live in program units (not OO class data), so units suffice.
-        var linage = new HashSet<string>(CobolNames.Comparer);
-        var varying = new HashSet<string>(CobolNames.Comparer);
-        // FILE-STATUS reference tagging (I-O-STATUS-04/07): the FILE STATUS data-item names, and the level-88
-        // condition-names on such an item whose singleton VALUE is '04' / '07'.
-        var fileStatus = new HashSet<string>(CobolNames.Comparer);
-        var fs88_04 = new HashSet<string>(CobolNames.Comparer);
-        var fs88_07 = new HashSet<string>(CobolNames.Comparer);
-        foreach (var unit in group.Units)
-        {
-            foreach (var file in unit.Data.Files)
-            {
-                if (file.Linage is not null)
-                {
-                    linage.Add(file.CobolName);
-                    foreach (var rec in file.Records)
-                        if (rec.CobolName is { } rn) linage.Add(rn);
-                }
-                if (file.FileStatusItem is { } fs)
-                {
-                    if (fs.CobolName is { } fsn) fileStatus.Add(fsn);
-                    foreach (var c in fs.Own88s)
-                        foreach (var v in c.Values)
-                            if (v.High is null)   // a singleton VALUE tests for exactly that status
-                                switch (StripLiteral(v.Low))
-                                {
-                                    case "04": fs88_04.Add(c.Name); break;
-                                    case "07": fs88_07.Add(c.Name); break;
-                                }
-                }
-            }
-            foreach (var report in unit.Data.Reports)
-                if (report.HasVarying)
-                    varying.Add(report.Name);
-        }
-
         // Map each program unit (outermost AND contained) to its bound model so VisitUnit can select the current
-        // unit's data + resolver for the name-resolving detectors (d/e); the methods are mapped below.
+        // unit's data + resolver for the name-resolving detectors (every one that reads a model fact); the methods are
+        // mapped below.
         var unitByIdentification = new Dictionary<CobolParserCore.IdentificationDivisionContext, BoundUnit>();
         foreach (var unit in group.Units)
             if (unit.Ctx.identificationDivision() is { } identification) unitByIdentification[identification] = unit;
@@ -189,7 +145,7 @@ internal sealed partial class FlagConformancePass : CursorFollowingVisitor   // 
         var activationSites = new HashSet<object>(ReferenceEqualityComparer.Instance);
         foreach (var binder in group.AllBindersAndInterfaces()) activationSites.UnionWith(binder.ActivationSites);
 
-        var pass = new FlagConformancePass(flag, sink, linage, varying, fileStatus, fs88_04, fs88_07,
+        var pass = new FlagConformancePass(flag, sink,
             group.Session.RefModZeroLength, group.Session.Turn, unitByIdentification, methodScopes, activationSites);
         pass.VisitPositioned(group.Tree);
         pass.FlagEcProgramDirectives();   // b EC-PROGRAM-EXCEPTIONS — cross-ref >>TURN lines with the source elements that call/invoke
@@ -265,13 +221,14 @@ internal sealed partial class FlagConformancePass : CursorFollowingVisitor   // 
     }
 
     /// <summary>Select the current program unit's data + resolver for the walk of its subtree (the name-resolving
-    /// detectors d/e resolve operands in THIS unit's COBOL name scope), with save/restore so a nested program
+    /// detectors resolve operands in THIS unit's COBOL name scope), with save/restore so a nested program
     /// restores its container's scope on exit.</summary>
     private object? VisitUnit(ParserRuleContext ctx, CobolParserCore.IdentificationDivisionContext? identification)
     {
-        var saved = (_currentData, _currentRefs, _hasAnyModeDecl, _hasReadModeDecl);
+        var saved = (_currentData, _currentRefs, _currentUnit, _hasAnyModeDecl, _hasReadModeDecl);
         if (identification is not null && _unitByIdentification.TryGetValue(identification, out var unit))
         {
+            _currentUnit = unit;
             _currentData = unit.Data;
             _currentRefs = unit.Refs;
             // The unit's Format-1 open-mode USE declaratives (BoundDeclarative.ModeIndex = the FileOpenMode ordinal;
@@ -282,7 +239,7 @@ internal sealed partial class FlagConformancePass : CursorFollowingVisitor   // 
                 d.ModeIndex == (int)FileOpenMode.Input || d.ModeIndex == (int)FileOpenMode.IO);
         }
         try { return VisitElement(ctx); }
-        finally { (_currentData, _currentRefs, _hasAnyModeDecl, _hasReadModeDecl) = saved; }
+        finally { (_currentData, _currentRefs, _currentUnit, _hasAnyModeDecl, _hasReadModeDecl) = saved; }
     }
 
     // ── FLAG-02 b EC-PROGRAM-EXCEPTIONS (§7.3.14.4 GR4 b) — record that the current source element calls a function
@@ -494,23 +451,19 @@ internal sealed partial class FlagConformancePass : CursorFollowingVisitor   // 
     // ── FLAG-14 m WRITE-END-OF-PAGE (§7.3.15.4 GR4 m) — a WRITE that ALLOWS an END-OF-PAGE phrase (its file has a
     //    LINAGE clause, §14.9.51) but does not specify it. "The END-OF-PAGE phrase" is the positive AT END-OF-PAGE
     //    phrase: §14.9.51.3 SR19 names it and the NOT END-OF-PAGE phrase separately, so a WRITE written with only the
-    //    NOT phrase does not specify it. The "allows EOP" fact is the file's LINAGE, resolved by name from the model;
-    //    anchored at the WRITE. ──
+    //    NOT phrase does not specify it. The "allows EOP" fact is the LINAGE of the file the WRITE resolves to in the
+    //    current unit's name scope (the record-name, qualified or not, or the FILE file-name — FileByRecordOrName,
+    //    kb/Work PB3288); anchored at the WRITE. ──
     public override object? VisitWriteStatement(CobolParserCore.WriteStatementContext ctx)
     {
-        if (ctx.writeAtEndOfPage() is not { } eop
-            || !PhraseBlocks.HasOnBranch(eop.statementBlock(), PhraseBlocks.StartsWithNot(eop)))
-        {
-            // recordName (a dataReference — unqualified for a WRITE record in practice; a qualified record name is a
-            // rare false-negative for this advisory flag) or the FILE fileName form.
-            string? target = ctx.recordName()?.GetText() ?? ctx.fileName()?.GetText();
-            if (target is not null && _linageWriteTargets.Contains(target))
-                Flag(FlagOption.Flag14WriteEndOfPage, ctx.Start.Line,
-                    "the WRITE without an END-OF-PAGE phrase (the file has a LINAGE clause)");
-        }
+        var file = FileByRecordOrName(ctx.recordName(), ctx.fileName());
+        if (file?.Linage is not null
+            && (ctx.writeAtEndOfPage() is not { } eop
+                || !PhraseBlocks.HasOnBranch(eop.statementBlock(), PhraseBlocks.StartsWithNot(eop))))
+            Flag(FlagOption.Flag14WriteEndOfPage, ctx.Start.Line,
+                "the WRITE without an END-OF-PAGE phrase (the file has a LINAGE clause)");
         // d I-O-DECLARATIVE — a WRITE to a keyed file (INVALID-KEY-capable) without an INVALID KEY phrase.
-        IoDeclarativeInvalidKey(InvalidKeyVerb.Write, ctx.writeInvalidKey() is not null,
-            FileByRecordOrName(ctx.recordName()?.GetText(), ctx.fileName()?.GetText()), ctx.Start.Line);
+        IoDeclarativeInvalidKey(InvalidKeyVerb.Write, ctx.writeInvalidKey() is not null, file, ctx.Start.Line);
         return base.VisitChildren(ctx);
     }
 
@@ -520,7 +473,7 @@ internal sealed partial class FlagConformancePass : CursorFollowingVisitor   // 
     public override object? VisitRewriteStatement(CobolParserCore.RewriteStatementContext ctx)
     {
         IoDeclarativeInvalidKey(InvalidKeyVerb.Rewrite, ctx.rewriteInvalidKeyPhrase() is not null,
-            FileByRecordOrName(ctx.recordName()?.GetText(), ctx.fileName()?.GetText()), ctx.Start.Line);
+            FileByRecordOrName(ctx.recordName(), ctx.fileName()), ctx.Start.Line);
         return base.VisitChildren(ctx);
     }
 
@@ -569,28 +522,40 @@ internal sealed partial class FlagConformancePass : CursorFollowingVisitor   // 
             _ => true,
         };
 
-    /// <summary>The current unit's <see cref="FileModel"/> named <paramref name="name"/> (source name; the flag pass
-    /// runs before file-connector renaming), or null.</summary>
+    /// <summary>The files a reference in the current unit can name: its own, then the GLOBAL ones of its containing
+    /// programs, nearest container first (ISO §13.18.27.4 GR1 — "A constant-name, data-name, file-name, report-name,
+    /// or screen-name described using a GLOBAL clause is a global name", and §8.4.6.2.1 — "A global name may be
+    /// referenced … in any source elements that are directly or indirectly contained within" the declaring one).</summary>
+    private IEnumerable<FileModel> VisibleFiles()
+    {
+        bool own = true;
+        for (var unit = _currentUnit; unit is not null; unit = unit.Parent, own = false)
+            foreach (var file in unit.Data.Files)
+                if (own || file.IsGlobal) yield return file;
+    }
+
+    /// <summary>The <see cref="FileModel"/> named <paramref name="name"/> in the current unit's scope (source name; the
+    /// flag pass runs before file-connector renaming), or null.</summary>
     private FileModel? FileByName(string? name)
-        => name is null || _currentData is null ? null
-            : _currentData.Files.FirstOrDefault(f => CobolNames.Same(f.CobolName, name));
+        => name is null ? null : VisibleFiles().FirstOrDefault(f => CobolNames.Same(f.CobolName, name));
 
     /// <summary>The <see cref="FileModel"/> a WRITE/REWRITE targets: the explicit <c>FILE file-name</c> when written,
-    /// else the file whose record descriptions include <paramref name="recordName"/>.</summary>
-    private FileModel? FileByRecordOrName(string? recordName, string? fileName)
+    /// else the file whose record descriptions include the record the <paramref name="record"/> reference RESOLVES to
+    /// (qualified or not: <c>REC IN F</c> names the same record as <c>REC</c> when it is unique).</summary>
+    private FileModel? FileByRecordOrName(CobolParserCore.RecordNameContext? record, CobolParserCore.FileNameContext? file)
     {
-        if (fileName is not null) return FileByName(fileName);
-        if (recordName is null || _currentData is null) return null;
-        return _currentData.Files.FirstOrDefault(f =>
-            f.Records.Any(r => CobolNames.Same(r.CobolName, recordName)));
+        if (file is not null) return FileByName(file.GetText());
+        if (record?.dataReference() is not { } dref || ResolveItem(dref) is not { } item) return null;
+        return VisibleFiles().FirstOrDefault(f => f.Records.Contains(item));
     }
 
     // ── FLAG-02 f TERMINATE-WITH-VARYING (§7.3.14.4 GR4 f) — a TERMINATE of a report whose description contains a
-    //    VARYING clause (§13.18.64). Flagged once per TERMINATE when any named report carries a VARYING. ──
+    //    VARYING clause (§13.18.64). Flagged once per TERMINATE when any named report carries a VARYING; each named
+    //    report is the one of the current unit's scope (its own, or a container's GLOBAL one: VisibleReports). ──
     public override object? VisitTerminateStatement(CobolParserCore.TerminateStatementContext ctx)
     {
         foreach (var report in ctx.reportName())
-            if (_varyingReports.Contains(report.GetText()))
+            if (_currentData?.VisibleReports.FirstOrDefault(r => CobolNames.Same(r.Name, report.GetText())) is { HasVarying: true })
             {
                 Flag(FlagOption.Flag02TerminateWithVarying, ctx.Start.Line,
                     "the TERMINATE of a report whose description contains a VARYING clause");
@@ -800,19 +765,29 @@ internal sealed partial class FlagConformancePass : CursorFollowingVisitor   // 
 
     /// <summary>Whether a numeric-edited VALUE clause is a plain LITERAL (numeric or nonnumeric — the caller has
     /// already excluded figurative constants) that contains NO editing symbols (j VALUE-EDITING). A numeric literal
-    /// never carries editing symbols (flagged); a nonnumeric STRINGLIT/NATLIT is scanned for the unambiguous
-    /// numeric-editing insertion characters. Only a '0'- or 'B'-only insertion (ambiguous with a digit / a letter)
-    /// escapes the scan — a rare false-negative for this advisory flag. A concatenation / boolean / hex literal is
-    /// not analyzed (not a numeric-editing value) and is not flagged.</summary>
+    /// never carries editing symbols (flagged); an alphanumeric (plain or hexadecimal) or national literal is
+    /// scanned for the unambiguous numeric-editing insertion characters. Only a '0'- or 'B'-only insertion (ambiguous
+    /// with a digit / a letter) escapes the scan — a rare false-negative for this advisory flag. A concatenation or
+    /// boolean literal is not analyzed (not a numeric-editing value) and is not flagged. The characters scanned are
+    /// the literal's VALUE — <see cref="CobolLiteral.Decode"/>, the one literal decoder: a doubled delimiter is one
+    /// character (§8.3.3.2.3 SR3, §8.3.3.5.3 SR3 for a national literal; §8.3.3.2.4 GR1: the delimiters are no part of
+    /// the value), and an <c>X"2E"</c> hexadecimal literal is the
+    /// <c>.</c> it denotes (§8.3.3.2.4 GR4).</summary>
     private static bool LiteralHasNoEditingSymbols(CobolParserCore.ValueClauseContext value)
     {
         if (FirstDescendant<CobolParserCore.NonNumericLiteralContext>(value) is { } nn)
         {
-            string? text = nn.STRINGLIT()?.GetText() ?? nn.NATLIT()?.GetText();
-            return text is not null && !ContainsEditingSymbol(StripLiteral(text));
+            return CharacterLiteralText(nn) is { } text && !ContainsEditingSymbol(CobolLiteral.Decode(text));
         }
         return FirstDescendant<CobolParserCore.NumericLiteralContext>(value) is not null;
     }
+
+    /// <summary>The source text of an alphanumeric (<c>"…"</c> or hexadecimal <c>X"…"</c>, §8.3.3.2) or national
+    /// (§8.3.3.5) literal operand — the three tokens whose VALUE is a character string a detector reads — else null.
+    /// The ONE place those three token kinds are listed for this pass (a hexadecimal literal is a token of its own,
+    /// <c>HEXLIT</c>, though §8.3.3.2 makes it one FORM of the alphanumeric literal).</summary>
+    private static string? CharacterLiteralText(CobolParserCore.NonNumericLiteralContext literal)
+        => (literal.STRINGLIT() ?? literal.NATLIT() ?? literal.HEXLIT())?.GetText();
 
     // The unambiguous numeric-editing INSERTION characters as they appear in an edited value literal (§13.18.40.3).
     // '0' (zero insertion) and 'B' (space insertion) are omitted — indistinguishable from a digit / a letter in the
@@ -825,14 +800,6 @@ internal sealed partial class FlagConformancePass : CursorFollowingVisitor   // 
         string trimmed = content.TrimEnd();   // the CR / DB trailing sign insertions
         return CobolNames.EndsWith(trimmed, "CR")
             || CobolNames.EndsWith(trimmed, "DB");
-    }
-
-    /// <summary>The content of a STRINGLIT / NATLIT token — a leading national <c>N</c> prefix and the surrounding
-    /// quotes stripped — for the editing-symbol scan.</summary>
-    private static string StripLiteral(string token)
-    {
-        string s = token.Length > 0 && token[0] is 'N' or 'n' ? token[1..] : token;
-        return s.Replace("\"", "").Replace("'", "");
     }
 
     /// <summary>The first descendant of type <typeparamref name="T"/> in <paramref name="node"/>'s subtree (pre-order),

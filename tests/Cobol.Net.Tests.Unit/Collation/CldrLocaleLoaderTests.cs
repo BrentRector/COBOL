@@ -380,6 +380,44 @@ public sealed class CldrLocaleLoaderTests(ITestOutputHelper output)
         Less(id, "xa", "xyb");
     }
 
+    /// <summary>kb/Work PB3293: a reset string, an extension and a prefix take their current elements from the NFD of
+    /// the string walked by UTS #10 S2.1 (longest contraction, then the discontiguous extension over unblocked
+    /// non-starters) over the mappings the rules have built SO FAR — what ICU's CollationBuilder does (<c>getCEs</c> of
+    /// the NFD string in <c>addReset</c> and <c>addRelation</c>). The defect read the string by whole key: a tailored
+    /// mapping counted only when it was the whole string, a contraction only when the base table held the whole
+    /// string, and the string was never normalized. Each case below orders the other way under the defect.</summary>
+    [Fact]
+    public void ResetExtensionAndPrefix_WalkTheirNfdOverTheRulesBuiltSoFar()
+    {
+        // zh.xml (pinyin): 一 七 三 are tailored into pinyin order (qī 七 < sān 三 < yī 一) before &'(一)'<<<㈠,
+        // &'(七)'<<<㈦, &'(三)'<<<㈢ — each parenthesized ideograph follows its reset string, whose ideograph is the
+        // TAILORED one. The defect read the ideographs' implicit weights (U+4E00 < U+4E03 < U+4E09): ㈠ < ㈦ < ㈢.
+        var zh = L("zh-u-co-pinyin");
+        Less(zh, "㈦", "㈢"); Less(zh, "㈢", "㈠");   // ㈦ < ㈢ < ㈠
+        Less(zh, "(一)", "㈠");                                // ㈠ is a tertiary variant of (一)
+        // ar.xml: &ء<<أ<<ؤ<<إ<<ئ … then &ئا=ﯪ=ﯫ — the ligature IS ئ (tailored) + ا. The defect read the root's ئ.
+        var ar = L("ar");
+        Same(ar, "ﯪ", "ئا"); Same(ar, "ﯫ", "ئا");
+        // Synthetic rules, one per arm. A reset string HOLDING a tailored contraction: chx is [ch][x], so q (a
+        // secondary variant of its x) sorts after z, where ch is; the defect made q = c h x', before every z-word.
+        var reset = FromRules("&z<ch &chx<<q");
+        Less(reset, "zz", "q"); Less(reset, "chx", "q");
+        // An extension holding one: w = a then the extension's [ch][x], exactly what "achx" walks to.
+        Same(FromRules("&z<ch &a=w/chx"), "w", "achx");
+        // A prefix holding one: chx|y is the contraction chxy = [ch][x] then y's own x', after chxa.
+        Less(FromRules("&z<ch &x<chx|y"), "chxa", "chxy");
+        // A reset string NOT in NFD reaches the tailored ä through its NFD a + U+0308 (tailored keys map by their NFD).
+        Less(FromRules("&a<ä &äx<<q"), "az", "q");
+        // The discontiguous arm: a + dot below + acute walks to the tailored á (a + U+0301, the dot below unblocked
+        // between them, UTS #10 S2.1.1-S2.1.3) and then the dot below; q is its secondary variant, so after b.
+        Less(FromRules("&b<á &ạ́<<q"), "bz", "q");
+        // A key led by a Hangul syllable is not a mapping the walk can meet (the engine decomposes the syllable before
+        // the table, so the built table maps no jamo spelling for it): 가x reads the root's jamo then x, exactly as the
+        // text 가x itself walks, so q (its secondary variant) sorts between 가x and 가y, not after a.
+        var hangul = FromRules("&a<가 &가x<<q");
+        Less(hangul, "가x", "q"); Less(hangul, "q", "가y");
+    }
+
     [Fact]
     public void Thai_ShiftedAndContractionsKept()
     {
