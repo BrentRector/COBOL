@@ -235,14 +235,7 @@ internal static class Program
             foreach (string e in result.Errors)
                 Console.Error.WriteLine($"  {e}");
 
-            // POSIX sysexits: 66 = no input, 65 = data/format error (source), 70 = internal software error (backend).
-            return result.Status switch
-            {
-                CompilerDriver.Outcome.SourceNotFound => 66,
-                CompilerDriver.Outcome.FrontendError => 65,
-                CompilerDriver.Outcome.BackendError => 70,
-                _ => 70,
-            };
+            return ExitCode(result.Status);
         }
 
         if (options.Run && result.Library)
@@ -254,6 +247,20 @@ internal static class Program
         }
         return options.Run ? Run(result.OutputDll) : 0;
     }
+
+    /// <summary>The process exit code of a compile outcome, POSIX sysexits: 0 success, 66 no input, 65 a data/format
+    /// error IN THE SOURCE (a parse error or a binding/conformance diagnostic — the program is wrong), 70 an internal
+    /// software error (the backend refused the C# this compiler generated — the compiler is wrong). Every outcome
+    /// is named and an unnamed one throws, never a silent 70: the binding phase's refusal of the source once fell to
+    /// that default and reported a wrong program as a compiler failure (kb/Work PB3175).</summary>
+    internal static int ExitCode(CompilerDriver.Outcome status) => status switch
+    {
+        CompilerDriver.Outcome.Success => 0,
+        CompilerDriver.Outcome.SourceNotFound => 66,
+        CompilerDriver.Outcome.FrontendError or CompilerDriver.Outcome.BindError => 65,
+        CompilerDriver.Outcome.BackendError => 70,
+        _ => throw new ArgumentOutOfRangeException(nameof(status), status, "an outcome with no exit code"),
+    };
 
     /// <summary>Launch the compiled assembly via the shared <c>dotnet</c> host and forward its exit code.</summary>
     private static int Run(string dllPath)

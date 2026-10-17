@@ -18,7 +18,7 @@ by 52 rows while still read as current). The fix is not a staleness check on a c
 so the session probe RENDERS the view at every session start, and `--check` only proves the inventory still produces
 one (the verdict-evidence invariant, DESIGN-test-build-ci.md §3.10: a view that is absent is not stale).
 
-    python scripts/spec/gen_conformance_notes.py --out kb/Conformance   # render (replaces the directory)
+    python scripts/spec/gen_conformance_notes.py --out kb/Conformance   # render (replaces a previous render)
     python scripts/spec/gen_conformance_notes.py --check                # non-zero when the inventory renders no view
 """
 from __future__ import annotations
@@ -26,9 +26,11 @@ from __future__ import annotations
 import argparse
 import json
 import pathlib
-import shutil
 import sys
 from collections import Counter, defaultdict
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import generated_output  # noqa: E402  (the one way a generator clears the directory it writes: never wholesale)
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
 INVENTORY = REPO / "tests" / "version-matrix" / "traceability-inventory.json"
@@ -135,10 +137,16 @@ def build_notes(rows: list[dict]) -> dict[str, str]:
     return notes
 
 
+def _is_view_note(name: str) -> bool:
+    """A note this view writes, at any revision of the inventory: the dashboard, or a clause note."""
+    return name == "_Dashboard.md" or (name.startswith("clause-") and name.endswith(".md"))
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--out", type=pathlib.Path, metavar="DIR",
-                    help="render the view into DIR (replaced wholesale); the registry's path is kb/Conformance/")
+                    help="render the view into DIR (a previous render there is replaced); the registry's path is "
+                         "kb/Conformance/")
     ap.add_argument("--check", action="store_true",
                     help="render in memory and exit non-zero when the inventory no longer produces a view")
     args = ap.parse_args()
@@ -168,10 +176,15 @@ def main() -> int:
 
 
 def write_view(rows: list[dict], notes: dict[str, str], out: pathlib.Path) -> int:
-    """Write the view into ``out``, replacing what was there (the view is wholly derived, so nothing in it is kept)."""
-    if out.exists():
-        shutil.rmtree(out)
-    out.mkdir(parents=True)
+    """Write the view into ``out``, replacing a previous render there (the view is wholly derived, so nothing of it is
+    kept). ``out`` is a directory the caller named, so only the view's own notes are removed: one holding anything
+    else is refused, with nothing deleted (scripts/spec/generated_output.py)."""
+    unusable = generated_output.prepare(out, _is_view_note)
+    if unusable is not None:
+        print(f"cannot render the view into {out}: {unusable}; name a new directory, or one holding only a previous "
+              f"render (nothing was deleted)", file=sys.stderr)
+        return 2
+    out.mkdir(parents=True, exist_ok=True)
     for name, text in notes.items():
         (out / name).write_text(text, encoding="utf-8", newline="\n")
 

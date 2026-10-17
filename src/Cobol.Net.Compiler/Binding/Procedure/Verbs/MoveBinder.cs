@@ -180,8 +180,12 @@ internal sealed class MoveBinder(BinderContext ctx, StatementBinder host, Corres
         // ⭐ ONLY when there is more than one receiving operand, and that is a PROOF, not a shortcut: with a
         // single identifier-2 the source expression is rendered exactly once already, and the equivalence's own
         // first two steps collapse — temp's description IS identifier-1's, so `MOVE a (b) TO temp / MOVE temp TO
-        // b` applies the identity copy and then the same conversion `MOVE a (b) TO b` applies. The intermediate
-        // is unobservable at N = 1, and MOVE is the most executed verb in a COBOL program.
+        // b` applies the identity copy and then the same conversion `MOVE a (b) TO b` applies. The intermediate's
+        // VALUE is unobservable at N = 1, and MOVE is the most executed verb in a COBOL program. Its ORDER is not:
+        // the sender is evaluated before the receiver is identified, which decides the exception condition a
+        // statement failing on both sides raises (§14.9.49.4 GR11). That order is the emitter's to keep — each
+        // store renders through PlaceIdentification.SenderFirst, which evaluates the sending value into a local
+        // ahead of the receiver's address when both sides identify at run time (kb/Work PB3261).
         // ⭐ AND the SECOND reason to freeze it, the same rule's other sentence: GR1's "If identifier-1 is a
         // zero-length item, it is as if literal-1 were specified as a zero-length literal" makes the sender's
         // LENGTH decide which value is stored, and "the length … is evaluated only once" then forbids reading a

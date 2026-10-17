@@ -417,10 +417,9 @@ public sealed record BoundIntrinsicCall(
     /// (rule 1) rather than the first. False for every other function.</summary>
     public bool FindLast { get; init; }
 
-    /// <summary>FIND-STRING (§15.37.2 / .4 rule 4): the <c>ANYCASE</c> phrase keyword — case-insensitive matching
-    /// (as if both arguments were lowered per LOWER-CASE). False for every other function.</summary>
-    /// <summary>The ANYCASE phrase was present — FIND-STRING's case-folded search (§15.37.4 r4) and the
-    /// NUMVAL-C / TEST-NUMVAL-C case-folded currency match (§15.68.3 r4f) share the ONE flag.</summary>
+    /// <summary>The ANYCASE phrase was present — FIND-STRING's case-folded search (§15.37.4 r4: case-insensitive
+    /// matching, as if both arguments were lowered per LOWER-CASE) and the NUMVAL-C / TEST-NUMVAL-C case-folded
+    /// currency match (§15.68.3 r4f) share the ONE flag. False for every other function.</summary>
     public bool Anycase { get; init; }
 
     /// <summary>SUBSTITUTE (§15.87.2): one mode flag per (argument-2, argument-3) pair — bit 0 = FIRST (rule 3.a),
@@ -696,13 +695,13 @@ public sealed record BoundBoolCall(BoundIntrinsicCall Call) : BoundBoolExpr;
 
 /// <summary>The figurative <c>ALL B"…"</c> (and figurative ZERO, normalized to <c>ALL B"0"</c> at bind) — a
 /// positionless pattern that materializes to the OTHER operand's length (ISO §8.3.3.6.4 GR2). <c>B-NOT ALL …</c>
-/// constant-folds to the flipped pattern at bind (ALL is positionless).</summary>
-/// <summary>A positionless boolean value — the figurative ZERO ([ALL] ZERO, §8.3.3.6.2 Format 1), the
+/// constant-folds to the flipped pattern at bind (ALL is positionless).
+/// <para>A positionless boolean value — the figurative ZERO ([ALL] ZERO, §8.3.3.6.2 Format 1), the
 /// Format-6 <c>ALL B"…"</c> literal, or a B-NOT fold of either. <paramref name="IsAllLiteral"/> is true ONLY
 /// for a source-written Format-6 ALL literal — the operand §8.8.2 rules 4/5 and §14.9.8.3 SR3 restrict.
 /// Figurative ZERO is a DISJOINT §8.8.2 alternative (its ALL is Format 1's optional word, §8.3.3.6.3 SR2
 /// excludes figuratives from Format 6), and a fold result is no longer "the ALL literal" the source wrote —
-/// conflating them rejected `COMPUTE B = ZERO` and `= ALL ZERO` and `= B-NOT ZERO` (kb/Work PB157).</summary>
+/// conflating them rejected `COMPUTE B = ZERO` and `= ALL ZERO` and `= B-NOT ZERO` (kb/Work PB157).</para></summary>
 public sealed record BoundBoolAll(string Bits, bool IsAllLiteral = false) : BoundBoolExpr;
 
 /// <summary>A binary boolean operation (<paramref name="Op"/> ∈ <c>'&amp;'</c> B-AND / <c>'|'</c> B-OR /
@@ -1038,10 +1037,18 @@ public sealed record ImplicitMovePhrase(string Statement, string Cite)
     /// frozen, classified and storage-marked — which is what building it in the emitter skipped (kb/Work PB880).</summary>
     public bool ValidityAskedByStatement { get; init; }
 
+    /// <summary>True when the owning statement identifies the RECEIVING operand before it evaluates the sending one,
+    /// so the move's store keeps that order instead of the MOVE statement's sender-first order (§14.9.25.4 GR1,
+    /// <c>PlaceIdentification.SenderFirst</c>; kb/Work PB3261). INITIALIZE is the one such statement: its rules give
+    /// no timing of their own, so §14.6.4 7) applies — "the identifiers within a statement are evaluated in left to
+    /// right order as the first operation of the execution of that statement" — and identifier-1, the receiver, is
+    /// written before the REPLACING phrase's sending identifier.</summary>
+    public bool ReceiverIdentifiedFirst { get; init; }
+
     /// <summary>INITIALIZE's implicit elementary MOVE — ISO §14.9.20.4 GR4, "Otherwise, the implicit statement is:
     /// MOVE sending-operand TO receiving-operand."</summary>
     public static readonly ImplicitMovePhrase Initialize =
-        new("INITIALIZE", "ISO §14.9.20.4 GR4") { ValidityAskedByStatement = true };
+        new("INITIALIZE", "ISO §14.9.20.4 GR4") { ValidityAskedByStatement = true, ReceiverIdentifiedFirst = true };
 
     /// <summary>MOVE CORRESPONDING's per-pair move — ISO §14.9.25.4 GR11, "The results are the same as if the user
     /// had referred to each pair of corresponding identifiers in separate MOVE statements." The pair was selected

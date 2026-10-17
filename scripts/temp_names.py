@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """temp_names.py — NO SCRIPT PUTS A FIXED NAME IN THE MACHINE-WIDE TEMP DIRECTORY (kb/Work PB2922).
 
-    python scripts/temp_names.py --check        # every tracked script under scripts/ and .claude/; exit 1 on a finding
+    python scripts/temp_names.py --check        # every tracked script under live_tools.ROOTS; exit 1 on a finding
     python scripts/temp_names.py --self-test    # the planted cases, then --check's scan of this tree
 
 ⛔ WHY. The machine-wide temp directory (TEMP/TMP on Windows, TMPDIR or /tmp elsewhere) is ONE directory for every
@@ -41,9 +41,9 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+import live_tools  # this directory's: the one list of the live tools' trees, which the scan reads
+
 REPO = Path(__file__).resolve().parents[1]
-#: The live tools (as line_endings.py's WRITERS arm): `tools/claude-skills` is a submodule with its own repository.
-LIVE_ROOTS = ("scripts/", ".claude/")
 SUFFIXES = (".py", ".ps1", ".psm1", ".sh")
 
 #: A part that makes a name the run's own. `$(date` is a per-run output directory named to the second.
@@ -95,10 +95,23 @@ class Finding:
         return f"{self.path}:{self.line}: {self.why}: {self.text.strip()}"
 
 
+#: The one line break of a tracked script: the tree is LF (line_endings.py), and LF is what Python's `ast` line numbers,
+#: PowerShell and bash count.
+LINE_BREAK = "\n"
+
+
+def source_lines(text: str) -> list[str]:
+    """The file's lines, split at LINE_BREAK only. `str.splitlines` also splits at U+2028, U+2029, form feed and the
+    other Unicode breaks a string literal may hold (conformance-suite/harness/run.py's normalization cases hold two),
+    so its line numbers drift from the file's and a finding names the wrong line (kb/Work PB3176, branch review R2-1:
+    a line planted at run.py:862 was reported with the text of line 856)."""
+    return text.split(LINE_BREAK)
+
+
 def _code_lines(text: str, block_comments: bool) -> list[tuple[int, str]]:
     """(line number, line) for each line that is code: not a whole-line `#` comment, not inside a `<# … #>` block."""
     out, in_block = [], False
-    for n, line in enumerate(text.splitlines(), 1):
+    for n, line in enumerate(source_lines(text), 1):
         s = line.strip()
         if block_comments:
             if in_block:
@@ -200,7 +213,7 @@ def _fixed_tmp_path(node: ast.AST) -> bool:
 
 def scan_py(path: str, text: str) -> list[Finding]:
     tree = ast.parse(text)
-    lines = text.splitlines()
+    lines = source_lines(text)
     found = []
 
     def hit(node: ast.AST, why: str) -> None:
@@ -235,7 +248,7 @@ def scan(path: str, text: str) -> list[Finding]:
 
 
 def live_scripts(root: Path) -> list[str]:
-    out = subprocess.run(["git", "-C", str(root), "ls-files", "-z", "--", *LIVE_ROOTS], capture_output=True,
+    out = subprocess.run(["git", "-C", str(root), "ls-files", "-z", "--", *live_tools.ROOTS], capture_output=True,
                          check=True).stdout.decode("utf-8")
     return sorted(p for p in out.split("\0") if p.endswith(SUFFIXES))
 
@@ -326,6 +339,17 @@ def self_test() -> int:
     for path, source, want in CASES:
         found = scan(path, source)
         expect(f"{path} {source.splitlines()[0][:70]!r} -> {want} finding(s)", len(found), want)
+    # Review finding R2-1 (kb/Work PB3176): this scan kept its own copy of the live trees and missed the conformance
+    # suite's harness, which the self-test runner and line_endings.py's WRITERS arm both read as live.
+    reached = sorted(r for r in live_tools.ROOTS if any(p.startswith(r) for p in live_scripts(REPO)))
+    expect("the scan reaches every live tree (live_tools.ROOTS), the conformance suite's harness among them",
+           reached, sorted(live_tools.ROOTS))
+    sep = chr(0x2028)  # a Unicode line separator inside a string literal is no line break in the file
+    for path, lines in (("c.py", [f"s = '{sep}'", "import tempfile, pathlib",
+                                  "p = pathlib.Path(tempfile.gettempdir()) / 'x.json'"]),
+                        ("c.ps1", [f"$s = 'a{sep}b'", "$p = Join-Path $env:TEMP 'x.json'"])):
+        expect(f"{path}: a finding after a U+2028 in a literal names its own line and text",
+               [(f.line, f.text) for f in scan(path, LINE_BREAK.join(lines))], [(len(lines), lines[-1])])
     found = scan_tree(REPO)
     for f in found:
         print(f"  {f}")

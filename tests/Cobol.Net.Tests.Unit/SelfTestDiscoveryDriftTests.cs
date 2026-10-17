@@ -8,7 +8,8 @@ namespace CobolNet.Tests.Unit;
 
 /// <summary>
 /// ⛔ EVERY SCRIPT SELF-TEST RUNS IN EVERY GATE AND IN CI, THROUGH ONE DISCOVERING RUNNER (kb/Work PB2563):
-/// <c>scripts/self_tests.py</c> finds every self-test under <c>scripts/</c>, and the local gate's audits, the Linux gate
+/// <c>scripts/self_tests.py</c> finds every self-test under the live tools' trees (<c>scripts/live_tools.py</c>'s
+/// <c>ROOTS</c>: <c>scripts/</c>, <c>.claude/</c> and <c>conformance-suite/harness/</c>), and the local gate's audits, the Linux gate
 /// and CI's jobs all run that runner and name no self-test by hand; only the gate (one shape, kb/Work PB3022) may
 /// REUSE a PASS recorded for unchanged inputs, while the Linux gate and CI run them all (kb/Work PB2914).
 /// </summary>
@@ -28,6 +29,46 @@ public sealed class SelfTestDiscoveryDriftTests
     private static readonly Regex ShellFlagArm = new(@"(^|\s)--self-test\)|=\s*[""']--self-test[""']", RegexOptions.Compiled);
     private static readonly Regex StandaloneName = new(@"^test_[^/]*\.(py|ps1)$", RegexOptions.Compiled);
 
+    /// <summary>The scripts that read the live tools' trees, each through <c>live_tools.ROOTS</c> and never a copy.</summary>
+    private static readonly string[] LiveTreeReaders = ["self_tests.py", "line_endings.py", "temp_names.py"];
+
+    /// <summary>
+    /// The trees the runner discovers in: the live tools' trees, read from <c>scripts/live_tools.py</c>'s
+    /// <c>ROOTS = (…)</c> so the net below scans exactly what the runner is meant to: <c>scripts/</c>, <c>.claude/</c>
+    /// and the conformance suite's harness, whose generator is a gate audit with a <c>--self-test</c> (kb/Work PB3174,
+    /// DESIGN-conformance-suite.md §9).
+    /// </summary>
+    private static IReadOnlyList<string> Roots()
+    {
+        Match m = Regex.Match(File.ReadAllText(TestRepo.Scripts("live_tools.py")), @"^ROOTS = \(([^)]*)\)",
+            RegexOptions.Multiline);
+        Assert.True(m.Success, "scripts/live_tools.py no longer declares the live tools' trees as `ROOTS = (…)`");
+        var roots = Regex.Matches(m.Groups[1].Value, @"""([^""]+)""").Select(x => x.Groups[1].Value).ToList();
+        Assert.All(roots, r => Assert.EndsWith("/", r));
+        Assert.Contains("scripts/", roots);
+        Assert.Contains("conformance-suite/harness/", roots);
+        return roots;
+    }
+
+    /// <summary>
+    /// The self-test runner, the line-endings WRITERS arm and the temp-name audit each kept a copy of the live trees
+    /// until kb/Work PB3176's branch review (R2-1): the harness joined two copies and not the third, so the temp-name
+    /// audit never scanned the harness the gate runs. Each reader now reads <c>live_tools.ROOTS</c> and declares no
+    /// tuple of its own.
+    /// </summary>
+    [Fact]
+    public void EveryLiveTreeReader_ReadsTheOneList()
+    {
+        foreach (string name in LiveTreeReaders)
+        {
+            string text = File.ReadAllText(TestRepo.Scripts(name));
+            Assert.True(text.Contains("live_tools.ROOTS", StringComparison.Ordinal),
+                $"scripts/{name} no longer reads the live tools' trees from live_tools.ROOTS");
+            Assert.False(Regex.IsMatch(text, @"^\w*ROOTS\s*=\s*\(", RegexOptions.Multiline),
+                $"scripts/{name} declares its own copy of the live tools' trees: read live_tools.ROOTS instead");
+        }
+    }
+
     /// <summary>What the runner discovered here: each self-test's repository path and whether it runs with the flag.</summary>
     private static IReadOnlyDictionary<string, bool> Discovered()
     {
@@ -35,10 +76,11 @@ public sealed class SelfTestDiscoveryDriftTests
         Assert.True(File.Exists(runner), $"the self-test runner is missing: {runner}");
         var r = PythonInstrument.Run(runner, "--list");
         Assert.True(r.ExitCode == 0, $"`self_tests.py --list` failed (exit {r.ExitCode}).\n{r.Stdout}\n{r.Stderr}");
+        var roots = Roots();
         var found = new Dictionary<string, bool>(StringComparer.Ordinal);
         foreach (string line in r.Stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
-            if (line.StartsWith("scripts/", StringComparison.Ordinal))
+            if (roots.Any(root => line.StartsWith(root, StringComparison.Ordinal)))
             {
                 string[] parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
                 found[parts[0]] = parts.Length > 1 && parts[1] == "--self-test";
@@ -50,18 +92,20 @@ public sealed class SelfTestDiscoveryDriftTests
 
     /// <summary>
     /// The runner's discovery reads Python's syntax tree; this net reads text, more broadly: any tracked file under
-    /// <c>scripts/</c> named <c>test_*.py</c>/<c>test_*.ps1</c>, any Python line that is not a comment and holds a quoted
-    /// <c>--self-test</c> beside <c>argv</c> or <c>add_argument</c>, and any shell <c>--self-test)</c> arm or
+    /// the runner's roots named <c>test_*.py</c>/<c>test_*.ps1</c>, any Python line that is not a comment and holds a
+    /// quoted <c>--self-test</c> beside <c>argv</c> or <c>add_argument</c>, and any shell <c>--self-test)</c> arm or
     /// <c>= "--self-test"</c> test. A self-test written in a shape the runner's rule misses is red here, by name.
     /// </summary>
     [Fact]
     public void EverySelfTestTheNetFinds_IsDiscoveredByTheRunner()
     {
         var discovered = Discovered();
+        var roots = Roots();
         var net = new SortedSet<string>(StringComparer.Ordinal);
         foreach (string rel in TrackedTree.Files())
         {
-            if (!rel.StartsWith("scripts/", StringComparison.Ordinal) || !(rel.EndsWith(".py", StringComparison.Ordinal)
+            if (!roots.Any(root => rel.StartsWith(root, StringComparison.Ordinal))
+                || !(rel.EndsWith(".py", StringComparison.Ordinal)
                 || rel.EndsWith(".sh", StringComparison.Ordinal) || rel.EndsWith(".ps1", StringComparison.Ordinal)))
             {
                 continue;
@@ -99,6 +143,7 @@ public sealed class SelfTestDiscoveryDriftTests
                      "scripts/orchestrator/test_alloc.py", "scripts/orchestrator/test_orchestrate_core.ps1",
                      "scripts/orchestrator/landing_check.py", "scripts/hooks/test_forbidden_commands.py",
                      "scripts/guard-population.sh", "scripts/run_gate_legs.py", "scripts/self_tests.py",
+                     "conformance-suite/harness/generate.py",
                  })
         {
             Assert.True(net.Contains(known), $"the net no longer finds the known self-test {known}: the net is broken.");

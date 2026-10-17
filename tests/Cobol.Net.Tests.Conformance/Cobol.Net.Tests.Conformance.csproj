@@ -3,8 +3,9 @@
   <!--
     Cobol.Net.Tests.Conformance — the conformance/differential harness for the greenfield WiseOwl COBOL compiler.
     It compiles and runs the NIST CCVS corpus against its committed goldens (tests/nist/corpus.tsv), the
-    differential cases against their committed goldens (tests/differential/), and the per-edition conformance
-    corpus (tests/conformance/<ver>/). It references only the greenfield projects.
+    differential cases against their committed goldens (tests/differential/), the per-edition conformance
+    corpus (tests/conformance/<ver>/) and the conformance suite (conformance-suite/, through the generator's wiseowl
+    manifest). It references only the greenfield projects.
   -->
   <PropertyGroup>
     <IsPackable>false</IsPackable>
@@ -23,6 +24,12 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Cobol.Net.Compiler\Cobol.Net.Compiler.csproj" />
     <ProjectReference Include="..\..\src\Cobol.Net.Runtime\Cobol.Net.Runtime.csproj" />
+    <!--
+      The cobol command, BUILT (in this configuration) but not referenced: ConformanceSuiteRunnerDriftTests runs the
+      conformance suite's run.py through the WiseOwl adapter, which drives the cobol command, and CI's Conformance legs
+      build this project alone (DESIGN-conformance-suite.md §5, kb/Work PB3176).
+    -->
+    <ProjectReference Include="..\..\src\Cobol.Net.Cli\Cobol.Net.Cli.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
 </Project>
