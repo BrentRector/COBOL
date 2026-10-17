@@ -365,7 +365,8 @@ def run(program_text: str, files: dict[str, bytes], edition: str, fmt: str, opti
             return None
         r = subprocess.run(["dotnet", "prog.dll"], cwd=work, capture_output=True, env=env, stdin=subprocess.DEVNULL,
                            timeout=120)
-        return r.stdout.decode("utf-8", errors="replace")
+        # LF only, as every expected output is (.gitattributes): a Windows run writes CR LF.
+        return r.stdout.decode("utf-8", errors="replace").replace("\r\n", "\n")
 
 
 def normalize(text: str) -> str:
@@ -560,7 +561,7 @@ def main() -> int:
             if not any(d.iterdir()):
                 d.rmdir()
     if args.map:
-        args.map.write_text(json.dumps(mapping, indent=1) + "\n", encoding="utf-8")
+        args.map.write_text(json.dumps(mapping, indent=1) + "\n", encoding="utf-8", newline="\n")
     for line in problems:
         print("  " + line)
     trees = {t: sum(1 for p in programs if p.tree == t and id(p) not in merged) for t in tree_dir}

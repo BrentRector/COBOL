@@ -53,7 +53,12 @@
       "Bash(grep:*)",
       "Bash(xargs -I {} basename {} .txt)",
       "Bash(git *)",
-      "PowerShell(New-Item *)"
+      "PowerShell(New-Item *)",
+      "Bash(python tools/claude-skills/skills/agent-fleet/references/orient.py src/Cobol.Net.Runtime/Values/Numeric/CobolFloat.cs)",
+      "Bash(cd *)"
     ]
+  },
+  "skillOverrides": {
+    "anthropic-skills:xlsx": "off"
   }
 }

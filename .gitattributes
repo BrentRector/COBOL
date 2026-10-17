@@ -31,4 +31,4 @@ src/**/PublicAPI.*.txt merge=union
 
 # A conformance fixture whose BYTES are its subject: CR LF terminates a free-form line, and a CR not followed by a LINE
 # FEED is a character of the line (DOC-A.1-156, kb/Work PB1496), so it keeps its CR LF terminators and its lone CRs.
-tests/conformance/2023/pb1496_lone_cr_is_a_character.cob -text
+conformance-suite/cases/6.5-Logical-conversion/pb1496_lone_cr_is_a_character.cob -text
