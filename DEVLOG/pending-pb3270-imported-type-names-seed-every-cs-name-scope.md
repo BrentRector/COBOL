@@ -30,3 +30,8 @@ Golden: `conformance/85/pb3270_runtime_type_names_as_user_words` (a main program
 RENAMES, condition and file are named after runtime types, CALLing a program named `HostLanding` with formals
 `ProgramRegistry` and a group `CobolRec`). No negative golden: no edition rejects these words, so there is no
 rejecting arm to pin. Rows re-verdicted: none (a name-allocation defect with no inventory row).
+
+Self-review (architecture, full code, performance, duplication): one list drives the seed; the seed is shared per scope
+kind, so a thousand record structs allocate nothing for it; no second copy of the rule. Gate: `=== BUILD-LOCAL GATE:
+LEG 1 ONLY (batched gating, PB2515): GREEN` (run 20261017T003242Z-dbf4b3; the golden and the four drift facts passed in
+leg 1). Linux gate: the lander's (batched gating).
