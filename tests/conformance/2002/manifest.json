@@ -13,6 +13,8 @@
   "pb370_start_indexed_reverse",
   "pb370_exception_object_identity",
   "pb370_use_file_beats_mode_method",
+  "pb370_move_first_condition",
+  "pb370_move_function_value_digits",
   "pb1177_sort_procedure_use_not_normal",
   "pb1177_method_sort_use_not_normal",
   "pb1177_sort_called_use_not_normal",
