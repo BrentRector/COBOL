@@ -47,11 +47,9 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
         // identifier-1's reference modifier, subscript or function-identifier is evaluated "immediately before data is
         // moved to the first of the receiving operands", and "Item identification for identifier-2 is performed
         // immediately before the data is moved to the respective data item"), so every store below renders through
-        // PlaceIdentification.SenderFirst. Two moves keep the receiver first: one whose carrying statement identifies
-        // it first (INITIALIZE — ImplicitMovePhrase.ReceiverIdentifiedFirst), and one whose overlapping receiver is
-        // prepared before the sender is read (EmitOverlapPrefill, D-OVL1/D-OVL2).
-        bool senderFirst = m.ImplicitOf is not { ReceiverIdentifiedFirst: true }
-            && m.Stores[i].Prefill.Kind == OverlapPrefillKind.None;
+        // PlaceIdentification.SenderFirst. A move whose carrying statement identifies the receiver first keeps C#'s
+        // order (INITIALIZE — ImplicitMovePhrase.ReceiverIdentifiedFirst), and so does an overlap prefill (EmitStore).
+        bool senderFirst = m.ImplicitOf is not { ReceiverIdentifiedFirst: true };
         // ⛔ ISO §14.9.25.4 GR1's ZERO-LENGTH-ITEM clause — "If identifier-1 is a zero-length item, it is as
         // if literal-1 were specified as a zero-length literal" — which lands in the GR2/GR3 substitution the
         // store above already carries for a written literal. Whether the sending ITEM is zero-length is a
@@ -124,6 +122,9 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
         OverlapPrefill prefill = default)
     {
         EmitOverlapPrefill(target, prefill);
+        // An overlapping receiver prepared BEFORE the sender is read (D-OVL1/D-OVL2) keeps that order: the prefill has
+        // already identified it, so the store below renders as it always did (kb/Work PB3261).
+        senderFirst &= prefill.Kind == OverlapPrefillKind.None;
         switch (kind)
         {
             case MoveKind.RefModSlice:
