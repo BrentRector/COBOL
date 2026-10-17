@@ -17,6 +17,7 @@
   "pb3164-method-duplicate-constant-unequal",
   "pb374-async-messaging-below-2023",
   "pb374-ec-mcs-name-below-2023",
+  "pb3149-ec-mcs-no-requestor-unknown",
   "pb2532-comment-paragraph-repeated",
   "pb2532-comment-paragraph-out-of-order",
   "pb3129-type-index-in-constant-record",
@@ -667,6 +668,13 @@
   "pb883-sum-rounded-without-column",
   "pb883-sum-expression-report-section",
   "pb882-sum-counter-ambiguous",
+  "pb3232-sum-counter-beside-data-item",
+  "pb3287-address-of-linkage-not-referenceable",
+  "pb3287-address-of-ambiguous-name",
+  "pb3287-address-of-index-name",
+  "pb3287-address-of-constant-name",
+  "pb3287-search-linkage-table-not-referenceable",
+  "pb3287-all-subscript-linkage-table-not-referenceable",
   "pb531-picture-repetition-factor-negative",
   "pb531-picture-repetition-factor-signed",
   "pb531-picture-repetition-factor-zero",
@@ -996,6 +1004,7 @@
   "pb132-call-vlg-argument",
   "pb132-call-bit-unaligned",
   "pb3158-call-bit-unaligned-after-aligned",
+  "pb3167-redefines-group-first-item-aligned",
   "pb132-call-bit-variable-subscript",
   "pb132-call-byvalue-index-name",
   "pb132-call-byvalue-implied-class",
@@ -2735,7 +2744,10 @@
   "pb656-cobol-reserved-through-2014",
   "pb3233-inspect-figurative-literal1-size",
   "pb3233-inspect-figurative-literal4-size",
-  "pb3233-inspect-symbolic-literal1-size"
+  "pb3233-inspect-symbolic-literal1-size",
+  "pb3254-sort-in-inverted-section-sort-procedure-first",
+  "pb3254-sort-in-inverted-section-sort-procedure-last",
+  "pb3254-merge-in-inverted-section-sort-procedure"
  ],
  "pending": []
 }

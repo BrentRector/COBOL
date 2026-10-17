@@ -81,12 +81,28 @@ internal static class BitLayout
     /// alignment of the first item within that group, when the first item is a bit data item, are at the same bit
     /// position in storage" — so a first bit child begins wherever the group begins (mid-byte for a bit group that
     /// shares its predecessor's byte, kb/Work PB3158), unless it is ALIGNED (§13.18.1.4 GR1), a group-typed TYPE
-    /// subject (§13.18.57.4 GR2 d)) or a dynamic-capacity table (§8.5.1.9.1 3)).</summary>
-    private static bool KeepsPosition(DataItem c) =>
+    /// subject (§13.18.57.4 GR2 d)) or a dynamic-capacity table (§8.5.1.9.1 3)).
+    /// <para>⛔ The same sentence binds the OTHER direction (kb/Work PB3167): a bit group whose first item begins on a
+    /// byte boundary begins on that boundary too, so a group keeps its position only when its first item does. Asking
+    /// it of the subject alone put <c>05 BA PIC 1(2) USAGE BIT. 05 SUB GROUP-USAGE BIT. 10 TA PIC 1(5) USAGE BIT
+    /// ALIGNED.</c>'s SUB at bit 2 and TA at bit 8, a group that began six filler bits before its first item (FUNCTION
+    /// LENGTH(SUB) 11, not 5). The filler belongs to the enclosing group, "of the same level number as the next item
+    /// within that group" (§8.5.1.6.3). The first child is never a redefiner (a REDEFINES entry follows its target).</para>
+    /// <para>Its negation is the "requires a byte boundary" that §13.18.44.3 SR15 compares for a REDEFINES subject
+    /// (<c>DataBinder.RedefinesEntry</c>), so it is public.</para></summary>
+    public static bool KeepsPosition(DataItem c) =>
         !c.IsDynamicTable                                       // §8.5.1.9.1 — a dynamic-capacity table is out of line
         && !c.IsAligned                                         // §13.18.1.4 GR1 — an ALIGNED subject never shares
         && !c.AlignedAsLevelOne                                 // §13.18.57.4 GR2 d) — nor does a group-typed subject
-        && IsBitItem(c);
+        && IsBitItem(c)
+        && (c.IsElementary || c.Children.Count == 0 || KeepsPosition(c.Children[0]));   // §8.5.1.6.3 — a group begins where its first item does
+
+    /// <summary>⛔ THE ONE PLACEMENT DISPATCH: does <paramref name="c"/> continue where the item before it ended
+    /// (<see cref="SharesByteWith"/>), or, as a group's first child (<paramref name="prev"/> null), where its group
+    /// began (<see cref="KeepsPosition"/>)? False is "the first bit position of the first available byte". The walk,
+    /// <see cref="PhaseOf"/> and <see cref="HoldsByteStart"/> all ask it, so the two arms are written once (kb/Work
+    /// PB3167: the dispatch had three spellings).</summary>
+    private static bool Continues(DataItem? prev, DataItem c) => prev is null ? KeepsPosition(c) : SharesByteWith(prev, c);
 
     /// <summary>⛔ THE ONE ANSWER TO "which of these siblings SHARE bytes" (ISO §8.5.1.6.3): a RUN is a maximal
     /// stretch of consecutive same-level bit members — "an elementary bit data item immediately following an
@@ -178,8 +194,8 @@ internal static class BitLayout
         occurrences <= 0 ? 0 : StrideBitsAt(table, phase) * (occurrences - 1) + WidthBitsAt(table, phase);
 
     /// <summary>The filler bits that pad the LAST occurrence of <paramref name="table"/> to its
-    /// <see cref="StrideBits"/> and are not part of its <see cref="TableBits"/> extent: zero unless the table is
-    /// ALIGNED (§13.18.1.4 GR2). The amount an OCCURS DEPENDING extent counted as <c>fixed + count × stride</c> must
+    /// <see cref="StrideBits"/> and are not part of its <see cref="TableBits"/> extent: zero unless the table's
+    /// occurrences stride whole bytes (an ALIGNED table or member, §13.18.1.4 GR2; kb/Work PB3167). The amount an OCCURS DEPENDING extent counted as <c>fixed + count × stride</c> must
     /// give back once at least one occurrence exists.</summary>
     public static int TrailingFillerBits(DataItem table) => StrideBits(table) - WidthBits(table);
 
@@ -240,15 +256,26 @@ internal static class BitLayout
 
     /// <summary>
     /// ⛔ THE ONE SUBSCRIPT STRIDE in bits — the distance from one occurrence's first bit to the next
-    /// occurrence's first bit. Equal to <see cref="WidthBits"/> for everything except an ALIGNED item, which is
-    /// exactly what <b>§13.18.1.4 GR2</b> requires: "An ALIGNED clause specified for a multiple-occurrence data
-    /// item applies to each occurrence of that item" — so EVERY occurrence, not just the first, begins at the
-    /// first bit of a byte, and the stride is the per-occurrence width rounded up to a byte.
+    /// occurrence's first bit. Equal to <see cref="WidthBits"/> for everything except an item whose layout depends on
+    /// where in a byte it begins (<see cref="HoldsByteStart"/>), which is exactly what <b>§13.18.1.4 GR2</b> requires:
+    /// "An ALIGNED clause specified for a multiple-occurrence data item applies to each occurrence of that item" — so
+    /// EVERY occurrence, not just the first, puts the subject at "the first bit of the first available byte boundary"
+    /// (GR1), and the stride is the per-occurrence width rounded up to a byte.
     ///
-    /// <para>Because the two coincide whenever <c>IsAligned</c> is false, converting a call site from
+    /// <para>⛔ <b>That includes an ALIGNED MEMBER of a table element</b> (kb/Work PB3167): an item subordinate to an
+    /// OCCURS entry has an occurrence per occurrence of the entry (§13.18.63.4 9) speaks of "every occurrence" of
+    /// such an item), so GR2 binds it too. A bit group <c>SUB OCCURS 3</c> holding <c>SA PIC 1. TA PIC 1(5) ALIGNED</c>
+    /// that begins at bit 2 is 11 bits (SA 2, filler 3-7, TA 8-12); a stride of 11 started the second occurrence at
+    /// bit 13 and its TA at bit 19, inside a byte. A whole-byte stride (16) starts every occurrence at the phase of the
+    /// first, so every occurrence's TA is on a byte and every occurrence has the one length of "the subject of the
+    /// entry" (§13.18.38.4 7)). The filler that pads an occurrence to the stride lies between occurrences, like the
+    /// implicit FILLER §13.18.55.4 8) b) generates "for each occurrence" of a synchronized table — the DETERMINATION
+    /// recorded in <c>docs/CONFORMANCE.md</c> (USAGE BIT).</para>
+    ///
+    /// <para>Because the two coincide for every item with no such member, converting a call site from
     /// <see cref="WidthBits"/> to this method is provably byte-identical for every program that writes no ALIGNED
-    /// clause — the whole pre-PB487 corpus — which is the same discipline the class header records for gating the
-    /// bit walk on <c>HasBitDescendant</c>.</para>
+    /// clause and no byte-starting member in a bit table, which is the same discipline the class header records for
+    /// gating the bit walk on <c>HasBitDescendant</c>.</para>
     ///
     /// <para>⚠ The trailing filler of the LAST occurrence is NOT part of the item's extent: §8.5.1.6.3 generates
     /// implicit filler "as needed to advance alignment to a required natural boundary for the NEXT item", so a
@@ -259,7 +286,32 @@ internal static class BitLayout
     public static int StrideBits(DataItem item) => StrideBitsAt(item, PhaseOf(item));
 
     private static int StrideBitsAt(DataItem item, int phase) =>
-        item.IsAligned ? RoundUpToByte(WidthBitsAt(item, phase)) : WidthBitsAt(item, phase);
+        HoldsByteStart(item) ? RoundUpToByte(WidthBitsAt(item, phase)) : WidthBitsAt(item, phase);
+
+    /// <summary>True when WHERE IN A BYTE an occurrence of <paramref name="item"/> begins changes its layout: the item,
+    /// or a member of it at any depth, is placed at "the first bit position of the first available byte"
+    /// (§8.5.1.6.3): an ALIGNED subject (§13.18.1.4 GR1), a group-typed TYPE subject (§13.18.57.4 GR2 d)), a group
+    /// whose first item is one (<see cref="KeepsPosition"/>), or a member that does not share its predecessor's byte.
+    /// Such an occurrence is a whole number of bytes from its first bit to the same bit of the next one
+    /// (<see cref="StrideBits"/>), so every occurrence begins at the same phase as the first and lays out as the first
+    /// does (kb/Work PB3167). An item with no such member is packed bit by bit wherever it begins, so its stride is its
+    /// width. A non-bit item answers false: its width is already a whole number of bytes. A dynamic-capacity table's
+    /// own flag is not asked: it places the table against its NEIGHBOURS (§8.5.1.9.1 3)), not one occurrence against
+    /// the next.</summary>
+    private static bool HoldsByteStart(DataItem item)
+    {
+        if (item.IsAligned || item.AlignedAsLevelOne) return true;   // §13.18.1.4 GR1 / GR2; §13.18.57.4 GR2 d)
+        if (!IsBitItem(item) || item.IsElementary) return false;
+        DataItem? prev = null;
+        foreach (var c in item.Children)
+        {
+            if (c.RedefinesTargetName is not null) continue;            // overlays its target, places nothing (§13.18.44)
+            if (!Continues(prev, c)) return true;                       // the walk rounds it up to a byte
+            if (HoldsByteStart(c)) return true;
+            prev = c;
+        }
+        return false;
+    }
 
     /// <summary>
     /// The total bit extent of <paramref name="group"/> — the §8.5.1.6.3 cursor walk over its NON-redefining
@@ -313,9 +365,9 @@ internal static class BitLayout
     /// group never shares a byte with its predecessor, <see cref="SharesByteWith"/>), so every other item answers 0
     /// without a walk. The phase is read off the parent's walk at the parent's own phase: the recursion climbs only
     /// through enclosing bit groups, and <see cref="Walk"/> passes the phase it already knows down, never asking
-    /// this method again. A table of bit groups is laid out as its FIRST occurrence: the stride must be uniform, and
-    /// a stride that is not a whole number of bytes would start later occurrences at other phases, so the first
-    /// occurrence's phase is the one the table's layout (and so every subscript) is built on.</para>
+    /// this method again. A table of bit groups is laid out as its FIRST occurrence, and that is exact: a group whose
+    /// layout depends on its phase strides whole bytes (<see cref="StrideBits"/>, kb/Work PB3167), so every occurrence
+    /// begins at the first one's phase, and a group whose layout does not is packed bit by bit at any phase.</para>
     /// </summary>
     private static int PhaseOf(DataItem item)
     {
@@ -331,7 +383,7 @@ internal static class BitLayout
             DataItem? prev = null;
             for (int i = at - 1; i >= 0 && prev is null; i--)
                 if (siblings[i].RedefinesTargetName is null) prev = siblings[i];
-            if (prev is null ? !KeepsPosition(item) : !SharesByteWith(prev, item)) return 0;   // a byte of its own
+            if (!Continues(prev, item)) return 0;                                               // a byte of its own
             if (prev is null) return PhaseOf(parent);                                           // begins where its group does
         }
         int parentPhase = PhaseOf(parent);
@@ -392,9 +444,9 @@ internal static class BitLayout
             if (c.RedefinesTargetName is not null) continue;   // overlays its target — no advance (§13.18.44)
 
             // Rule 1 vs 2 (and §13.18.1.4 GR1) — ONE predicate.
-            if (!(prev is null ? KeepsPosition(c) : SharesByteWith(prev, c))) cursor = RoundUpToByte(cursor);   // rules 2 and 3 — same advance, different reasons
+            if (!Continues(prev, c)) cursor = RoundUpToByte(cursor);   // rules 2 and 3 — same advance, different reasons
             if (starts is not null) starts[i] = cursor - phase;
-            cursor += RunBitsAt(c, cursor % BitsPerCharacter);   // width, or the ALIGNED per-occurrence stride × (n−1) + width (GR2)
+            cursor += RunBitsAt(c, cursor % BitsPerCharacter);   // width, or the whole-byte stride × (n−1) + width (GR2)
             prev = c;
         }
         if (starts is null) return cursor - phase;

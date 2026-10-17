@@ -635,7 +635,6 @@ CobolNet.Runtime.Collation.CollationTable.CombiningClass(int codePoint) -> int
 CobolNet.Runtime.Collation.CollationTable.ContractionCount.get -> int
 CobolNet.Runtime.Collation.CollationTable.Description.get -> string!
 CobolNet.Runtime.Collation.CollationTable.ElementCount.get -> int
-CobolNet.Runtime.Collation.CollationTable.GetElements(System.ReadOnlySpan<int> codePoints) -> CobolNet.Runtime.Collation.CollationElement[]!
 CobolNet.Runtime.Collation.CollationTable.GetElements(int codePoint) -> System.ReadOnlyMemory<CobolNet.Runtime.Collation.CollationElement>
 CobolNet.Runtime.Collation.CollationTable.HasContraction(System.ReadOnlySpan<int> codePoints) -> bool
 CobolNet.Runtime.Collation.CollationTable.HasExplicitMapping(int codePoint) -> bool
@@ -1907,14 +1906,14 @@ CobolNet.Runtime.OdoTail.Comps.init -> void
 CobolNet.Runtime.OdoTail.CountFrom(int components, int total) -> int?
 CobolNet.Runtime.OdoTail.CutAt(int count) -> int
 CobolNet.Runtime.OdoTail.CutComponents(int count) -> int
-CobolNet.Runtime.OdoTail.Deconstruct(out int Elem, out int Max, out int Comps, out int Lead, out int PositionsPerCharacter) -> void
+CobolNet.Runtime.OdoTail.Deconstruct(out int Elem, out int Max, out int Comps, out int Lead, out int PositionsPerCharacter, out int Trailing) -> void
 CobolNet.Runtime.OdoTail.Elem.get -> int
 CobolNet.Runtime.OdoTail.Elem.init -> void
 CobolNet.Runtime.OdoTail.Equals(CobolNet.Runtime.OdoTail other) -> bool
 CobolNet.Runtime.OdoTail.Max.get -> int
 CobolNet.Runtime.OdoTail.Max.init -> void
 CobolNet.Runtime.OdoTail.OdoTail() -> void
-CobolNet.Runtime.OdoTail.OdoTail(int Elem, int Max, int Comps = 0, int Lead = 0, int PositionsPerCharacter = 1) -> void
+CobolNet.Runtime.OdoTail.OdoTail(int Elem, int Max, int Comps = 0, int Lead = 0, int PositionsPerCharacter = 1, int Trailing = 0) -> void
 CobolNet.Runtime.OdoTail.Present.get -> bool
 CobolNet.Runtime.OdoTail.Width.get -> int
 CobolNet.Runtime.OmittedFormal
@@ -2964,7 +2963,7 @@ static CobolNet.Runtime.CobolTable.OccValue(System.Int128 unscaled, int scale) -
 static CobolNet.Runtime.CobolTable.OccValueDec(CobolNet.Runtime.CobolDec value) -> System.Int128
 static CobolNet.Runtime.CobolTable.OccValueReal(double value) -> System.Int128
 static CobolNet.Runtime.CobolTable.OdoExtent(CobolNet.Runtime.Occurrence count, int min, int max, int fixedUnits, int elemUnits) -> int
-static CobolNet.Runtime.CobolTable.OdoExtentChars(CobolNet.Runtime.Occurrence count, int min, int max, int fixedUnits, int elemUnits, int positionsPerChar) -> int
+static CobolNet.Runtime.CobolTable.OdoExtentChars(CobolNet.Runtime.Occurrence count, int min, int max, int fixedUnits, int strideUnits, int trailingUnits, int positionsPerChar) -> int
 static CobolNet.Runtime.CobolTable.SortInPlace<T>(System.Span<T> occurrences, System.Comparison<T>! compare) -> void
 static CobolNet.Runtime.CobolTable.With<T, R>(T value, System.Func<T, R>! body) -> R
 static CobolNet.Runtime.CobolTiming.ContinueAfter(CobolNet.Runtime.CobolDec seconds, bool checkLessThanZero) -> bool

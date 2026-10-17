@@ -103,6 +103,7 @@
   "pb190_reverse_argument_shapes",
   "pb257_variance_eae_native",
   "pb882_report_sum_counter_identity",
+  "pb3232_sum_counter_qualified_beside_data_item",
   "pb1454_sum_counter_group_qualifier",
   "pb1279_redefines_within_occurs",
   "pb883_report_sum_expression",
@@ -432,7 +433,8 @@
   "pb3154_contained_symbolic_shadowed",
   "pb359_unsuccessful_read_start_position",
   "pb243_display_all_literal",
-  "pb3233_inspect_figurative_pattern_size"
+  "pb3233_inspect_figurative_pattern_size",
+  "pb3254_sort_inverted_section_thru"
  ],
  "pending": []
 }

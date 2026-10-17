@@ -49,6 +49,7 @@ CASES = [
     (f"cd {WT.as_posix()}; git rm -r src/X", MAIN, False),                            # `;`: a failed cd removes in main
     (f"ls && cd {WT.as_posix()} && git rm -r src/X", MAIN, False),                    # more than the one prefix
     (f"(cd {WT.as_posix()} && git rm -r src/X)", MAIN, False),                        # a subshell is never covered
+    (f"echo y | ( cd {WT.as_posix()} && git rm -r src/X )", MAIN, False),             # nor one reading a pipe (R3-1)
     (f"bash -c 'git rm -r src/X'", str(WT), False),                                  # nor a -c payload
     ("cd $WT && git rm -r src/X", MAIN, False),                                      # a target the line does not determine
     ("git rm -r", str(WT), False),                                                   # no path
@@ -59,6 +60,19 @@ CASES = [
     (f"git rm -r src/X >{REPO.as_posix()}/src/a.cs", str(WT), False),                # a redirect truncates outside
     ("git rm -r src/X 2>/e/COBOL/kb/Work/PB1.md", str(WT), False),
     ("git rm -r <(ls) src/X", str(WT), False),                                       # process substitution
+    # argv is the shared parser's words (kb/Work PB3198: one model of the command line, no second splitter)
+    ('git rm -r "src/a b"', str(WT), True),                                          # a quoted path with a space
+    (f'git rm -r "{str(WT).replace("/", BS)}{BS}src{BS}X"', str(WT), True),          # a quoted backslash path inside
+    ("git rm -r src/X <<'EOF'\nx\nEOF", str(WT), False),                             # a heredoc feeds the call
+    ("cat > m.txt <<'EOF'\ngit rm -r src/X\nEOF", str(WT), False),                   # a body is text, not the command
+    ("git rm -r E:src/X", str(WT), False),                                           # drive-relative: its dir is unknown
+    ("git -C E:sub rm -r src/X", str(WT), False),
+    # the git call is `git_calls`' reading: only `-C` options, applied in order, and the step is that one call
+    (f"git -C {REPO.as_posix()} -C {WT.as_posix()} rm -r src/X", MAIN, True),       # the last -C wins, as in git
+    (f"git -C {WT.as_posix()} -C ../.. rm -r src/X", MAIN, False),                  # ... and can leave the worktree
+    ("git --work-tree=/e/COBOL rm -r src/X", str(WT), False),                        # another global option: no allow
+    ("git -c core.x=y rm -r src/X", str(WT), False),
+    ("git rm -r src/X; bash <<'EOF'\ngit rm -r src/Y\nEOF", str(WT), False),         # a shell's heredoc is a payload
 ]
 
 

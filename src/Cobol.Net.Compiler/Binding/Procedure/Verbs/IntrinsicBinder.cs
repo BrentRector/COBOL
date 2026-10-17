@@ -2410,8 +2410,8 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
     /// boundaries, so subtracting its counted extent leaves the fixed part exactly; the OCCURS DEPENDING table of
     /// bit elements, whose occurrences share bytes, is counted in bit positions
     /// (<see cref="BoundOdoExtent.PositionsPerCharacter"/>), and a bit GROUP's LENGTH is those positions
-    /// (§15.50.4 r1) rather than the bytes they occupy. An ALIGNED table's occurrences are padded to whole bytes
-    /// (§13.18.1.4 GR2): the positions are counted a stride apart with the LAST occurrence's padding given back
+    /// (§15.50.4 r1) rather than the bytes they occupy. The occurrences of a table with an ALIGNED subject or member
+    /// are padded to whole bytes (§13.18.1.4 GR2; kb/Work PB3167): the positions are counted a stride apart with the LAST occurrence's padding given back
     /// (<see cref="BitLayout.TableBits"/>, <see cref="BoundOdoExtent.TrailingWidth"/>), so the answer is the one the same
     /// table fixed at that many occurrences has (kb/Work PB3156).</para>
     /// </remarks>
@@ -2512,13 +2512,15 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
                         int prefixBits = BitLayout.StartBitOf(group, c), strideBits = BitLayout.StrideBits(c);
                         if (prefixBits < 0)
                         { failure = Stage($"the OCCURS DEPENDING table '{c.CobolName ?? c.CsName}' follows an overlay chain whose layout is not modelled"); return; }
-                        // An ALIGNED table's occurrences are a stride apart and the LAST one's padding is not part of the
-                        // extent (BitLayout.TableBits; §8.5.1.6.3 generates filler "as needed to advance alignment to a
-                        // required natural boundary for the next item"): in whole characters that is the same number
-                        // (the padding is under a byte), in boolean positions it is not, and §15.50.4 r1 counts those —
-                        // so the runtime term gives it back once an occurrence exists (BoundOdoExtent.TrailingWidth), and
+                        // A table whose occurrences stride whole bytes (an ALIGNED table or member, §13.18.1.4 GR2) has
+                        // its occurrences a stride apart and the LAST one's padding is not part of the extent
+                        // (BitLayout.TableBits; §8.5.1.6.3 generates filler "as needed to advance alignment to a required
+                        // natural boundary for the next item"), in boolean positions (§15.50.4 r1) and in characters
+                        // alike: such a table can begin mid-byte, and then its stride-counted end lies a byte past its
+                        // real one (kb/Work PB3167; the character count was refused as "negative"). So the runtime term
+                        // gives it back once an occurrence exists (BoundOdoExtent.TrailingWidth), before any ceiling, and
                         // the maximum the constant part is taken from is the table's TableBits (kb/Work PB3156).
-                        int trailingBits = bitPositions ? BitLayout.TrailingFillerBits(c) : 0;
+                        int trailingBits = BitLayout.TrailingFillerBits(c);
                         long endBits = prefixBits + (long)max * strideBits - trailingBits;
                         // The dynamic-capacity tables found so far each sit in the prefix as ONE occurrence (whole bytes,
                         // on byte boundaries): their runtime terms add the full capacity, so the prefix counts none.
@@ -3076,10 +3078,11 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         // sum counter"; kb/Work PB1271): it is asked of the ONE counter resolver FIRST, in the order
         // ReferenceResolver.Resolve asks it, and its register carries the OCCURS levels the walk below reads.
         var counter = ctx.Refs.SumCounterFamilyFor(dref, name, quals, report: true);
-        if ((counter?.Family.Register ?? ctx.Refs.FindItem(name, quals)) is not { } item)
+        if ((counter?.Family.Register ?? ctx.Refs.FindReportedItem(dref, name, quals)) is not { } item)
         {
-            // The resolver's ONE §8.4.2.1 / §8.4.2.2 report (kb/Work PB1029 — this arm refused silently).
-            ctx.Refs.ReportUnidentified(dref, name, quals);
+            // The resolver's ONE reported lookup (kb/Work PB1029 — this arm refused silently; kb/Work PB3287 — and it
+            // asked no §13.7.3 SR4 screen of a LINKAGE table the procedure division may not reference): the §8.4.2.1 /
+            // §8.4.2.2 report and the LINKAGE screen are FindReportedItem's.
             args.Add(BoundOperandError.Refused(ctx.Edition, $"table(ALL) reference '{name}'"));
             return true;
         }

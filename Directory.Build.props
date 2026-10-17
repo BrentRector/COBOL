@@ -17,7 +17,7 @@
          and a run unit refuses a module of another major (RuntimeAbi.Skew). Raise the major exactly when the runtime's
          public surface (src/Cobol.Net.Runtime/PublicAPI.Shipped.txt) or a codec's image layout changes incompatibly;
          RuntimeAbiPinDriftTests pins it beside the surface's hash. -->
-    <Version>6.0.0</Version>
+    <Version>7.0.0</Version>
   </PropertyGroup>
   <!-- The LICENSE file PackageLicenseFile names, packed at the package root. Items are evaluated after every property,
        so the project's own IsPackable (false in every test and tool project) is already set here. -->
