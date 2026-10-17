@@ -2,6 +2,7 @@
 """generate.py — the ONE reader of the conformance-suite test headers (DESIGN-conformance-suite.md §3, §4, §9).
 
     python conformance-suite/harness/generate.py            # refuse, or write the manifests and print completeness
+    python conformance-suite/harness/generate.py --out DIR  # the same, written to DIR instead of suites/
     python conformance-suite/harness/generate.py --check    # the refusals only, writing nothing (a gate audit)
     python conformance-suite/harness/generate.py --self-test
 
@@ -26,6 +27,8 @@ WHAT IT WRITES (build output, never committed; `.gitignore` names `conformance-s
   suites/wiseowl/manifest.json    everything WiseOwl COBOL runs: every test of both trees at every edition it names,
                                   portable or not, and `wiseowl/diagnostics.json`'s refusals (§4).
   suites/completeness.json        the completeness report (below), which it also prints.
+`--out DIR` writes the same tree to DIR instead: WiseOwl's in-process runner (S1c) generates into a directory of its
+own, so a test run never rewrites the repository's `suites/` under a concurrent `run.py`.
 
 THE COMPLETENESS REPORT (§4) is per edition and per WITNESS KIND, never one count: each inventory row whose band
 holds the edition is counted once, under the first of these that holds — documented non-support ("unwitnessed until
@@ -806,8 +809,11 @@ def manifests(cases: list[Case], inputs: Inputs) -> dict[str, dict[str, Any]]:
     by_id = {c.test_id: c for c in cases}
     for test_id in sorted(inputs.diagnostics):
         entry = inputs.diagnostics[test_id]
-        wiseowl["diagnostics"][test_id] = {"source": _posix(by_id[test_id].path),
-                                           "source-format": by_id[test_id].source_format,
+        case = by_id[test_id]
+        # What a runner needs to compile the refused program as the suite compiles it: its source, its reference
+        # format and its declared files (a copybook it COPYs), never a re-read of its header.
+        wiseowl["diagnostics"][test_id] = {"source": _posix(case.path), "source-format": case.source_format,
+                                           "files": [_posix(case.path.parent / f) for f in case.files],
                                            "refuse-at": list(entry["refuse-at"]), "expect": entry["expect"]}
     out["wiseowl"] = wiseowl
     return out
@@ -996,11 +1002,14 @@ def main(argv: list[str]) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--check", action="store_true", help="the refusals only, writing nothing (the gate audit)")
     ap.add_argument("--self-test", action="store_true", help="prove every refusal and the manifests on planted trees")
+    ap.add_argument("--out", type=Path, metavar="DIR", help="write the manifests and the report to DIR (default: suites/)")
     args = ap.parse_args(argv)
     if args.self_test:
         return self_test()
+    if args.check and args.out is not None:
+        ap.error("--check writes nothing, so it takes no --out")
     inputs, problems = repository_inputs()
-    rc, _ = generate(SUITE, inputs, problems, None if args.check else OUT)
+    rc, _ = generate(SUITE, inputs, problems, None if args.check else (args.out or OUT))
     return rc
 
 
@@ -1154,6 +1163,10 @@ def self_test() -> int:
                   {"loose", "own"} <= set(w2023) and "unverified" in {t["id"] for t in mw["editions"]["85"]}, w2023)
             check("arm: the wiseowl manifest carries diagnostics.json's refusals",
                   mw["diagnostics"]["flagged"]["expect"] == "X1", mw["diagnostics"])
+            check("arm: ... each with what compiles the refused program: its source, reference format and files",
+                  {k: mw["diagnostics"]["free-flag"][k] for k in ("source", "source-format", "files", "refuse-at")}
+                  == {"source": "cases/2.2.2-Free/free-flag.cob", "source-format": "free", "files": [],
+                      "refuse-at": ["2002"]}, mw["diagnostics"]["free-flag"])
             report = json.loads((root / "suites/completeness.json").read_text(encoding="utf-8"))
             r85 = report["85"]
             check("arm: completeness counts each row once under its first witness kind",
