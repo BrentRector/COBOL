@@ -328,19 +328,21 @@ public sealed class CompiledProgramCacheDriftTests : IDisposable
 
     /// <summary>The output DIRECTORY is the one option not keyed (only the output FILE NAME is): compile the same
     /// programs cold into two directories and every output byte, the diagnostics and the warnings must agree. The
-    /// sample is every enabled corpus program that reports a source position at run time (EXCEPTION-LOCATION,
-    /// DEBUG-ITEM) — the constructs most likely to carry a path — plus a copybook program and a NIST program.</summary>
+    /// sample is the first twelve conformance-suite tests that report a source position at run time
+    /// (EXCEPTION-LOCATION, DEBUG-ITEM) — the constructs most likely to carry a path — plus a copybook program and a
+    /// NIST program.</summary>
     [Fact]
     public void TheOutputDirectory_DoesNotReachTheOutput()
     {
         var sources = new List<CompilerDriver.Options>();
-        foreach (object[] row in ConformanceCorpus.EnabledPositive())
+        foreach (object[] row in ConformanceSuite.Tests())
         {
-            if ((string)row[0] == "shell") continue;
-            string path = Path.Combine(ConformanceCorpus.Root, (string)row[0], (string)row[1] + ".cob");
-            string text = File.ReadAllText(path);
+            SuiteTest test = ConformanceSuite.Manifest.Editions[(string)row[0]][(string)row[1]];
+            if (test.Expect != "accept") continue;
+            string text = File.ReadAllText(Path.Combine(ConformanceSuite.Root, test.Source));
             if (!Regex.IsMatch(text, "EXCEPTION-LOCATION|DEBUG-ITEM|DEBUG-LINE", RegexOptions.IgnoreCase)) continue;
-            sources.Add(ConformanceCorpus.PositiveOptions((string)row[0], (string)row[1], "x.dll"));
+            CompilerDriver.Options staged = ConformanceSuiteRunner.AcceptOptions(test, (string)row[0], Path.Combine(_dir, "suite", test.Id));
+            sources.Add(staged with { OutputPath = "x.dll" });
             if (sources.Count == 12) break;
         }
         Assert.NotEmpty(sources);

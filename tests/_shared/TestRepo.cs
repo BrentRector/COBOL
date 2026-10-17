@@ -84,6 +84,30 @@ internal static class TestRepo
     /// <summary><c>tests/nist/</c> — the NIST CCVS corpus, its manifest and its goldens.</summary>
     public static string Nist(params string[] segments) => Tests(["nist", .. segments]);
 
+    /// <summary><c>conformance-suite/</c> — the conformance suite (docs/rearchitecture/DESIGN-conformance-suite.md):
+    /// its two trees of tests, the generator and the harness.</summary>
+    public static string Suite(params string[] segments) => At(["conformance-suite", .. segments]);
+
+    /// <summary>The program of the conformance-suite test <paramref name="id"/>, wherever its clause folder files it
+    /// (<c>conformance-suite/cases/&lt;clause&gt;/&lt;id&gt;.cob</c> or <c>wiseowl/cases/…</c>): an id is unique across
+    /// both trees and names no clause, so a test that moves to another clause keeps every reader that names it
+    /// (DESIGN-conformance-suite.md §3.1). An unknown id throws.</summary>
+    public static string SuiteCase(string id) =>
+        s_suiteCases.Value.TryGetValue(id, out string? path)
+            ? path
+            : throw new FileNotFoundException($"no conformance-suite test is named {id}", id);
+
+    /// <summary>A file beside the conformance-suite test <paramref name="id"/> (its expected output
+    /// <c>&lt;id&gt;.out</c>, a copybook it declares).</summary>
+    public static string SuiteFile(string id, string name) => Path.Combine(Path.GetDirectoryName(SuiteCase(id))!, name);
+
+    private static readonly Lazy<IReadOnlyDictionary<string, string>> s_suiteCases = new(() =>
+        new[] { Suite("cases"), Suite("wiseowl", "cases") }
+            .Where(Directory.Exists)
+            .SelectMany(tree => Directory.EnumerateDirectories(tree))
+            .SelectMany(folder => Directory.EnumerateFiles(folder, "*.cob"))
+            .ToDictionary(p => Path.GetFileNameWithoutExtension(p), p => p, StringComparer.Ordinal));
+
     private static string Locate()
     {
         for (var d = new DirectoryInfo(AppContext.BaseDirectory); d is not null; d = d.Parent)

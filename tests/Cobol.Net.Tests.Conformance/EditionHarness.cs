@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using System.Text;
 using CobolNet;
 using CobolNet.Tests.Shared;
 using Xunit;
@@ -44,7 +45,8 @@ public static class EditionHarness
         try
         {
             string src = Path.Combine(dir, "prog.cob");
-            src = CompiledProgramCache.StageSource(src, source, copybooks);   // copybooks staged WITH it (kb/Work PB1755)
+            src = CompiledProgramCache.StageSource(src, source,   // copybooks staged WITH it (kb/Work PB1755)
+                copybooks?.ToDictionary(c => c.Key, c => Encoding.UTF8.GetBytes(c.Value), StringComparer.Ordinal));
             var r = CompiledProgramCache.Compile(new CompilerDriver.Options(
                 src, Path.Combine(dir, "prog.dll"), DialectLevel: edition, Permissive: permissive,
                 CopyPaths: copybooks is null ? null : [Path.GetDirectoryName(src)!], SourceFormat: InitialReferenceFormat.Auto,

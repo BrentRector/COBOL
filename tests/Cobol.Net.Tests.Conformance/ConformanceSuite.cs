@@ -22,17 +22,20 @@ namespace CobolNet.Tests.Conformance;
 /// <param name="Line">A flagged test's marked line.</param>
 /// <param name="Control">A flagged test's control: the accepted twin with the violation removed.</param>
 /// <param name="InSuite">Whether the per-edition suites carry it (the rest are WiseOwl's own tests).</param>
+/// <param name="Options">A WiseOwl test's WiseOwl compile options (<c>conformance-suite/wiseowl/options.json</c>), by
+/// option: <c>sign-encoding</c>, <c>flag-extensions</c>; empty for every other test.</param>
 internal sealed record SuiteTest(
     string Id, string Clause, string Source, string SourceFormat, IReadOnlyList<string> Files,
     IReadOnlyList<string> Requires, IReadOnlyList<string> Words, string Expect, IReadOnlyList<int> ImplementorDefined,
-    IReadOnlyDictionary<string, string> ExpectedOutput, int Line, string? Control, bool InSuite);
+    IReadOnlyDictionary<string, string> ExpectedOutput, int Line, string? Control, bool InSuite,
+    IReadOnlyDictionary<string, string> Options);
 
 /// <summary>One of WiseOwl COBOL's refusals (<c>conformance-suite/wiseowl/diagnostics.json</c>, carried into the
 /// wiseowl manifest): the editions at which WiseOwl refuses the program, and the code or message substring it
 /// reports.</summary>
 internal sealed record SuiteRefusal(
     string Id, string Source, string SourceFormat, IReadOnlyList<string> Files, IReadOnlyList<string> RefuseAt,
-    string Expect);
+    string Expect, IReadOnlyDictionary<string, string> Options);
 
 /// <summary>What WiseOwl COBOL's profile (<c>conformance-suite/profiles/wiseowl.json</c>) claims: the editions, the
 /// Annex A.4 modules and A.3 elements, its value of each Annex A.1 item the standard enumerates, and the words it
@@ -180,7 +183,8 @@ internal sealed record WiseOwlManifest(
         {
             refusals[r.Name] = new SuiteRefusal(r.Name, r.Value.GetProperty("source").GetString()!,
                 r.Value.GetProperty("source-format").GetString()!, Strings(r.Value.GetProperty("files")),
-                Strings(r.Value.GetProperty("refuse-at")), r.Value.GetProperty("expect").GetString()!);
+                Strings(r.Value.GetProperty("refuse-at")), r.Value.GetProperty("expect").GetString()!,
+                Map(r.Value.GetProperty("options")));
         }
         return new WiseOwlManifest(editions, refusals);
     }
@@ -204,8 +208,11 @@ internal sealed record WiseOwlManifest(
                 : new Dictionary<string, string>(StringComparer.Ordinal),
             accepted ? 0 : t.GetProperty("line").GetInt32(),
             accepted ? null : t.GetProperty("control").GetString()!,
-            t.GetProperty("in-suite").GetBoolean());
+            t.GetProperty("in-suite").GetBoolean(), Map(t.GetProperty("options")));
     }
+
+    private static IReadOnlyDictionary<string, string> Map(JsonElement map) =>
+        map.EnumerateObject().ToDictionary(o => o.Name, o => o.Value.GetString()!, StringComparer.Ordinal);
 
     private static IReadOnlyList<string> Strings(JsonElement array) => [.. array.EnumerateArray().Select(e => e.GetString()!)];
 }

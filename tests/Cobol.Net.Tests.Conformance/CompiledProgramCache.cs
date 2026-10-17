@@ -122,35 +122,47 @@ internal static class CompiledProgramCache
     /// that compiles the same program a second writer of the same file — the version matrix compiles one construct
     /// at four editions in parallel, and the loser read a half-written copybook ("being used by another process").
     /// Every file is placed write-if-absent through a temporary file and an atomic move, so a concurrent stager of
-    /// the identical content never sees a partial file.</para></summary>
+    /// the identical content never sees a partial file.</para>
+    /// <para>A companion is its BYTES, never re-encoded text: a library text stored in UTF-16 or UTF-32 is what a
+    /// conformance test of the compiler's reading of it witnesses (kb/Work PB3177). Its name is a path relative to the
+    /// program's directory, so a library folder beside the program (<c>COPY X OF LIB</c>, a library-name's directory
+    /// under DOC-A.1-40) is staged as one.</para></summary>
     public static string StageSource(string plannedPath, string sourceText,
-        IReadOnlyDictionary<string, string>? companions = null)
+        IReadOnlyDictionary<string, byte[]>? companions = null)
     {
         var others = companions?.OrderBy(c => c.Key, StringComparer.Ordinal).ToList() ?? [];
+        byte[] source = Encoding.UTF8.GetBytes(sourceText);
         if (!Enabled)
         {
-            File.WriteAllText(plannedPath, sourceText);
-            foreach (var (name, text) in others) File.WriteAllText(Path.Combine(Path.GetDirectoryName(plannedPath)!, name), text);
+            File.WriteAllBytes(plannedPath, source);
+            foreach (var (name, bytes) in others) WriteCompanion(Path.Combine(Path.GetDirectoryName(plannedPath)!, name), bytes);
             return plannedPath;
         }
 
         string fileName = Path.GetFileName(plannedPath);
         var identity = new StringBuilder(fileName).Append('\0').Append(sourceText);
-        foreach (var (name, text) in others) identity.Append('\0').Append(name).Append('\0').Append(text);
+        foreach (var (name, bytes) in others) identity.Append('\0').Append(name).Append('\0').Append(Sha256Hex(bytes));
 
         string dir = Path.Combine(Root, "src", Sha256Hex(Encoding.UTF8.GetBytes(identity.ToString()))[..32]);
         string path = Path.Combine(dir, fileName);
         Directory.CreateDirectory(dir);
-        StageFile(path, sourceText);
-        foreach (var (name, text) in others) StageFile(Path.Combine(dir, name), text);
+        StageFile(path, source);
+        foreach (var (name, bytes) in others) StageFile(Path.Combine(dir, name), bytes);
         try { Directory.SetLastWriteTimeUtc(dir, DateTime.UtcNow); } catch (IOException) { } catch (UnauthorizedAccessException) { }
         return path;
 
-        static void StageFile(string target, string text)
+        static void WriteCompanion(string target, byte[] bytes)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            File.WriteAllBytes(target, bytes);
+        }
+
+        static void StageFile(string target, byte[] bytes)
         {
             if (File.Exists(target)) return;
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
             string tmp = target + "." + Guid.NewGuid().ToString("N") + ".tmp";
-            File.WriteAllText(tmp, text);
+            File.WriteAllBytes(tmp, bytes);
             try { File.Move(tmp, target); }
             catch (IOException) { TryDeleteFile(tmp); }   // a concurrent stager placed the identical file first
         }
