@@ -46,8 +46,8 @@ than half-adjudicated — a partially applied batch is the worst outcome availab
 land look exactly like reviewed work and nothing afterwards can tell them from it.
 
 WHAT IS CHECKED HERE, AND WHAT IS NOT. This validates SHAPE only: the rule-id is real, the verdict is in the
-vocabulary, the fields that verdict requires are present, the editions are in their one spelling (or empty:
-`Schema.editions_error`, kb/Work PB3172), the syntax of each reference
+vocabulary, the fields that verdict requires are present, the editions are in their one spelling, named and a
+run through the newest edition (`Schema.editions_error`, kb/Work PB3172, PB3173), the syntax of each reference
 parses, the register anchor the row's KIND computes is present, and no fragment on an `anchored-files` path is
 outside that file's anchor space. A record may also carry a `derivation` — §1.1's owner-signed alternative to a
 spec-derived test, for a rule with no observable obligation (kb/Work PB386) — and every one of the six bounds the
@@ -243,8 +243,10 @@ def validate(records: list[tuple[pathlib.Path, int, dict]], schema, catalog: dic
             if not after.get(field):
                 bad.append(f"{where}: verdict {verdict} requires a non-empty '{field}'")
 
-        # The one validator of the field (`Schema.editions_error`, kb/Work PB3172): the one spelling or empty.
-        if err := schema.editions_error(rec.get("editions", "")):
+        # The one validator of the field (`Schema.editions_error`): the one spelling (kb/Work PB3172), never
+        # empty and a run through the newest edition (kb/Work PB3173). Asked of the row AS WRITTEN, like the
+        # evidence rules above: a witness-only record restates no editions and keeps the row's.
+        if err := schema.editions_error(after["editions"]):
             bad.append(f"{where}: {err}")
 
         # Each reference the record NAMES is shape-checked by the one predicate the history replay also asks

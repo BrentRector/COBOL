@@ -48,8 +48,8 @@ Counting rule: a "program" is a manifest entry (`enabled` + `pending`); the file
   verdict they are 394 CONFORMS (222 of them Annex A.1 documentation rows pinned by `docs/CONFORMANCE.md`, 46 carrying
   a derivation), 45 DOCUMENTED-NON-SUPPORT, 44 PARTIAL, 12 DIVERGES, 1 NOT-IMPLEMENTED. 476 positive and 590
   negative programs are cited by no row. 457 rows are DOCUMENTED-NON-SUPPORT; 84 negative programs witness them,
-  asserting that WiseOwl refuses a standard facility. The `editions` field has one spelling (§13 S0a) and is empty
-  on 148 rows (2026-10-16).
+  asserting that WiseOwl refuses a standard facility. The `editions` field has one spelling (§13 S0a) and is
+  decided on every row (§13 S0b): a run from the rule's introducing edition through 2023.
 - NIST CCVS85 (`tests/nist/`, 364 programs) covers COBOL-85 only.
 - Consumers of the layout: `git grep -l -E 'tests/conformance|CorpusRunnerTests|ConformanceCorpus|CorpusManifest'`,
   excluding the history trees (`kb/`, `DEVLOG/`, `adjudication/`) and the corpus itself, lists 144 files (60 docs, 84
@@ -343,7 +343,16 @@ hold the status, this section the scope. Every slice ships its own tests and dri
 - **S0b — the empty `editions` rows decided (PB3173; 148 on 2026-10-16).** For each, the editions at which the rule exists, derived
   from the standard and the version-change reference (`docs/VERSION_CHANGE_REFERENCE.md`), each with its citation
   checked by `cite.py`; then the validator refuses an empty field. An adjudication slice: an adjudicator decides, a
-  refuter checks each decision.
+  refuter checks each decision. **As landed:** each decision names the facility that bounds the rule and its
+  evidence (an Annex E or F item through `cite.py`; for an edge below 2023, which the 2023 text cannot quote, the
+  compiler's own edition record: a `constructs.json` row, the `IntrinsicCatalog` window, the first edition
+  `reserved-words.json` reserves the word at, or a decided sibling row), and the decision script checks every piece
+  before it writes the batch; the row's `notes` carry the decision. **One design correction:** every row is a rule of
+  the 2023 text, so its band always ends at 2023 and has no gap. The schema's `editions` entry now says so as data
+  (`required`, `run-through-last`), the one validator and its C# twin refuse any other band, and the 20 rows that
+  wrote one (a start edition alone, endpoints, or a band stopping at 2014) were corrected in the same batch, with the
+  wrong FORMAT / SELECT WHEN band (85, a clause whose keyword is first reserved at 2002) and four sibling bands
+  that contradicted the compiler's own edition windows.
 - **S1a — the generator (PB3174).** `conformance-suite/harness/generate.py`: the one header parser (fixed and free
   form), every refusal of §4, the per-edition manifests and the `wiseowl` manifest, the completeness report by witness
   kind (§4), `--check` (the refusals only, writing nothing) as a gate audit (§9), `--self-test` (discovered by
