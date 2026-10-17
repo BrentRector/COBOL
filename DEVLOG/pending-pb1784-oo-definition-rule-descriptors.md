@@ -75,3 +75,19 @@ five of the seven stale headers; the other two named the code in prose. A built-
 The review finisher's gate, run `20261017T113417Z-7025a0` on `f84c138f0`: `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched
 gating, PB2515): GREEN`, with Conformance 6,246/11,953, Unit 33,517/33,927 and Characterization 5/36 run and no
 failure; both new facts, the renamed OoSpineTests fact and the seven re-headed negatives passed in leg 1.
+
+Branch review round 2 found two more residues of the same rename. R2-1: the implementer had also renamed
+`OoSpineTests.GobackRaising_BindViolations_0849` and `RaisingPhraseTupleTests.ExitProgramRaising_FactoryPresenceDiffers_0849`
+to their `_4211` names, but the inventory rows SR-14.9.18.3-4 and SR-14.9.14.3-5 still cited the old names, so
+`SpecTraceabilityInventoryDriftTests.EveryTestRef_ResolvesToARealTest` was RED ("2 unresolved test-ref(s) over 4195
+inventory row(s)", reproduced on the reviewed inventory). Leg 1 never ran that method: it is tier 1 and over the 2 %
+leg-1 budget, so it sat in leg 2 while twelve cheaper methods of the same class ran. Both rows now cite the `_4211`
+names and record the old ones as `retired-witness:`; the witness-loss audit reads 0 unexcused, 6 retired, and the
+drift test passes. A sweep of every test method the branch removed found no third. `kb/Work/PB389.md` named the
+old GOBACK test as the pin and now names the new one. R2-2: the SR-11.6.3-3 note said the cycle DFS reports
+COBOLNET2791 but its probe lines still read 0840. The three probes (self, two-cycle, three-cycle) were rebuilt and
+re-run at 2002, 2014 and 2023; each reports COBOLNET2791 on every interface in the cycle, so the note now says so
+and names the golden as the row's spec-derived test in place of "test-needed". A sweep of every inventory note
+stating a probe result `-> 0820/0821/0822/0838/0839/0840/0849` found the rest current: the 0840 lines of
+SR-11.4.3-1, SR-11.6.3-2 and SR-11.8.3-1 are the not-in-scope funnel (sr2_classname, sr2_norepo and sr2_undefined
+re-run: 0840 citing §11.6.3 SR2), and the 0839 lines are the FINAL-method rule.
