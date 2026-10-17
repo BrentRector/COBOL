@@ -4,7 +4,7 @@ kb/Work PB370's last open row, `GR-14.9.49.4-11` ("the exception condition that 
 statement to select is the first one that occurs in the order of evaluation of the statement"), was held open by a
 defect wave 1091e measured: `MOVE X (1:L) TO T (I)` with L and I both out of range selected EC-BOUND-SUBSCRIPT, the
 RECEIVER's condition. Re-probed on the w1102f build it still did, and the defect was wider than the one leg measured:
-the main build failed six of the seven MOVE legs of the new golden, every one receiver first. Two mechanisms put the
+the main build failed seven of the nine MOVE legs of the new golden, every one receiver first. Two mechanisms put the
 receiver ahead. The store C# renders, `CobolTable.At(T, Occ(I)) = <sender>`, identifies its ref-returning left operand
 before it evaluates its right; and a receiver's function-bearing subscript or user-function activation is a pre-op
 that runs before the statement. The one leg that passed (`MOVE T (I) TO X (1:L)`) passed by accident, because a
@@ -23,8 +23,8 @@ while the compilation group can enable a condition at all (`TurnState.AnyEnabled
 list: the MOVE's freeze lands where the sender finished binding, before the receivers' pre-ops (so N > 1 is ordered
 too), and `ArgumentOrder.StoreAt` uses it instead of its own copy of the relocation.
 
-Goldens: `conformance:2002/pb370_move_first_condition` (seven MOVE legs in both orders over EC-BOUND-REF-MOD,
-EC-BOUND-SUBSCRIPT, EC-BOUND-ODO and EC-ARGUMENT-FUNCTION, a control leg, and the nonfatal-first EVALUATE leg, where
+Goldens: `conformance:2002/pb370_move_first_condition` (nine MOVE legs in both orders over EC-BOUND-REF-MOD,
+EC-BOUND-SUBSCRIPT, EC-BOUND-ODO, EC-ARGUMENT-FUNCTION and a BASED operand's EC-DATA-PTR-NULL, a control leg, and the nonfatal-first EVALUATE leg, where
 §14.7.8 2)'s EC-RANGE-INVALID runs its declarative before the second WHEN's EC-BOUND-SUBSCRIPT), and its reject half
 `negative/pb370-move-first-condition-below-2002` (COBOLNET0900 at 85). Every expected line was derived from the rules
 before the first run. Batch `w1102f-pb370-gr11`: GAP 65 → 64; PB370 is landed with all seven of its rows closed. The

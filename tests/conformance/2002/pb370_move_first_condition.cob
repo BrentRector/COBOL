@@ -28,6 +28,10 @@
       *>      EC-BOUND-REF-MOD is first.
       *>   G  MOVE FUNCTION SQRT (NEG) TO N (I): the mirror - the
       *>      sending function-identifier's EC-ARGUMENT-FUNCTION.
+      *>   I  MOVE X (1:L) TO BX: BX is BASED with its address NULL, so
+      *>      identifying it raises EC-DATA-PTR-NULL (§13.18.5.4 GR3);
+      *>      the sender's EC-BOUND-REF-MOD is first.
+      *>   J  MOVE BX TO X (1:L): the mirror - EC-DATA-PTR-NULL.
       *>   H  EVALUATE V WHEN "Z" THRU "A" ... WHEN T (I): the first
       *>      condition is NONFATAL - §14.7.8 2) sets EC-RANGE-INVALID
       *>      for a range whose start is greater than its end, and
@@ -54,6 +58,7 @@
        01 L  PIC 99 VALUE 50.
        01 NEG PIC S99 VALUE -4.
        01 V  PIC X VALUE "M".
+       01 BX PIC X(4) BASED.
        PROCEDURE DIVISION.
        DECLARATIVES.
        D-SUB SECTION.
@@ -76,6 +81,11 @@
        D-ARG-P.
            DISPLAY "  SELECTED EC-ARGUMENT-FUNCTION"
            RESUME AT NEXT STATEMENT.
+       D-PTR SECTION.
+           USE AFTER EXCEPTION CONDITION EC-DATA-PTR-NULL.
+       D-PTR-P.
+           DISPLAY "  SELECTED EC-DATA-PTR-NULL"
+           RESUME AT NEXT STATEMENT.
        D-RNG SECTION.
            USE AFTER EXCEPTION CONDITION EC-RANGE-INVALID.
        D-RNG-P.
@@ -83,7 +93,7 @@
        END DECLARATIVES.
        MAIN SECTION.
        MAIN-P.
-           >>TURN EC-BOUND EC-ARGUMENT EC-RANGE CHECKING ON
+           >>TURN EC-BOUND EC-ARGUMENT EC-RANGE EC-DATA CHECKING ON
            DISPLAY "A MOVE X (1:L) TO T (I)"
            MOVE X (1:L) TO T (I)
            DISPLAY "B MOVE T (I) TO X (1:L)"
@@ -98,6 +108,10 @@
            MOVE X (1:L) TO T (FUNCTION SQRT (NEG))
            DISPLAY "G MOVE FUNCTION SQRT (NEG) TO N (I)"
            MOVE FUNCTION SQRT (NEG) TO N (I)
+           DISPLAY "I MOVE X (1:L) TO BX"
+           MOVE X (1:L) TO BX
+           DISPLAY "J MOVE BX TO X (1:L)"
+           MOVE BX TO X (1:L)
            DISPLAY "H EVALUATE V WHEN Z THRU A WHEN T (I)"
            EVALUATE V
                WHEN "Z" THRU "A" DISPLAY "  WHEN-1"

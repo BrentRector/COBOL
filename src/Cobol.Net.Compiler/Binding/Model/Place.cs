@@ -123,6 +123,17 @@ public abstract record Place
     /// §14.9.25.4 GR1). ABSTRACT, so a new place kind cannot compile without answering; a decorator forwards to its
     /// inner place unless its own decoration is evaluated. The answer may be a conservative "yes", never a wrong "no".</summary>
     public abstract bool IdentifiesAtRunTime { get; }
+
+    /// <summary>The BASED half every storage leaf shares: a reference to a BASED entry or to any item subordinate to
+    /// it dereferences the entry's data-address pointer, and §13.18.5.4 GR3 — "If the subject of the entry or any item
+    /// subordinate to it is referenced directly or indirectly while its address is NULL, the EC-DATA-PTR-NULL
+    /// exception condition is set to exist" — makes that dereference an evaluation that can raise.</summary>
+    protected static bool UnderBasedEntry(DataItem item)
+    {
+        for (DataItem? at = item; at is not null; at = at.Parent)
+            if (at.IsBased) return true;
+        return false;
+    }
 }
 
 /// <summary>
@@ -173,7 +184,7 @@ public sealed record MemberPlace(AccessPath Path, DataItem MemberItem) : Place
     public override DataItem Item => MemberItem;
 
     /// <inheritdoc/>
-    public override bool IdentifiesAtRunTime => Path.IdentifiesAtRunTime;
+    public override bool IdentifiesAtRunTime => Path.IdentifiesAtRunTime || UnderBasedEntry(MemberItem);
 }
 
 /// <summary>
@@ -372,10 +383,10 @@ public sealed record RedefViewPlace(AccessPath Backing, Position Offset, int Wid
 
     /// <summary>The window's backing path, its byte offset (which carries a subscript term per enclosing table), its
     /// storage cell's path and its dynamic ordinal — every address fragment <c>CodeGen.PlaceIdentification</c>
-    /// freezes.</summary>
+    /// freezes — and a BASED entry's pointer, which the backing dereferences.</summary>
     public override bool IdentifiesAtRunTime =>
         Backing.IdentifiesAtRunTime || !Offset.IsSelfEvaluating
-        || Cell is { IdentifiesAtRunTime: true } || DynOrdinal is { IsSelfEvaluating: false };
+        || Cell is { IdentifiesAtRunTime: true } || DynOrdinal is { IsSelfEvaluating: false } || UnderBasedEntry(ViewItem);
 }
 
 /// <summary>The CODING of a <see cref="RedefViewPlace"/> window over the class's one byte backing — the relation

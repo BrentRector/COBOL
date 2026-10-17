@@ -615,7 +615,8 @@ it registered pre-ops, or it identifies at run time while the compilation group 
 placed on the pending list at the point the sender finished binding (`SendingValueTemp.Positioned`, the one
 placement `ArgumentOrder` uses for a function argument too), so it also precedes a receiver's pre-ops at N > 1.
 `Place.IdentifiesAtRunTime` is ABSTRACT: a new place kind cannot compile without answering whether identifying it
-evaluates anything. A NUMERIC function-identifier's temporary is sized for the MOVE's receivers
+evaluates anything (a subscript, a reference modifier, an occurs-depending length, an omitted-formal guard, or a
+BASED entry's pointer, §13.18.5.4 GR3). A NUMERIC function-identifier's temporary is sized for the MOVE's receivers
 (`SendingValueTemp.ReturnedValuePicFor` over `PicInfo.WidestReceiving`): the fixed 30-digit, scale-9 description
 stored `MOVE FUNCTION PI TO S1 S2` into `PIC 9V9(12)` as 3.141592653000 where the single-receiver MOVE stores
 3.141592653589, so the equivalence was exact only for receivers of scale 9 or less and 21 integer digits or fewer.
