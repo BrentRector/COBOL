@@ -52,4 +52,7 @@ twin does, and the cycle walk no longer mutates while it reads. Performance: one
 chains, linear in the length of each chain. Duplication: the class and interface INHERITS rules now share one
 descriptor instead of two codes.
 
-**Gate.** (verdict line recorded in the report)
+**Gate.** Run `20261017T105616Z-457d02`, on HEAD `7f7ad8651`: `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN`.
+Leg 1 ran Conformance 6,161/11,951, Unit 33,489/33,925 and Characterization 5/36 with no failure. The three new
+negatives, the new OoSpineTests fact, the renamed `_4211` tests and the seven re-pinned negatives all passed in leg 1.
+The Linux gate is run at landing (batched gating).
