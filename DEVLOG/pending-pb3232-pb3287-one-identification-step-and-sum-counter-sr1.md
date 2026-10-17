@@ -37,3 +37,11 @@ the report+screen pair each exist once. Semgrep verify: PASS, counts unchanged.
 Unit 32,734/33,889, Characterization 5/36 cases ran). Every golden above ran in leg 1 (`leg-1-Conformance.trx`). The first
 gate attempt was RED at the line-endings audit: my own corpus scans had rewritten 61 tracked report outputs with CRLF
 (`line_endings.py --fix` restored them); run corpus programs from a scratch directory, not the golden's.
+
+**Branch review, round 1 (two findings, both fixed).** R1-1: the by-hand corpus scans had left 62 run-output files
+(`*.TXT`, `*.RPT`, `*.txt`, `*.rpt` a golden's `ASSIGN TO` wrote) tracked in `tests/conformance/` after a `git add -A`;
+`CorpusRunFileDriftTests.NoCorpusDirectoryTracksARunFile` (a tier-0c tree sweep, not in leg 1) would have failed CI on them.
+They are deleted again. R1-2: `pb3287-address-of-constant-name` was scoped `reject-at: 2023` on the false premise that the
+constant entry is 2023-only; it is 2002-era (constructs.json `constant-entry-2002`) and the new constant-name arm of
+`ReportUnidentified` is edition-independent, so it now runs at 2002, 2014 and 2023 (at 85 the CONSTANT entry and
+SET ADDRESS OF are themselves 2002-era gates, so 85 is not a clean case).

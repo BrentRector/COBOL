@@ -1,14 +1,0 @@
-PG
-H=A
-D 1
-D 2
-D 3
-D 4
-D 5
-D 6PG
-H=A
-D 7
-F=A
-H=B
-D 8
-F=B
