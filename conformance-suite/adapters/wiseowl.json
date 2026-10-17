@@ -4,7 +4,9 @@
     "dotnet tool); point it at a build with `run.py --compiler wiseowl --set cobol=<path>`. A compiled program is a",
     ".NET assembly run with `dotnet`. The warning mechanism ISO 4.2.2 requires is the ordinary compile: WiseOwl",
     "reports every syntax-rule and general-format violation it detects, and --flag-extensions adds the 4.2.10",
-    "warning for a nonstandard extension. A diagnostic reads `<file>(<line>,<column>): <severity> COBOLNET<n>: ...`.",
+    "warning for a nonstandard extension. A diagnostic reads `<file>(<line>,<column>): <severity> <code>: ...`, its",
+    "code any of the compiler's (COBOL<n> from the parser, CBL<n> from COPY, COBOLNET<n> from the rest; a drift test,",
+    "ConformanceSuiteAdapterDriftTests, holds this pattern to every code the compiler can report).",
     "An ASSIGN name is a file of the working directory. Crash codes: 0xE0434352 (an unhandled .NET exception on",
     "Windows), 0xC0000005 (access violation) and 0xC00000FD (stack overflow); on Linux a crash is a signal.",
     "A program's default USER and SYSTEM locales are its environment's (docs/CONFORMANCE.md DOC-A.1-118), so the",
@@ -21,7 +23,7 @@
   "run": ["dotnet", "{program}.dll"],
   "flag": ["{cobol}", "{source}", "--std", "{std}", "--source-format", "{source-format}", "--flag-extensions",
            "-o", "{program}.dll"],
-  "diagnostic": "^\\s*(?P<file>[^\\s(][^(]*)\\((?P<line>[0-9]+),[0-9]+\\): [a-z]+ COBOLNET[0-9]+:",
+  "diagnostic": "^\\s*(?P<file>[^\\s(][^(]*)\\((?P<line>[0-9]+),[0-9]+\\): [a-z]+ [A-Z]+[0-9]+:",
   "crash-exit-codes": [3762504530, 3221225477, 3221225725],
   "environment": {"COBOL_USER_LOCALE": "INVARIANT", "COBOL_SYSTEM_LOCALE": "INVARIANT"}
 }

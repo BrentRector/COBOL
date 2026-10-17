@@ -74,7 +74,8 @@ compiler reserves beyond the standard; or a flagged test's control did not compi
 crashed, a process exceeded the hang guard, or the harness could not run the test). Results go to
 `results/<compiler>/` as JSON and JUnit XML, with totals per edition and per clause and the changes against
 `baselines/<compiler>.json`: a run is RED only when a verdict became worse than the recorded one (or, with no
-baseline, on any FAIL or NO VERDICT).
+baseline, on any FAIL or NO VERDICT). `--record-baseline` with `--editions` re-records only those editions and keeps
+the others' verdicts; it cannot be combined with `--test`.
 
 ### In WiseOwl COBOL's own gate
 

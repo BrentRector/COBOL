@@ -278,8 +278,9 @@ conformance-suite/
   recorded baseline (`baselines/`), so a second compiler's run is a regression net rather than a permanently red leg:
   a regression (a recorded PASS lost), a new FAIL or NO VERDICT, any other change, an improvement, and a recorded test
   that did not run. A run is RED when a verdict differs from its recorded one (or has none) and is FAIL or NO VERDICT,
-  or was a recorded PASS; with no baseline, any FAIL or NO VERDICT is RED. `--record-baseline` writes a whole run's
-  verdicts (never a `--test`-narrowed one). `run.py` executes the per-edition suites; the `wiseowl` manifest and its
+  or was a recorded PASS; with no baseline, any FAIL or NO VERDICT is RED. `--record-baseline` writes a run's verdicts:
+  a whole run replaces the baseline, an `--editions` run replaces the record of each edition it ran and keeps the
+  others' (each edition's record is a whole run of its suite), and `--test` is refused with it. `run.py` executes the per-edition suites; the `wiseowl` manifest and its
   refusals are the in-process xUnit runner's (S1c).
 - **In WiseOwl's own pipeline**: the xUnit runner in `Cobol.Net.Tests.Conformance` executes the same manifests
   in-process (fast) and also checks `wiseowl/diagnostics.json`; the drift test that requires the two runners'
@@ -455,7 +456,7 @@ hold the status, this section the scope. Every slice ships its own tests and dri
   of §5, the WiseOwl and GnuCOBOL adapters and profiles, a fresh working directory per test, stdin closed, the
   verdicts and their JUnit XML and JSON, `--record-baseline` and the CHANGES report; `--self-test` drives a stub
   compiler (a Python script) through every verdict, so the logic is tested without `cobc`. Runs on Windows and
-  Linux. **As landed:** `harness/run.py` (the runner, its results and CHANGES, a 58-arm `--self-test` passing on
+  Linux. **As landed:** `harness/run.py` (the runner, its results and CHANGES, a 59-arm `--self-test` passing on
   Windows and under WSL) and `harness/config.py` (the formats); `adapters/` and `profiles/` for `wiseowl` and
   `gnucobol`; `baselines/gnucobol.json` recorded on the S1a seed under WSL (14 PASS, 6 NOT APPLICABLE at 2023, and 2
   FAIL: READ PREVIOUS after OPEN is at end at -std=cobol2002 and -std=cobol2014, the 2023 rule, where E.2 item 22
