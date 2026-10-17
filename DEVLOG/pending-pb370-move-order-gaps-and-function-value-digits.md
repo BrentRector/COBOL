@@ -56,3 +56,12 @@ SendingValueTemp's private copy of 38 is gone.
 `COMPUTE N (FUNCTION SQRT (NEG)) = N (I)` selects EC-ARGUMENT-FUNCTION, where §14.7.7 4) b) identifies the receivers
 after the initial evaluation. STRING also identifies a BASED identifier-3 at its statement-head freeze:
 `STRING T (I) DELIMITED BY SIZE INTO BX`, with BX's address NULL, selects EC-DATA-PTR-NULL.
+
+**Self-review.** One mechanism per job holds: the store order stays `PlaceIdentification.SenderFirst`'s, the pre-op
+order is the binder's one freeze, and the run-time question has one answer, which the binder asks as well (the binder
+already calls the code generator's `FigurativeConstants` the same way). Every leg is compared against its un-frozen
+single-receiver twin. The build has 0 warnings and 0 errors, and `semgrep/verify.py` PASS shows no rule's count rose.
+
+**Gate.** Run `20261017T124929Z-c76990`: `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN — leg 2
+left to CI's whole-population run: Conformance 5,088 · Unit 377 · Characterization 31 … ===`. All three PB370 corpus
+cases and `pb3261_sender_first_order` passed in leg 1, and the leg-1 trx files hold 0 failed results.
